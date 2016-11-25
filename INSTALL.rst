@@ -36,7 +36,7 @@ OSX:
 2) Execute the script "lipsia-setup.sh" (in a shell)
 ``````````````````````````````````````````````````````
  ::
-
+   cd <lipsa_dir>
    source ./lipsia-setup.sh
 
 3) Compile lipsia
@@ -47,7 +47,7 @@ OSX:
    make
 where <lipsa_dir> is the directory of the lipsia repository.
 All executables can be found in <lipsa_dir>/bin.
-We recommend adding them to the .bashrc, so that you can start lipsia from anywhere in the terminal. Add this line to ~/.bashrc (for ubuntu, for OSX ~/.bash_profile)
+We recommend adding them to the .bashrc, so that you can start lipsia from anywhere within the terminal. Add this line to ~/.bashrc (for ubuntu, for OSX ~/.bash_profile)
 
  ::
 
