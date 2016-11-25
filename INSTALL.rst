@@ -53,7 +53,7 @@ All executables can be found in <lipsa_dir>/bin.
 `````````````````````````
  ::
 
-We recommend adding them to the .bashrc, so that you can start lipsia from anywhere within the terminal. Furthermore, the library path needs to be set. Add the following two lines to ~/.bashrc (for ubuntu, for OSX ~/.bash_profile)
+The following changes need to be performed to your local bash profile (for ubuntu ~/.bashrc, for OSX ~/.bash_profile) Furthermore, the library path needs to be set. Add the following two lines to 
 
  ::
 
