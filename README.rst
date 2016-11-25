@@ -7,7 +7,6 @@ description of lipsia
 
 Installation
 ````````````````````````
-Follow the `instructions <install_>` here.
+Follow the `instructions here <install>`.
 
 .. _install: INSTALL.rst
-`vgendesign <vgendesign>`
