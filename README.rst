@@ -7,6 +7,6 @@ description of lipsia
 
 Installation
 ````````````````````````
-Follow the `instructions here <install>`.
+Follow the `instructions here <install_>`.
 
 .. _install: INSTALL.rst
