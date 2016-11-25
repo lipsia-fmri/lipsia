@@ -2,7 +2,9 @@
 LIPSIA 3.0: fMRI analysis tools
 ======================================
 
-description of lipsia
+* one minute example (should have been detrended)
+* vista file format
+
 
 
 Installation
