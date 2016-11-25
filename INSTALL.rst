@@ -1,21 +1,19 @@
 How to install LIPSIA
 ===========================
 1) Install the necessary compilers and libraries
+`````````````````````````````````````````````````````
 * gcc, g++
 * fftw3 dev
 * gsl dev
 * boost dev
 
 Ubuntu:
-``````````
  ::
 
     sudo apt-get install build-essential libfftw3-dev libgsl0-dev libboost-dev
 
 
 OSX:
-`````````
-
  ::
 
      #install homebrew package manager
@@ -31,18 +29,18 @@ OSX:
      #install fftw
      brew install fftw
 
-     Furtermore, make sure the last line in the file "lipsia-setup.sh" should be:
+     Furthermore, make sure the last line in the file "lipsia-setup.sh" should be:
      export CC="/usr/local/bin/gcc-4.8"
 
 
-2) Then execute the script "lipsia-setup.sh" using the command line
-
+2) Execute the script "lipsia-setup.sh" (in a shell)
+``````````````````````````````````````````````````````
  ::
 
    source ./lipsia-setup.sh
 
 3) Compile lipsia
-
+`````````````````````````
  ::
 
    cd <lipsa_dir>/src
