@@ -5,6 +5,8 @@ LIPSIA 3.0: fMRI analysis tools
 description of lipsia
 
 
-.. _INSTALL: INSTALL.rst
+Installation
+````````````````````````
+Follow the instructions here: `install`_.
 
-.. _Python: http://www.python.org/
+.. _install: INSTALL.rst
