@@ -9,8 +9,12 @@
 !*.cpp
 !*.h
 
+
+!publish_selection.sh
+!publish_config.txt
+!INSTALL.rst
 !Makefile
-!README
+!README.rst
 !COPYRIGHT
 !lipsia-setup.sh
 !tar_lipsia.sh
@@ -27,3 +31,5 @@
 /docs/_build/*
 /docs/_build/.*
 /docs/_build/*/
+
+/ext*

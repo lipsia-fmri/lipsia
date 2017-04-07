@@ -58,4 +58,4 @@ The following changes need to be performed to your local bash profile (for ubunt
  ::
 
     PATH=<lipsia_dir>/bin:$PATH
-    export LD_LIBRARY_PATH=<lipsa_dir>:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=<lipsa_dir>/lib:$LD_LIBRARY_PATH
