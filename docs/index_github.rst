@@ -2,9 +2,32 @@
 Converter
 ```````````````````````
 `vnifti`_: convert nifti to to vista (lipsia file format) and vice versa
+
 `vdicom`_: convert dicom to vista
 
 
+LISA statistical inference
+``````````````````````````````````
 
-.. _vnifti: docs/conv/vnifti.rst
-.. _vdicom: docs/conv/vdicom.rst
+`vlisa1`_: onesample LISA statistical inference
+
+
+Network tools
+`````````````````````````````
+`vted`_: Task-based edge density algorithm TED
+
+`vecm`_: Eigenvector centrality mapping (ECM)
+
+
+
+.. _vnifti: conv/vnifti.rst
+.. _vdicom: conv/vdicom.rst
+
+.. _vlisa1: stats/vlisa1.rst
+
+.. _vted: ted/vted.rst
+.. _vtedfdr: ted/vtedfdr.rst
+.. _vcuttrials: ted/vcuttrials.rst
+.. _vhubness: ted/vhubness.rst
+
+.. _vecm: nets/vecm.rst

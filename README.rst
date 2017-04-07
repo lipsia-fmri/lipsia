@@ -55,4 +55,5 @@ Compute Eigenvector Centrality Map (ECM)::
 	
  
 .. _install: INSTALL.rst
-.. _documentation: docs/index.rst
+.. _documentation: docs/index_github.rst
+
