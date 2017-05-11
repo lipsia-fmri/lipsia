@@ -30,17 +30,21 @@
 #include <omp.h>
 #endif /*_OPENMP*/
 
+extern float kth_smallest(float *a, size_t n, size_t k);
 #define Median(a,n) kth_smallest(a,n,(((n)&1)?((n)/2):(((n)/2)-1)))
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
-extern double t2z(double,double);
-extern void VIsolatedVoxels(VImage src,VImage,float threshold);
-extern void VHistogram(gsl_histogram *histogram,VString filename);
-extern void VCheckImage(VImage src);
-extern void FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_histogram *realhist,VString filename);
+extern void   VIsolatedVoxels(VImage src,float threshold);
+extern void   VHistogram(gsl_histogram *histogram,VString filename);
+extern void   VCheckImage(VImage src);
+extern void   FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_histogram *realhist,VString filename);
 extern double ttest1(double *data1,int n);
-extern void ImageStats(VImage src,double *,double *,double *hmin,double *hmax);
-extern void Hotspot(VImage src,VImage dst,VImage tmp,int type,int radius,double var1,double var2,int numiter);
+extern void   ImageStats(VImage src,double *,double *,double *hmin,double *hmax);
+extern void   VBilateralFilter(VImage src,VImage dest,int radius,double var1,double var2,int);
+extern double VImageVar(VImage src);
+extern void   VImageCount(VImage src);
+extern void   VMedian6(VImage src);
+extern void   VLocalVariance(VImage src,int radius,double *,double *);
 
 
 /* generate permutation table */
@@ -78,6 +82,7 @@ void HistoUpdate(VImage src1,gsl_histogram *hist)
   }
 }
 
+/* onesample t-test */
 void OnesampleTest(VImage *src1,VImage dest,int *permtable,int n)
 {
   int i,k,b,r,c,nslices,nrows,ncols;
@@ -104,10 +109,10 @@ void OnesampleTest(VImage *src1,VImage dest,int *permtable,int n)
 	  }
 	}
 	if (k < n-2) continue;
-	nx = (double)k;
+	nx   = (double)k;
 	mean = s1/nx;
-	var = (s2 - nx * mean * mean) / (nx - 1.0);
-	t  = sqrt(nx) * mean/sqrt(var);
+	var  = (s2 - nx * mean * mean) / (nx - 1.0);
+	t    = sqrt(nx) * mean/sqrt(var);
 	VPixel(dest,b,r,c,VFloat) = t;
       }
     }
@@ -122,13 +127,13 @@ int main (int argc, char *argv[])
   static VFloat   alpha = 0.05; 
   static VShort   radius = 2;
   static VString  fdrfilename= "";
-  static VFloat   rvar = 1.9;
+  static VFloat   rvar = 2.0;
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
   static VShort   numperm = 2000;
   static VLong    seed = 99402622;
   static VBoolean cleanup = TRUE;
-  static VShort   nproc = 10;
+  static VShort   nproc = 0;
   static VOptionDescRec options[] = {
     {"in", VStringRepn, 0, & in_files1, VRequiredOpt, NULL,"Input files" },
     {"out", VStringRepn, 1, & out_filename, VOptionalOpt, NULL,"Output file" },
@@ -204,7 +209,8 @@ int main (int argc, char *argv[])
   }
 
 
-  /* random permutations */
+
+  /* ini random permutations */
   size_t n = nimages;
   gsl_rng_env_setup();
   const gsl_rng_type *T = gsl_rng_default;
@@ -214,28 +220,35 @@ int main (int argc, char *argv[])
   int **permtable = genperm(rx,(int)n,(int)numperm);
 
 
+
+  /* estimate null variance to adjust radiometric parameter, use first 30 permutations */
+  double vmin=0,vmax=0,hmin=0,hmax=0,gave=0,gvar=0;
+  double xrvar = rvar;
+  if (numperm > 0) {
+    int tstperm = 30;
+    if (tstperm > numperm) tstperm = numperm;
+    VImage zmap = VCreateImageLike(src1[0]);
+    double vsum=0,nx=0;
+    for (nperm = 0; nperm < tstperm; nperm++) {
+      OnesampleTest(src1,zmap,permtable[nperm],nimages);
+      vsum += VImageVar(zmap);
+      nx++;
+    }    
+    double meanvar = vsum/nx;
+    xrvar = (rvar * meanvar);
+    fprintf(stderr," null variance: %f,  adjusted: %f  %f\n",meanvar,xrvar,svar);
+    VDestroyImage(zmap);
+  }
+
+  
+
   /* no permutation */
   int *nopermtable = (int *) VCalloc(n,sizeof(int));
-  VImage tmpimage = VCreateImageLike(src1[0]);
-  VImage dst1 = VCreateImageLike (src1[0]);
+  VImage dst1  = VCreateImageLike (src1[0]);
   VImage zmap1 = VCreateImageLike(src1[0]);
-  VFillImage(dst1,VAllBands,0);
-  VFillImage(zmap1,VAllBands,0);
   OnesampleTest(src1,zmap1,nopermtable,nimages);
-
-
-  /* adjust radiometric parameter for bilateral filter if needed */
-  double vmin=0,vmax=0,hmin=0,hmax=0,gave=0,gvar=0,globalvar=0;
-  double xrvar = rvar;
-  ImageStats(zmap1,&gave,&globalvar,&vmin,&vmax); 
-  xrvar *= globalvar;
-
-
-  /* get non-permuted hotspot map */
-  int type = 0;
-  if (cleanup) type = 1;
-  Hotspot(zmap1,dst1,tmpimage,(int)type,(int)radius,(double)xrvar,(double)svar,(int)numiter);
-  VDestroyImage(tmpimage);
+  VBilateralFilter(zmap1,dst1,(int)radius,(double)(xrvar),(double)svar,(int)numiter);
+  /* if (cleanup) VMedian6(dst1); */
 
 
   /* ini histograms */
@@ -245,13 +258,11 @@ int main (int argc, char *argv[])
   hmax = vmax + 4.0;
   if (hmin < -12.0) hmin = -12.0;
   if (hmax > 12.0) hmax = 12.0;
-
   gsl_histogram *hist0 = gsl_histogram_alloc (nbins);
   gsl_histogram_set_ranges_uniform (hist0,hmin,hmax);
   gsl_histogram *histz = gsl_histogram_alloc (nbins);
   gsl_histogram_set_ranges_uniform (histz,hmin,hmax);
   HistoUpdate(dst1,histz);
-  type = 0;  /* no cleanup for permutations */
 
 
   /* random permutations */
@@ -259,43 +270,38 @@ int main (int argc, char *argv[])
   for (nperm = 0; nperm < numperm; nperm++) {
     if (nperm%20 == 0) fprintf(stderr," perm  %4d  of  %d\r",nperm,(int)numperm);
 
-    VImage tmpimage = NULL;
-    VImage zmap = VCopyImage(src1[0],NULL,VAllBands);
-    VFillImage(zmap,VAllBands,0);
-    OnesampleTest(src1,zmap,permtable[nperm],nimages);
-    VImage dst = VCreateImageLike (zmap);
-    tmpimage = VCreateImageLike (zmap);
-    Hotspot(zmap,dst,tmpimage,(int)type,(int)radius,(double)rvar,(double)svar,(int)numiter);
+    VImage zmap = VCreateImageLike(src1[0]);
+    VImage dst  = VCreateImageLike (zmap);
+    OnesampleTest(src1,zmap,permtable[nperm],nimages);  
+    VBilateralFilter(zmap,dst,(int)radius,(double)(xrvar),(double)svar,(int)numiter);
 
 #pragma omp critical 
     {
       HistoUpdate(dst,hist0);
     }
-
     VDestroyImage(dst);
-    VDestroyImage(tmpimage);
     VDestroyImage(zmap);
   }
   
 
   /* apply fdr */
   VImage fdrimage = VCopyImage (dst1,NULL,VAllBands);
-  if (numperm > 0) FDR(dst1,fdrimage,(double)alpha,hist0,histz,fdrfilename);
+  if (numperm > 0) {
+    FDR(dst1,fdrimage,(double)alpha,hist0,histz,fdrfilename);
+
+    if (cleanup && alpha < 1.0) {
+      VIsolatedVoxels(fdrimage,(float)(1.0-alpha));
+    }
+  }
+  VImageCount(fdrimage);
 
 
-  /* remove isolated voxels */
-  VImage fdrimage_clean = VCopyImage(fdrimage,NULL,VAllBands);
-  if (cleanup && alpha < 1.0)
-    VIsolatedVoxels(fdrimage,fdrimage_clean,(float)(1.0-alpha));
 
-
-  /*
-  ** output
-  */
+  /* write output to disk */
   out_list = VCreateAttrList ();
   VHistory(VNumber(options),options,prg_name,&list1,&out_list);
   VSetGeoInfo(geolist,out_list);
-  VAppendAttr (out_list,"image",NULL,VImageRepn,fdrimage_clean);
+  VAppendAttr (out_list,"image",NULL,VImageRepn,fdrimage);
   fp = VOpenOutputFile (out_filename, TRUE);
   if (! VWriteFile (fp, out_list)) exit (1);
   fclose(fp);

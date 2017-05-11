@@ -236,17 +236,8 @@ int main (int argc,char *argv[])
 
   /* ini output data structs  */
   VImage *dest = (VImage *) VCalloc(nslices, sizeof(VImage));
-  VAttrList out_list = VCreateAttrList();
-  double *D=NULL;
-  if (geoinfo != NULL) {   
-    D = VGetGeoDim(geoinfo,NULL);
-    D[0] = (double)4.0;
-    D[1] = (double)ncols;
-    D[2] = (double)nrows;
-    D[3] = (double)nslices;
-    D[4] = (double)(nt);
-    VSetGeoInfo(geoinfo,out_list);
-  }
+  VAttrList out_list = VCreateAttrList();  
+  if (geoinfo != NULL) VSetGeoInfo(geoinfo,out_list);
   for (slice=0; slice<nslices; slice++) {
     dest[slice] = VCreateImage(nt,nrows,ncols,VShortRepn);
     VFillImage(dest[slice],VAllBands,0);

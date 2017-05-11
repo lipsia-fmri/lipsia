@@ -26,8 +26,10 @@ rescale these values. There are three possible ways to do this:
 1. set all negative correlations to zero.
 2. add +1 to all  correlations.
 3. take absolute values.
+4. evaluate negative correlations only, i.e. ignore all positive correlations, and invert all negative correlations to make them positive.
 
-ECM uses the second option (add +1) as the default. But the other two options
+
+ECM uses the second option (add +1) as the default. But the other three options
 are just as valid.
 
 Note that the number of voxels in the mask determines the computational burden.
@@ -71,7 +73,7 @@ Parameters of 'vecm'
  -minval  Signal threshold. Default: 0
  -first   First timestep to use. Default: 0
  -length  Length of time series to use, '0' to use full length. Default: 0
- -type    Type of scaling [ pos | add | abs ]. Default: add
+ -type    Type of scaling [ pos | add | abs | neg ]. Default: add
  -j       Number of processors to use, '0' to use all. Default: 10
 
 

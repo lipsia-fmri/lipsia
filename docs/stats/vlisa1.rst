@@ -15,6 +15,12 @@ an effect (FDR corrected).
 
 
 
+**Reference:**
+*Lohmann et al (2017),
+"Inflated False Negative Rates Undermine Reproducibility In Task-Based fMRI",
+bioRxiv, https://doi.org/10.1101/122788*
+
+
 Parameters of 'vlisa1':
 ```````````````````````````````````
 

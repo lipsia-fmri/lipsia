@@ -85,29 +85,22 @@ double VGetValue(char *data,size_t index,int datatype)
 /* get image statistics for re-scaling parameters */
 void VDataStats(char *data,size_t ndata,size_t nsize,int datatype,double *xmin,double *xmax)
 {
-  size_t i;
-  double s1=0,s2=0,nx=0;
+  size_t i,n;
   double zmin = VRepnMaxValue(VDoubleRepn);
   double zmax = VRepnMinValue(VDoubleRepn);
 
+  n=0;
   for (i=0; i<ndata; i+= nsize) {
     double u = VGetValue(data,i,datatype);
-    if (ABS(u) < TINY) continue;
+    if (fabs(u) < TINY) continue;
     if (u < zmin) zmin = u;
     if (u > zmax) zmax = u;
-    s1 += u;
-    s2 += u*u;
-    nx++;
+    n++;
   }
-  if (nx < 1.0) VError(" no non-zero data points found");
-  double mean = s1/nx;
-  double var = (s2 - nx * mean * mean) / (nx - 1.0);
-  if (var < 1.0e-6) VWarning(" zero variance");
-  double sigma = sqrt(var);
-  /* fprintf(stderr," mean,std= %.3f %.3f,   min,max= %.3f %.3f\n",mean,sigma,zmin,zmax); */
+  if (n < 1) VError(" no non-zero data points found");
 
-  *xmin = zmin;
-  *xmax = zmax;
+  *xmin = (zmin+TINY);
+  *xmax = (zmax-TINY);
 }
 
 
@@ -169,7 +162,7 @@ void Nii2Vista3D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 	  double u = VGetValue(data,index,datatype);
 	  if (gsl_isnan(u) || gsl_isinf(u)) u = 0;
 	  if (do_scaling) {
-	    if (ABS(u) >= TINY) u = scalefactor * (u-xmin)/(xmax-xmin);
+	    if (ABS(u) > TINY) u = scalefactor * (u-xmin)/(xmax-xmin);
 	  }
 	  if (u < umin) u = umin;
 	  if (u > umax) u = umax;
@@ -193,9 +186,8 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
   size_t nrnc = nrows*ncols;
   size_t npix = nrnc*nslices;
 
-  double umin = VRepnMinValue(VShortRepn);
+  double umin = 0;
   double umax = VRepnMaxValue(VShortRepn);
-  double scalefactor = umax;
 
   VImage *dst = (VImage *) VCalloc(nslices,sizeof(VImage));
 
@@ -215,7 +207,9 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 	  const size_t index = (col + row*ncols + slice*nrnc + ti*npix)*nsize;
 	  double u = VGetValue(data,index,datatype);
 	  if (do_scaling) {
-	    if (ABS(u) >= TINY) u = scalefactor * (u-xmin)/(xmax-xmin);
+	    if (ABS(u) > TINY) {
+	      u = umax * (u-xmin)/(xmax-xmin);
+	    }
 	  }
 	  if (u < umin) u = umin;
 	  if (u > umax) u = umax;
@@ -470,6 +464,7 @@ VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_s
     size_t npixels = nslices * nrows * ncols;
     size_t ndata   = nt * npixels * nsize;
     VDataStats(data,ndata,nsize,datatype,&xmin,&xmax);
+    fprintf(stderr," data range: [%f, %f]\n",xmin,xmax);
   }
 
 

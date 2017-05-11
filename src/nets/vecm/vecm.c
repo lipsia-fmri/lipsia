@@ -25,7 +25,7 @@
 
 #define SQR(x) ((x) * (x))
 #define ABS(x) ((x) > 0 ? (x) : -(x))
-
+#define NEG(x) ((x) < 0 ? (-x) : 0)
 
 
 #ifdef _OPENMP
@@ -56,8 +56,7 @@ void my_sspmv(float *A,float *x,float *y,int n)
 }
 
 
-double
-Correlation(const float * arr1,const float * arr2,int n)
+double Correlation(const float * arr1,const float * arr2,int n)
 {
   int i;
   double sx,sy,sxx,syy,sxy,rx;
@@ -83,8 +82,7 @@ Correlation(const float * arr1,const float * arr2,int n)
   return rx;
 }
 
-void
-EigenvectorCentrality(float *A,float *ev,int n)
+void EigenvectorCentrality(float *A,float *ev,int n)
 {
   int i,iter,maxiter;
   float sum,d,nx;
@@ -119,8 +117,7 @@ EigenvectorCentrality(float *A,float *ev,int n)
 }
 
 
-VImage
-WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float *ev, int n)
+VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float *ev, int n)
 {
   VImage dest=NULL;
   int i,b,r,c;
@@ -273,19 +270,18 @@ VAttrList VECM(VAttrList list,VImage mask,VShort minval,VShort first,VShort leng
 
     const float *arr1 = gsl_matrix_float_const_ptr(mat,i,0);
     for (j=0; j<=i; j++) {
-
-      if (i == j)
-	continue;
-
+      if (i == j) continue;
       const float *arr2 = gsl_matrix_float_const_ptr(mat,j,0);
       const double v = Correlation(arr1,arr2,nt);
       double u = 0;
 
       /* make positive */
       switch (type) {
+
       case 0:
 	if (v > tiny) u = v;
 	break;
+
       case 1:
 	u = v + 1.0f;
 	break;
@@ -294,16 +290,15 @@ VAttrList VECM(VAttrList list,VImage mask,VShort minval,VShort first,VShort leng
 	u = ABS(v);
 	break;
 
+      case 3:
+	if (v < -tiny) u = -v;
+	break;
+
       default:
 	VError(" illegal type");
       }
       if (u < tiny) u = tiny;
-      /*
-	Calculate index in an half matrix.
-	Normaly its column+row*columns, but as columns depends on the row (columns of the row before equals its row number)
-	we have column(j) + row(i) * ( row_before(i-1) +1 )
-	eg: index(3,2) = 2+(3+2+1) (little gauss solved this problem for us - so we can use 2+(3*4)/2 == 2*6)
-      */
+
       const size_t k=j+i*(i+1)/2;
       if (k >= m) VError(" illegal addr k= %d, m= %d",k,m);
       A[k] = u;
@@ -329,6 +324,7 @@ VDictEntry TYPDict[] = {
   { "pos", 0, 0,0,0,0 },
   { "add", 1, 0,0,0,0 },
   { "abs", 2, 0,0,0,0 },
+  { "neg", 3, 0,0,0,0 },
   { NULL, 0,0,0,0,0 }
 };
 
@@ -357,6 +353,7 @@ int main (int argc,char *argv[])
   fprintf(stderr, "%s\n", prg_name);
 
   VParseFilterCmd (VNumber (options),options,argc,argv,&in_file,&out_file);
+  if (type > 3) VError(" illegal type");
 
 
   /* read mask */
