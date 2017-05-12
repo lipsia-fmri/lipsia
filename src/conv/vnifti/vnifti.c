@@ -36,41 +36,61 @@
 
 #include <nifti/nifti1.h>
 #include <nifti/nifti1_io.h>
+#include <zlib.h>
 
 #define MIN_HEADER_SIZE 348
 #define NII_HEADER_SIZE 352
 
-extern VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_scaling);
+extern VAttrList Nifti1_to_Vista(char *data_file,VLong tr);
 extern void Vista_to_Nifti1(VAttrList list,VString filename);
+
+/* check if gzipped */
+int CheckGzip(char *filename)
+{
+  int n = strlen(filename);
+  if (n < 3) return 0;
+  if (filename[n-1] == 'z' && filename[n-2] == 'g' && filename[n-3] == '.') return 1;
+  else return 0;
+}
+
 
 /* get type of format (.nii or .v) */
 int getformat(char *filename)
 {
   int n = strlen(filename);
   int type = -1;
-  if (filename[n-1] == 'i' && filename[n-2] == 'i' && filename[n-3] == 'n' && filename[n-4] == '.')
+  if (filename[n-1] == 'i' && filename[n-2] == 'i' && filename[n-3] == 'n' && filename[n-4] == '.') {
     type = 1;
-  if (filename[n-1] == 'v' && filename[n-2] == '.') type = 0;
+  }
+  if (filename[n-1] == 'z' && filename[n-2] == 'g' && filename[n-3] == '.' &&
+      filename[n-4] == 'i' && filename[n-5] == 'i' && filename[n-6] == 'n' && filename[n-7] == '.') {
+    type = 1;
+  }
+  if (filename[n-1] == 'v' && filename[n-2] == '.') {
+    type = 0;
+  }
   return type;
 }
+
 
 int main(int argc,char *argv[])
 {
   static VString in_filename = "";
   static VString out_filename = "";
   static VLong tr=0;
-  static VBoolean scale = FALSE;
+  static VBoolean list3d = FALSE;
   static VOptionDescRec  options[] = {
     {"in",VStringRepn,1,(VPointer) &in_filename,VRequiredOpt,NULL,"input file"},
     {"out",VStringRepn,1,(VPointer) &out_filename,VRequiredOpt,NULL,"output file"},
     {"tr",VLongRepn,1,(VPointer) &tr,VOptionalOpt,NULL,"repetition time in milliseconds"},
-    {"scale",VBooleanRepn,1,(VPointer) &scale,VOptionalOpt,NULL,"Whether to allow scaling"}
+    {"3dlist",VBooleanRepn,1,(VPointer) &list3d,VOptionalOpt,NULL,"Output list of 3D images"},
   };
   char *prg_name=GetLipsiaName("vnifti");
   fprintf(stderr, "%s\n", prg_name);
 
   /* parse command line */
   VParseFilterCmd (VNumber (options),options,argc,argv,NULL,NULL);
+
 
 
   /* get format types */
@@ -80,7 +100,7 @@ int main(int argc,char *argv[])
 
   /* nifti-1 to vista */
   if (itype == 1 && otype == 0) {
-    VAttrList out_list = Nifti1_to_Vista(in_filename,in_filename,tr,scale);
+    VAttrList out_list = Nifti1_to_Vista(in_filename,tr);
     FILE *fp_out = VOpenOutputFile (out_filename, TRUE);
     if (! VWriteFile (fp_out, out_list)) exit (1);
     fclose(fp_out);

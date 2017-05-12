@@ -105,22 +105,6 @@ void Vista2Nii3D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
   hdr->bitpix    = VPixelPrecision(src);
 
 
-  /* fill data buffer, flip rows if neded */
-  double *data = (double *) VCalloc(nrows,sizeof(double));
-  size_t slice,row,col;
-  for (slice=0; slice<nslices; slice++) {
-    for (col=0; col<ncols; col++) {
-      for (row=0; row<nrows; row++) {
-	double val = VGetPixel(src,slice,row,col);
-	data[row] = val;
-      }
-      for (row=0; row<nrows; row++) {
-	VSetPixel(src,slice,row,col,data[row]);
-      }
-    }
-  }
-  VFree(data);
-
   /* write header */
   VWriteNiftiHeader(fp,hdr);
 

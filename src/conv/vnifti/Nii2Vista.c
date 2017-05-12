@@ -23,12 +23,66 @@
 #define TINY 1.0e-10
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
+extern int   CheckGzip(char *filename);
+extern char *ReadGzippedData(char *filename,size_t *len);
+extern char *ReadUnzippedData(char *filename,size_t *len);
 
-extern int isnan(double);
-extern int isinf(double);
 extern void VByteSwapNiftiHeader(nifti_1_header *hdr);
 extern void VByteSwapData(char *data,size_t ndata,size_t nsize);
 
+
+
+/*
+ *  VIniImage
+ *
+ *  Allocate Image structure and fill voxel values with databuffer.
+ *  Returns a pointer to the image if successful, zero otherwise.
+ *  Useful for converting from 4D nifti to list of 3D vista images
+ */
+VImage VIniImage (int nbands, int nrows, int ncolumns, VRepnKind pixel_repn, char *databuffer)
+{
+  size_t row_size = ncolumns * VRepnSize (pixel_repn);
+  size_t row_index_size = nbands * nrows * sizeof (char *);
+  size_t band_index_size = nbands * sizeof (char **);
+  size_t pixel_size;
+  VImage image;
+  int band=0, row=0;
+  char *p = NULL;
+
+  /* Check parameters: */
+  if (nbands < 1) VError("VIniImage: Invalid number of bands: %d", (int) nbands);
+  if (nrows < 1)  VError ("VIniImage: Invalid number of rows: %d", (int) nrows);
+  if (ncolumns < 1) VError ("VIniImage: Invalid number of columns: %d",(int) ncolumns);
+
+#define AlignUp(v, b) ((((v) + (b) - 1) / (b)) * (b))
+
+  /* Initialize VImage data struct */ 
+  pixel_size = VRepnSize (pixel_repn);
+  p = VMalloc(AlignUp (sizeof (VImageRec) + row_index_size + band_index_size, pixel_size));
+
+  image = (VImage) p;
+  image->nbands = nbands;
+  image->nrows = nrows;
+  image->ncolumns = ncolumns;
+  image->flags = VImageSingleAlloc;
+  image->pixel_repn = pixel_repn;
+  image->attributes = VCreateAttrList ();
+  image->band_index = (VPointer **) (p += sizeof (VImageRec));
+  image->row_index = (VPointer *) (p += band_index_size);
+  image->data = (VPointer) databuffer;
+  image->nframes = nbands;
+  image->nviewpoints = image->ncolors = image->ncomponents = 1;
+
+  /* Initialize the indices: */
+  for (band = 0; band < nbands; band++)
+    image->band_index[band] = image->row_index + band * nrows;
+  for (row = 0, p = image->data; row < nbands * nrows; row++, p += row_size)
+    image->row_index[row] = p;
+
+  return image;
+
+#undef AlignUp
+}
 
 
 #define xgetval(data,index,Datatype) \
@@ -104,82 +158,31 @@ void VDataStats(char *data,size_t ndata,size_t nsize,int datatype,double *xmin,d
 }
 
 
-/* 3D data */
-void Nii2Vista3D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncols,
-		 int datatype,VRepnKind dst_repn,VBoolean do_scaling,double xmin,double xmax,
-		 VString voxelstr,VShort tr,VAttrList out_list)
+
+
+/* list of 3D images */
+void Nii2Vista3DList(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncols,size_t nt,
+		     VRepnKind pixel_repn,VString voxelstr,VShort tr,VAttrList out_list)
 {
-  size_t slice,row,col;
-  VImage image = VCreateImage(nslices,nrows,ncols,dst_repn);
-  if (!image) VError(" err allocating output image");
-  VFillImage(image,VAllBands,0);
-  VSetAttr(VImageAttrList(image),"voxel",NULL,VStringRepn,voxelstr);
-  if (tr > 0) VSetAttr(VImageAttrList(image),"repetition_time",NULL,VShortRepn,tr);
-  double umin  = VPixelMinValue(image);
-  double umax  = VPixelMaxValue(image);
-  size_t nrnc = nrows*ncols;
-  double scalefactor = umax;
+  size_t i;
+  size_t npix = nrows*ncols*nslices;
 
-  /* check if scaling needed */
-  VBoolean noscale = FALSE;
-  if (datatype == DT_FLOAT && dst_repn == VFloatRepn) noscale = TRUE;
-  if (datatype == DT_SIGNED_SHORT && dst_repn == VShortRepn) noscale = TRUE;
-  if (datatype == DT_UINT16 && dst_repn == VUShortRepn) noscale = TRUE;
-  if (datatype == DT_SIGNED_INT && dst_repn == VIntegerRepn) noscale = TRUE;
-  if (datatype == DT_UINT32 && dst_repn == VUIntegerRepn) noscale = TRUE;
-  if (datatype == DT_UNSIGNED_CHAR && dst_repn == VUByteRepn) noscale = TRUE;
+  VImage *dst = (VImage *) VCalloc(nt,sizeof(VImage));
 
-  /* no scaling... */
-  /*  klappt nicht bei isinf, isnan
-  if (noscale && do_scaling == FALSE) {
-    fprintf(stderr," no scaling\n");
-    VImageData(image) = data;
+  for (i=0; i<nt; i++) {
+    const size_t index = i*npix*nsize;
+    dst[i] = VIniImage(nslices,nrows,ncols,pixel_repn,&data[index]);
+    VSetAttr(VImageAttrList(dst[i]),"voxel",NULL,VStringRepn,voxelstr);
+    if (tr > 0) VSetAttr(VImageAttrList(dst[i]),"repetition_time",NULL,VShortRepn,tr);
+    VAppendAttr(out_list,"image",NULL,VImageRepn,dst[i]);
   }
-  */
-  if (noscale == TRUE && do_scaling == FALSE) {
-    /* fprintf(stderr," no scaling\n"); */
-    for (slice=0; slice<nslices; slice++) {
-      for (row=0; row<nrows; row++) {
-	for (col=0; col<ncols; col++) {
-	  const size_t index = (col + row*ncols + slice*nrnc)*nsize;
-	  double u = VGetValue(data,index,datatype);
-	  if (gsl_isnan(u) || gsl_isinf(u)) u=0;
-	  VSetPixel(image,slice,row,col,u);
-	}
-      }
-    }
-  }
-
-
-  /* scaling... */
-  else {
-    /* fprintf(stderr," scaling,  scalefactor: %f\n",scalefactor); */
-    for (slice=0; slice<nslices; slice++) {
-      for (row=0; row<nrows; row++) {
-	for (col=0; col<ncols; col++) {
-	  const size_t index = (col + row*ncols + slice*nrnc)*nsize;
-
-	  double u = VGetValue(data,index,datatype);
-	  if (gsl_isnan(u) || gsl_isinf(u)) u = 0;
-	  if (do_scaling) {
-	    if (ABS(u) > TINY) u = scalefactor * (u-xmin)/(xmax-xmin);
-	  }
-	  if (u < umin) u = umin;
-	  if (u > umax) u = umax;
-	  VSetPixel(image,slice,row,col,u);
-	}
-      }
-    }
-  }
-
-  /* check of isnan, isinf */
-  VAppendAttr(out_list,"image",NULL,VImageRepn,image);
 }
+
 
 
 /* 4D time series data */
 void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncols,size_t nt,
-		 int datatype,VBoolean do_scaling,double xmin,double xmax,
+		 int datatype,double xmin,double xmax,
 		 VString voxelstr,double *slicetime,VShort tr,VAttrList out_list)
 {
   size_t slice,row,col,ti;
@@ -205,11 +208,16 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
       for (row=0; row<nrows; row++) {
 	for (col=0; col<ncols; col++) {
 	  const size_t index = (col + row*ncols + slice*nrnc + ti*npix)*nsize;
+	  /*
+	  const size_t src_index = (col + row*ncols + i*nrnc + j*npix)*nsize;
+	  const size_t dst_index = (col + row*ncols + j*nrnc)*nsize;
+	  for (k=0; k<nsize; k++) {
+	    pp[dst_index+k] = data[src_index+k];
+	  }
+	  */
 	  double u = VGetValue(data,index,datatype);
-	  if (do_scaling) {
-	    if (ABS(u) > TINY) {
-	      u = umax * (u-xmin)/(xmax-xmin);
-	    }
+	  if (fabs(u) > TINY) {
+	    u = umax * (u-xmin)/(xmax-xmin);
 	  }
 	  if (u < umin) u = umin;
 	  if (u > umax) u = umax;
@@ -220,7 +228,6 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
     VAppendAttr(out_list,"image",NULL,VImageRepn,dst[slice]);
   }
 }
-
 
 
 
@@ -328,23 +335,22 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
 
 
 
-VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_scaling)
+VAttrList Nifti1_to_Vista(char *filename,VLong tr)
 {
-  nifti_1_header hdr;
+  char *databuffer=NULL;
+  size_t buflen=0;
 
-  /* open and read header */
-  FILE *fp = fopen(hdr_file,"r");
-  if (fp == NULL) {
-    fprintf(stderr, "\nError opening header file %s\n",hdr_file);
-    exit(1);
+  if (CheckGzip(filename)) {
+    databuffer = ReadGzippedData(filename,&buflen);
   }
- 
-  size_t ret = fread(&hdr, MIN_HEADER_SIZE, 1, fp);
-  if (ret != 1) {
-    fprintf(stderr, "\nError reading header file %s\n",hdr_file);
-    exit(1);
+  else {
+    databuffer = ReadUnzippedData(filename,&buflen);
   }
-  fclose(fp);
+
+
+  /* read header */
+  nifti_1_header hdr;
+  memcpy(&hdr,databuffer,MIN_HEADER_SIZE);
   if ((strncmp(hdr.magic,"ni1\0",4) != 0) && (strncmp(hdr.magic,"n+1\0",4) != 0))
     VError(" not a nifti-1 file, magic number is %s",hdr.magic);
 
@@ -355,7 +361,7 @@ VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_s
   }
 
   /* get data type */
-  VRepnKind dst_repn=VShortRepn;
+  VRepnKind dst_repn;
   int datatype = (int)hdr.datatype;
 
   switch(datatype) {
@@ -396,20 +402,9 @@ VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_s
     dst_repn = VULongRepn;
     break;
   default:
-    VError(" unknown repn %d",datatype);
+    VError(" unknown data type %d",datatype);
   }
 
-
-
-  /* open the datafile, jump to data offset */
-  fp = fopen(data_file,"r");
-  if (fp == NULL) {
-    VError("Error opening data file %s",data_file);
-  }
-  ret = fseek(fp, (long)(hdr.vox_offset), SEEK_SET);
-  if (ret != 0) {
-    VError("Error doing fseek in data file %s",(long)(hdr.vox_offset), data_file);
-  }
 
   /* number of values stored at each time point */
   if (hdr.dim[5] > 1) VError("data type not supported, dim[5]= %d\n",hdr.dim[5]);
@@ -422,18 +417,6 @@ VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_s
   size_t nslices = (size_t)hdr.dim[3];
   size_t nt      = (size_t)hdr.dim[4];
 
-  if (nt == 1) {
-    hdr.dim[0] = 3;
-    dimtype = 3;
-  }
-  if (nt > 1) dimtype = 4;
-  fprintf(stderr," dim: %ldD,  image matrix= %ld %ld %ld,  nt= %ld\n",dimtype,ncols,nrows,nslices,nt);
-
-  if (dimtype == 4) {
-    dst_repn = VShortRepn; 
-    if (hdr.datatype != DT_SIGNED_SHORT) do_scaling = TRUE;
-    VWarning(" functional data will be rescaled to 16 bit representation");
-  }
 
   /* fill data container */
   size_t bytesize = 8;
@@ -441,14 +424,9 @@ VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_s
   size_t nsize   = hdr.bitpix/bytesize;
   size_t npixels = nslices * nrows * ncols;
   size_t ndata   = nt * npixels * nsize;
-  char *data = (char *) VMalloc(ndata);
-  if (!data) VError(" error allocating data container");
-  ret = fread(data,1,ndata,fp);
-  if (ret != ndata) {
-    fprintf(stderr," fread error, ret= %ld:\n",ret);
-    VError("Error reading from %s",data_file);
-  }
-  fclose(fp);
+  size_t hdrsize = MIN_HEADER_SIZE;
+  char *data = &databuffer[hdrsize];
+  
 
 
   /* byte swap image data, if needed */
@@ -456,17 +434,15 @@ VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_s
     VByteSwapData(data,ndata,nsize);
   }
 
-
   /* functional data must be VShortRepn, rescale if needed */
   double xmin=0,xmax=0;
-  if (do_scaling) {
+  if (nt > 1 || dimtype == 4) {
     /* fprintf(stderr," scaling...\n"); */
     size_t npixels = nslices * nrows * ncols;
     size_t ndata   = nt * npixels * nsize;
     VDataStats(data,ndata,nsize,datatype,&xmin,&xmax);
     fprintf(stderr," data range: [%f, %f]\n",xmin,xmax);
   }
-
 
 
   /* repetition time (may be wrong in some cases) */
@@ -483,9 +459,9 @@ VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_s
 
   
   /* voxel reso */
-  int buflen=512;
-  char *voxelstr = (char *) VCalloc(buflen,sizeof(char));
-  memset(voxelstr,0,buflen);
+  int blen=512;
+  char *voxelstr = (char *) VCalloc(blen,sizeof(char));
+  memset(voxelstr,0,blen);
   sprintf(voxelstr,"%f %f %f",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
   fprintf(stderr," voxel: %f %f %f\n",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
 
@@ -499,12 +475,11 @@ VAttrList Nifti1_to_Vista(char *hdr_file, char *data_file,VLong tr,VBoolean do_s
   VAttrList out_list = VCreateAttrList();
   VAppendAttr(out_list,"geoinfo",NULL,VAttrListRepn,geolist);
 
-  if (nt > 1 || dimtype == 4) {
-    Nii2Vista4D(data,nsize,nslices,nrows,ncols,nt,datatype,do_scaling,xmin,xmax,voxelstr,slicetime,(VShort)tr,out_list);
+  if (nt <= 1 || dimtype == 3) {
+    Nii2Vista3DList(data,nsize,nslices,nrows,ncols,nt,dst_repn,voxelstr,(VShort)tr,out_list);
   }
   else {
-    Nii2Vista3D(data,nsize,nslices,nrows,ncols,datatype,dst_repn,do_scaling,xmin,xmax,voxelstr,(VShort)tr,out_list);
+    Nii2Vista4D(data,nsize,nslices,nrows,ncols,nt,datatype,xmin,xmax,voxelstr,slicetime,(VShort)tr,out_list);
   }
-
   return out_list;
 }
