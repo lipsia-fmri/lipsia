@@ -29,10 +29,9 @@ Parameters of 'vlisa1':
     -out     Output file.
     -alpha   FDR significance level. Default: 1
     -perm    Number of permutations. Default: 0
-    -type    [bilateral | bilateral+median].Type of spatial filter. Default: bilateral+median
     -seed    Seed for random number generation. Default: 99402622
     -radius  Neighbourhood radius in voxels. Default: 2
-    -rvar    Bilateral parameter (radiometric). Default: 1.9
+    -rvar    Bilateral parameter (radiometric). Default: 2.0
     -svar    Bilateral parameter (spatial). Default: 2
     -numiter Number of iterations in bilateral filter. Default: 2
     -cleanup  Whether to delete isolated voxels. Default: false
