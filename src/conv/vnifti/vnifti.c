@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <sys/stat.h>
 
 #include <nifti/nifti1.h>
 #include <nifti/nifti1_io.h>
@@ -41,36 +42,15 @@
 #define MIN_HEADER_SIZE 348
 #define NII_HEADER_SIZE 352
 
-extern VAttrList Nifti1_to_Vista(char *data_file,VLong tr);
+extern char *VReadGzippedData(char *filename,size_t *len);
+extern char *VReadUnzippedData(char *filename,VBoolean nofail,size_t *size);
+extern char *VReadDataContainer(char *filename,VBoolean nofail,size_t *size);
+extern FILE *VOpenStream(char *databuffer,size_t size);
+extern VImage VReadImage(char *filename);
+
+extern VAttrList Nifti1_to_Vista(char *data_file,VLong tr,VBoolean);
 extern void Vista_to_Nifti1(VAttrList list,VString filename);
 
-/* check if gzipped */
-int CheckGzip(char *filename)
-{
-  int n = strlen(filename);
-  if (n < 3) return 0;
-  if (filename[n-1] == 'z' && filename[n-2] == 'g' && filename[n-3] == '.') return 1;
-  else return 0;
-}
-
-
-/* get type of format (.nii or .v) */
-int getformat(char *filename)
-{
-  int n = strlen(filename);
-  int type = -1;
-  if (filename[n-1] == 'i' && filename[n-2] == 'i' && filename[n-3] == 'n' && filename[n-4] == '.') {
-    type = 1;
-  }
-  if (filename[n-1] == 'z' && filename[n-2] == 'g' && filename[n-3] == '.' &&
-      filename[n-4] == 'i' && filename[n-5] == 'i' && filename[n-6] == 'n' && filename[n-7] == '.') {
-    type = 1;
-  }
-  if (filename[n-1] == 'v' && filename[n-2] == '.') {
-    type = 0;
-  }
-  return type;
-}
 
 
 int main(int argc,char *argv[])
@@ -78,29 +58,39 @@ int main(int argc,char *argv[])
   static VString in_filename = "";
   static VString out_filename = "";
   static VLong tr=0;
-  static VBoolean list3d = FALSE;
+  static VBoolean attrtype = TRUE;
   static VOptionDescRec  options[] = {
-    {"in",VStringRepn,1,(VPointer) &in_filename,VRequiredOpt,NULL,"input file"},
-    {"out",VStringRepn,1,(VPointer) &out_filename,VRequiredOpt,NULL,"output file"},
-    {"tr",VLongRepn,1,(VPointer) &tr,VOptionalOpt,NULL,"repetition time in milliseconds"},
-    {"3dlist",VBooleanRepn,1,(VPointer) &list3d,VOptionalOpt,NULL,"Output list of 3D images"},
+    {"in",VStringRepn,1,(VPointer) &in_filename,VRequiredOpt,NULL,"Input file"},
+    {"out",VStringRepn,1,(VPointer) &out_filename,VRequiredOpt,NULL,"Output file"},
+    {"tr",VLongRepn,1,(VPointer) &tr,VOptionalOpt,NULL,"Repetition time in milliseconds"},
+    {"attrtype",VBooleanRepn,1,(VPointer) &attrtype,VOptionalOpt,NULL,"Whether to output standard lipsia"},
   };
   char *prg_name=GetLipsiaName("vnifti");
   fprintf(stderr, "%s\n", prg_name);
+
 
   /* parse command line */
   VParseFilterCmd (VNumber (options),options,argc,argv,NULL,NULL);
 
 
-
   /* get format types */
+  if (CheckGzip(out_filename)) VError(" output file cannot be gzipped");
   int itype = getformat(in_filename);
+  if (itype < 0 || itype > 1) VError(" illegal input type");
   int otype = getformat(out_filename);
+  if (otype < 0 || otype > 1) VError(" illegal output type");
+  if (itype == otype) VError(" input equals output format");
+  
+
+
+  /* read data from input file */
+  size_t bufsize=0;
+  char *databuffer = VReadDataContainer(in_filename,TRUE,&bufsize);
 
 
   /* nifti-1 to vista */
   if (itype == 1 && otype == 0) {
-    VAttrList out_list = Nifti1_to_Vista(in_filename,tr);
+    VAttrList out_list = Nifti1_to_Vista(databuffer,tr,attrtype);
     FILE *fp_out = VOpenOutputFile (out_filename, TRUE);
     if (! VWriteFile (fp_out, out_list)) exit (1);
     fclose(fp_out);
@@ -109,16 +99,16 @@ int main(int argc,char *argv[])
 
   /* vista to nifti-1 */
   else if (itype == 0 && otype == 1) {
-    FILE *fp = VOpenInputFile (in_filename, TRUE);
+    FILE *fp = VOpenStream(databuffer,bufsize);
     VAttrList list = VReadFile (fp,NULL);
     if (! list) VError(" can't read input file");
-    fclose(fp);
     Vista_to_Nifti1(list,out_filename);
   }
 
   else if (itype == otype) {
     VError(" input equals output format");
   }
+
   else {
     VError(" illegal formats: %d %d\n",itype,otype);
   }

@@ -23,13 +23,23 @@
 #define TINY 1.0e-10
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
-extern int   CheckGzip(char *filename);
-extern char *ReadGzippedData(char *filename,size_t *len);
-extern char *ReadUnzippedData(char *filename,size_t *len);
+extern char *VReadGzippedData(char *filename,size_t *len);
+extern char *VReadUnzippedData(char *filename,VBoolean nofail,size_t *size);
+extern char *VReadDataContainer(char *filename,VBoolean nofail,size_t *size);
+extern FILE *VReadInputFile (char *filename,VBoolean nofail);
+extern int  CheckGzip(char *filename);
 
 extern void VByteSwapNiftiHeader(nifti_1_header *hdr);
 extern void VByteSwapData(char *data,size_t ndata,size_t nsize);
 
+
+/* set dimension in geo info */
+void VSetGeo3d4d(VAttrList geolist,int dimtype)
+{
+  double *D = VGetGeoDim(geolist,NULL);
+  D[0] = (double)dimtype;
+  VSetGeoDim(geolist,D);
+} 
 
 
 /*
@@ -42,9 +52,10 @@ extern void VByteSwapData(char *data,size_t ndata,size_t nsize);
 VImage VIniImage (int nbands, int nrows, int ncolumns, VRepnKind pixel_repn, char *databuffer)
 {
   size_t row_size = ncolumns * VRepnSize (pixel_repn);
+  size_t data_size = nbands * nrows * row_size;
   size_t row_index_size = nbands * nrows * sizeof (char *);
   size_t band_index_size = nbands * sizeof (char **);
-  size_t pixel_size;
+  size_t pixel_size=0;
   VImage image;
   int band=0, row=0;
   char *p = NULL;
@@ -54,6 +65,7 @@ VImage VIniImage (int nbands, int nrows, int ncolumns, VRepnKind pixel_repn, cha
   if (nrows < 1)  VError ("VIniImage: Invalid number of rows: %d", (int) nrows);
   if (ncolumns < 1) VError ("VIniImage: Invalid number of columns: %d",(int) ncolumns);
 
+
 #define AlignUp(v, b) ((((v) + (b) - 1) / (b)) * (b))
 
   /* Initialize VImage data struct */ 
@@ -62,14 +74,15 @@ VImage VIniImage (int nbands, int nrows, int ncolumns, VRepnKind pixel_repn, cha
 
   image = (VImage) p;
   image->nbands = nbands;
-  image->nrows = nrows;
+  image->nrows  = nrows;
   image->ncolumns = ncolumns;
-  image->flags = VImageSingleAlloc;
+  image->flags    = VImageSingleAlloc;
   image->pixel_repn = pixel_repn;
   image->attributes = VCreateAttrList ();
   image->band_index = (VPointer **) (p += sizeof (VImageRec));
-  image->row_index = (VPointer *) (p += band_index_size);
-  image->data = (VPointer) databuffer;
+  image->row_index  = (VPointer *) (p += band_index_size);
+  image->data = (VPointer) AlignUp((long) (databuffer+4), pixel_size);
+
   image->nframes = nbands;
   image->nviewpoints = image->ncolors = image->ncomponents = 1;
 
@@ -159,7 +172,6 @@ void VDataStats(char *data,size_t ndata,size_t nsize,int datatype,double *xmin,d
 
 
 
-
 /* list of 3D images */
 void Nii2Vista3DList(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncols,size_t nt,
 		     VRepnKind pixel_repn,VString voxelstr,VShort tr,VAttrList out_list)
@@ -168,6 +180,7 @@ void Nii2Vista3DList(char *data,size_t nsize,size_t nslices,size_t nrows,size_t 
   size_t npix = nrows*ncols*nslices;
 
   VImage *dst = (VImage *) VCalloc(nt,sizeof(VImage));
+  VAppendAttr(out_list,"nimages",NULL,VLongRepn,(VLong) nt);
 
   for (i=0; i<nt; i++) {
     const size_t index = i*npix*nsize;
@@ -207,7 +220,7 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
     for (ti=0; ti<nt; ti++) {
       for (row=0; row<nrows; row++) {
 	for (col=0; col<ncols; col++) {
-	  const size_t index = (col + row*ncols + slice*nrnc + ti*npix)*nsize;
+	  const size_t index = (col + row*ncols + slice*nrnc + ti*npix + 1)*nsize;
 	  /*
 	  const size_t src_index = (col + row*ncols + i*nrnc + j*npix)*nsize;
 	  const size_t dst_index = (col + row*ncols + j*nrnc)*nsize;
@@ -215,6 +228,7 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 	    pp[dst_index+k] = data[src_index+k];
 	  }
 	  */
+	  
 	  double u = VGetValue(data,index,datatype);
 	  if (fabs(u) > TINY) {
 	    u = umax * (u-xmin)/(xmax-xmin);
@@ -222,6 +236,7 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 	  if (u < umin) u = umin;
 	  if (u > umax) u = umax;
 	  VPixel(dst[slice],ti,row,col,VShort) = (VShort)u;
+	  
 	}
       }
     }
@@ -335,18 +350,8 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
 
 
 
-VAttrList Nifti1_to_Vista(char *filename,VLong tr)
+VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype)
 {
-  char *databuffer=NULL;
-  size_t buflen=0;
-
-  if (CheckGzip(filename)) {
-    databuffer = ReadGzippedData(filename,&buflen);
-  }
-  else {
-    databuffer = ReadUnzippedData(filename,&buflen);
-  }
-
 
   /* read header */
   nifti_1_header hdr;
@@ -463,7 +468,7 @@ VAttrList Nifti1_to_Vista(char *filename,VLong tr)
   char *voxelstr = (char *) VCalloc(blen,sizeof(char));
   memset(voxelstr,0,blen);
   sprintf(voxelstr,"%f %f %f",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
-  fprintf(stderr," voxel: %f %f %f\n",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
+  fprintf(stderr," voxel: %.4f %.4f %.4f\n",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
 
 
   /* geometry information */
@@ -475,11 +480,19 @@ VAttrList Nifti1_to_Vista(char *filename,VLong tr)
   VAttrList out_list = VCreateAttrList();
   VAppendAttr(out_list,"geoinfo",NULL,VAttrListRepn,geolist);
 
-  if (nt <= 1 || dimtype == 3) {
+
+  if (nt <= 1) {            /* output one 3D image */
     Nii2Vista3DList(data,nsize,nslices,nrows,ncols,nt,dst_repn,voxelstr,(VShort)tr,out_list);
+    VSetGeo3d4d(geolist,(int) 3);
   }
-  else {
+  else if (attrtype == FALSE) {  /* output list of 3D images */
+    Nii2Vista3DList(data,nsize,nslices,nrows,ncols,nt,dst_repn,voxelstr,(VShort)tr,out_list);
+    VSetGeo3d4d(geolist,(int) 3);
+  }
+  else if (attrtype == TRUE && nt > 1) {   /* output one 4D image */
     Nii2Vista4D(data,nsize,nslices,nrows,ncols,nt,datatype,xmin,xmax,voxelstr,slicetime,(VShort)tr,out_list);
+    VSetGeo3d4d(geolist,(int) 4);
   }
+
   return out_list;
 }

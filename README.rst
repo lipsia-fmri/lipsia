@@ -28,7 +28,9 @@ Lipsia uses its own data format, which is called vista (extension *.v*).
 You can easily convert your nifti data from and to lipsia with the program *vnifti*::
 
   vnifti -in data.nii -out data.v
+	vnifti -in data.nii.gz -out data.v
   vnifti -in result.v -out result.nii
+	vnifti -in result.v.gz -out result.nii
 
 Alternatively, you can import a folder with DICOM files into the vista format::
 
@@ -42,7 +44,7 @@ Convert fmri data file into lipsia format::
   vnifti -in fmri.nii -out fmri.v
 
 
-Convert rfegion of interest mask file into lipsia format::
+Convert region of interest mask file into lipsia format::
 
   vnifti -in mask.nii -out mask.v
 
