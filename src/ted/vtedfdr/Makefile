@@ -1,5 +1,5 @@
 
-LDLIBS = -lgsl -lgslcblas -lviaio3.0 -lm
+LDLIBS = -lgsl -lgslcblas -lviaio3.0 -lm -lz
 
 PROG = vtedfdr
 SRC = vtedfdr.c

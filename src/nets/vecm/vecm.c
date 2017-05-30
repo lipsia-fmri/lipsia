@@ -139,7 +139,7 @@ VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float
 
 
 
-VAttrList VECM(VAttrList list,VImage mask,VShort minval,VShort first,VShort length,VShort type)
+VAttrList VECM(VAttrList list,VImage mask,VFloat minval,VShort first,VShort length,VShort type)
 {
   VAttrList out_list=NULL;
   VAttrListPosn posn;
@@ -158,7 +158,6 @@ VAttrList VECM(VAttrList list,VImage mask,VShort minval,VShort first,VShort leng
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
     VGetAttrValue (& posn, NULL,VImageRepn, & src[i]);
-    if (VPixelRepn(src[i]) != VShortRepn) continue;
     if (VImageNBands(src[i]) > ntimesteps) ntimesteps = VImageNBands(src[i]);
     if (VImageNRows(src[i])  > nrows)  nrows = VImageNRows(src[i]);
     if (VImageNColumns(src[i]) > ncols) ncols = VImageNColumns(src[i]);
@@ -194,7 +193,7 @@ VAttrList VECM(VAttrList list,VImage mask,VShort minval,VShort first,VShort leng
     if (VImageNRows(src[b]) < 2) continue;
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-	if (VPixel(src[b],i1,r,c,VShort) < minval) continue;
+	if (VGetPixel(src[b],i1,r,c) < minval) continue;
 	if (VGetPixel(mask,b,r,c) < 0.5) continue;
 	n++;
       }
@@ -219,7 +218,7 @@ VAttrList VECM(VAttrList list,VImage mask,VShort minval,VShort first,VShort leng
     if (VImageNRows(src[b]) < 2) continue;
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-	if (VPixel(src[b],i1,r,c,VShort) < minval) continue;
+	if (VGetPixel(src[b],i1,r,c) < minval) continue;
 	if (VGetPixel(mask,b,r,c) < 0.5) continue;
 
 	VPixel(map,0,0,i,VFloat) = b;
@@ -247,7 +246,7 @@ VAttrList VECM(VAttrList list,VImage mask,VShort minval,VShort first,VShort leng
     for (k=first; k<=last; k++) {
       if (j >= mat->size2) VError(" j= %d %d",j,mat->size2);
       if (k >= VImageNBands(src[b])) VError(" k= %d %d",k, VImageNBands(src[b]));
-      *ptr++ = (float) VPixel(src[b],k,r,c,VShort);
+      *ptr++ = (float) VGetPixel(src[b],k,r,c);
       j++;
     }
   }
@@ -331,47 +330,39 @@ VDictEntry TYPDict[] = {
 int main (int argc,char *argv[])
 {
 	
-  static VString  filename = "";
+  static VString  mask_filename = "";
   static VShort   first  = 0;
   static VShort   length = 0;
   static VShort   type   = 1;
-  static VShort   minval = 0;
+  static VFloat   minval = 0;
   static VShort   nproc  = 10;
   static VOptionDescRec  options[] = {
-    {"mask",VStringRepn,1,(VPointer) &filename,VRequiredOpt,NULL,"mask"},
-    {"minval",VShortRepn,1,(VPointer) &minval,VOptionalOpt,NULL,"Signal threshold"},
+    {"mask",VStringRepn,1,(VPointer) &mask_filename,VRequiredOpt,NULL,"mask"},
+    {"minval",VFloatRepn,1,(VPointer) &minval,VOptionalOpt,NULL,"Signal threshold"},
     {"first",VShortRepn,1,(VPointer) &first,VOptionalOpt,NULL,"First timestep to use"},
     {"length",VShortRepn,1,(VPointer) &length,VOptionalOpt,NULL,"Length of time series to use, '0' to use full length"},
     {"type",VShortRepn,1,(VPointer) &type,VOptionalOpt,TYPDict,"type of scaling to make correlations positive"},
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"number of processors to use, '0' to use all"}
   };
-  FILE *in_file,*out_file,*fp;
-  VAttrList list=NULL,list1=NULL,out_list=NULL;
-  VAttrListPosn posn;
-  VImage mask=NULL;
+  FILE *out_file=NULL;
+  VString in_file=NULL;
   char *prg_name=GetLipsiaName("vecm");
   fprintf(stderr, "%s\n", prg_name);
 
-  VParseFilterCmd (VNumber (options),options,argc,argv,&in_file,&out_file);
+  VParseFilterCmdX (VNumber (options),options,argc,argv,&in_file,&out_file);
   if (type > 3) VError(" illegal type");
 
 
   /* read mask */
-  fp = VOpenInputFile (filename, TRUE);
-  list1 = VReadFile (fp, NULL);
-  if (! list1) VError("Error reading mask file");
-  fclose(fp);
-
-  for (VFirstAttr (list1, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & mask);
-  }
-  if (mask == NULL) VError(" no mask found");
+  VAttrList listm = VReadAttrList(mask_filename,0L,TRUE,FALSE);
+  VImage mask = VReadImage(listm);
+  if (mask == NULL) VError(" no ROI mask found");
 
 
   /* read functional data */
-  if (! (list = VReadFile (in_file, NULL))) exit (1);
-  fclose(in_file);
+  VAttrList list = VReadAttrList(in_file,0L,TRUE,FALSE);
+  if (list == NULL) VError(" error reading input file %s",in_file);
+  VAttrList geolist = VGetGeoInfo(list);
 
 
 
@@ -385,11 +376,10 @@ int main (int argc,char *argv[])
 
 
   /* main process */
-  out_list = VECM(list,mask,minval,first,length,type );
+  VAttrList out_list = VECM(list,mask,minval,first,length,type);
 
 
   /* update geoinfo, 4D to 3D */
-  VAttrList geolist = VGetGeoInfo(list);
   if (geolist != NULL) {
     double *D = VGetGeoDim(geolist,NULL);
     D[0] = 3;  /* 3D */

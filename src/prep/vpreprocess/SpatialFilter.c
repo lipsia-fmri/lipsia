@@ -211,42 +211,28 @@ VImage VGauss3d(VImage src,VImage dest,VImage kernel)
 
 void VSpatialFilter(VAttrList list,VDouble fwhm)
 {
-  VAttrListPosn posn;
-  VImage src[NSLICES],xsrc=NULL,tmp=NULL,dest=NULL,kernel=NULL,tmp2d=NULL;
-  VString str=NULL;
+  VImage tmp=NULL,dest=NULL,kernel=NULL,tmp2d=NULL;
   float v0,v1,v2,v3;
   int b,r,c,i,size;
   int n,nslices,nrows,ncols,dim;
-  double u, sigma=0;
+  double u=0, sigma=0;
   extern VImage VGaussianConv (VImage,VImage,VBand,double,int);
 
 
   /* get image dimensions */
-  dim = 3;
-  v0 = v1 = v2 = v3 = 1;
-  n = i = nrows = ncols = 0;
-  str = VMalloc(100);
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (i >= NSLICES) VError(" too many slices");
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & xsrc);
-    if (VPixelRepn(xsrc) != VShortRepn) continue;
-    if (VImageNBands(xsrc) > n) n = VImageNBands(xsrc);
-    if (VImageNRows(xsrc) > nrows) nrows = VImageNRows(xsrc);
-    if (VImageNColumns(xsrc) > ncols) ncols = VImageNColumns(xsrc);
-    if (VGetAttr (VImageAttrList (xsrc), "voxel", NULL,VStringRepn, (VPointer) & str) == VAttrFound) {
-      sscanf(str,"%f %f %f",&v1,&v2,&v3);
-    }
-    src[i] = xsrc;
-    i++;    
-  }
-  nslices = i;
+  nslices = VAttrListNumImages(list);
+  VImage *src = VAttrListGetImages(list,nslices);
+  VImageDimensions(src,nslices,&n,&nrows,&ncols);
 
 
   /* in general, apply 3D spatial filtering */
-  dim = 3;
-
   /* only if clearly non-isotropic apply 2D filtering */
+  dim = 3;
+  v0 = v1 = v2 = v3 = 1;
+  VString str = VMalloc(100);
+  if (VGetAttr (VImageAttrList (src[0]), "voxel", NULL,VStringRepn, (VPointer) & str) == VAttrFound) {
+    sscanf(str,"%f %f %f",&v1,&v2,&v3);
+  }
   v0 = 0.5*(v1+v2);
   if (ABS(v0-v3) > 0.5) {
     VWarning(" non-isotropic voxel grid, apply 2D filtering");
@@ -299,7 +285,7 @@ void VSpatialFilter(VAttrList list,VDouble fwhm)
 	if (VImageNRows(src[b]) < 2) continue;
 	for (r=0; r<nrows; r++) {
 	  for (c=0; c<ncols; c++) {
-	    u = VPixel(src[b],i,r,c,VShort);
+	    u = VGetPixel(src[b],i,r,c);
 	    VPixel(tmp,b,r,c,VFloat) = u;
 	  }
 	}
@@ -312,7 +298,7 @@ void VSpatialFilter(VAttrList list,VDouble fwhm)
 	for (r=0; r<nrows; r++) {
 	  for (c=0; c<ncols; c++) {
 	    u = VPixel(dest,b,r,c,VFloat);
-	    VPixel(src[b],i,r,c,VShort) = u;
+	    VSetPixel(src[b],i,r,c,u);
 	  }
 	}
       }

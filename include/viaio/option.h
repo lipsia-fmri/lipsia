@@ -238,3 +238,10 @@ void VReportValidParamOptions (
 #endif
 
 #endif /* V_option_h */
+
+
+/*
+** needed for handling gzipped vista- and nifti data
+**  G.Lohmann, May 2017
+*/
+extern void VParseFilterCmdX (int,VOptionDescRec opts[],int,char **,VString *,FILE **);

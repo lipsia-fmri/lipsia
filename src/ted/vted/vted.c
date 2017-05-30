@@ -435,7 +435,6 @@ int main (int argc,char *argv[])
     /* corr matrices */
     float zthr = ZMatrix(ZvalHist,SNR1,SNR2,n1,n2,roi,map,mapimage,(int)adjdef,
 			 (float)elength,(float)qthreshold,(int)step,(int)metric);
-
     
     /* estimate number of truly needed edges, estimate noise */
     if (noise_cutoff > 0.0 && nperm == numperm && histonly == FALSE) {

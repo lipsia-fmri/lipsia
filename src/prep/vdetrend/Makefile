@@ -1,5 +1,5 @@
 
-LDLIBS =  -lviaio3.0 -lm -lgsl -lgslcblas -lvia3.0
+LDLIBS =  -lviaio3.0 -lm -lgsl -lgslcblas -lvia3.0 -lz
 #CFLAGS = -g
 
 PROG = vdetrend

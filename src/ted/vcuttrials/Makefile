@@ -1,5 +1,5 @@
 
-LDLIBS = -lvia3.0 -lviaio3.0 -lm -lgsl -lgslcblas 
+LDLIBS = -lvia3.0 -lviaio3.0 -lm -lgsl -lgslcblas -lz
 
 PROG = vcuttrials
 SRC = vcuttrials.c

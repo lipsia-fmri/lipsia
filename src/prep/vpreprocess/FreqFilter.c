@@ -38,8 +38,7 @@
 #define ABS(x) ((x) < 0 ? -(x) : (x))
 
 
-void
-VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat sharp)
+void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat sharp)
 {
   VAttrListPosn posn;
   VImage src=NULL;
@@ -72,7 +71,6 @@ VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat sharp)
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
     VGetAttrValue (& posn, NULL,VImageRepn, & src);
-    if (VPixelRepn(src) != VShortRepn) continue;
     if (VImageNBands(src) > n) n = VImageNBands(src);
     if (VImageNRows(src) > nrows) nrows = VImageNRows(src);
     if (VImageNColumns(src) > ncols) ncols = VImageNColumns(src);
@@ -125,7 +123,6 @@ VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat sharp)
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
     VGetAttrValue (& posn, NULL,VImageRepn, & src);
-    if (VPixelRepn(src) != VShortRepn) continue;
     k++;
 
     if (VImageNRows(src) < 2) continue;
@@ -139,15 +136,15 @@ VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat sharp)
 	sum=0;
 
 	for (j=0; j<tail; j++) {
-	  in[j] = (double)VPixel(src,tail-j,r,c,VShort); 
+	  in[j] = (double)VGetPixel(src,tail-j,r,c); 
 	  sum += in[j];
 	}
 	for (j=tail; j<n-tail; j++) {
-	  in[j] = (double)VPixel(src,j-tail,r,c,VShort); 
+	  in[j] = (double)VGetPixel(src,j-tail,r,c); 
 	  sum += in[j];
 	}
 	for (j=n-tail; j<n; j++) {
-	  in[j] = (double)VPixel(src,2*n-3*tail-2-j,r,c,VShort); 
+	  in[j] = (double)VGetPixel(src,2*n-3*tail-2-j,r,c); 
 	  sum += in[j];
 	}
 
@@ -191,7 +188,7 @@ VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat sharp)
 	  for (i=0; i<n; i++) in[i] /= (double)n;
 
 	  for (j=tail; j<n-tail; j++) 
-	    VPixel(src,j-tail,r,c,VShort) = (VShort)in[j];
+	    VSetPixel(src,j-tail,r,c,in[j]);
 	  
 	}
 	else not++;

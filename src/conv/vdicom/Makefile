@@ -4,7 +4,7 @@ PROG = vdicom
 SRC  = vdicom.cpp i2o_dcm.cpp
 HDRS = i2o_dcm.h
 
-LDLIBS = -lgslcblas -lgsl -lviaio3.0 -lm
+LDLIBS = -lgslcblas -lgsl -lviaio3.0 -lm -lz
 
 LIPSIA ?= /usr/include
 LIPSIA_INCLUDE ?= ${LIPSIA}/include

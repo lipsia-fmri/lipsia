@@ -33,11 +33,12 @@ void ImageStats(VImage src,double *ave,double *var,double *hmin,double *hmax)
     u = (double)(*pp++);
     if (u < umin) umin = u;
     if (u > umax) umax = u;
-    if (ABS(u) < tiny) continue;
+    if (fabs(u) < tiny) continue;
     s1 += u;
     s2 += u*u;
     nx++;
   }
+  if (nx < 3.0) VError(" nx: %f\n",nx);
   *hmin = umin;
   *hmax = umax;  
   mean = s1/nx;
@@ -46,11 +47,12 @@ void ImageStats(VImage src,double *ave,double *var,double *hmin,double *hmax)
 }
 
 
+
 /* get image variance */
 double VImageVar(VImage src)
 {
   size_t i=0;
-  double u=0,s1=0,s2=0,nx=0,mean=0,tiny=1.0e-8;
+  double u=0,s1=0,s2=0,nx=0,tiny=1.0e-8;
   VFloat *pp=VImageData(src);
   for (i=0; i<VImageNPixels(src); i++) {
     u = (double)(*pp++);
@@ -60,6 +62,7 @@ double VImageVar(VImage src)
     nx++;
   }
   if (nx < 3.0) VError(" nx: %f\n",nx);
+  double mean = s1/nx;
   double var = (s2 - nx * mean * mean) / (nx - 1.0);
   return var;
 }
@@ -79,62 +82,68 @@ void VImageCount(VImage src)
 }
 
 
-
-/* median filter in 6-adj neighbourhood */
-void VMedian6(VImage src)
+int compare_function(const void *a,const void *b) 
 {
-  int b,r,c,bb,rr,cc,m,k,l;
-  float u=0,x=0,z=0,tiny=1.0e-10;
-  float data[8];
-
-  int nslices = VImageNBands(src);
-  int nrows = VImageNRows(src);
-  int ncols = VImageNColumns(src);
-
-  VImage dst = VCreateImageLike(src);  
-  VCopyImagePixels(src,dst,VAllBands);
-
-  for (b=0; b<nslices; b++) {
-    for (r=0; r<nrows; r++) {
-      for (c=0; c<ncols; c++) {
-
-	x = VPixel(src,b,r,c,VFloat);
-	if (fabs(x) < tiny) continue;  /* outside of brain */
-
-	size_t n=0;
-	data[n++] = x;
-
-	for (m=-1; m<=1; m++) {
-	  bb = b+m;
-	  if (bb < 0 || bb >= nslices) continue;
-
-	  for (k=-1; k<=1; k++) {
-	    rr = r+k;
-	    if (rr < 0 || rr >= nrows) continue;
-
-	    for (l=-1; l<=1; l++) {
-	      cc = c+l;
-	      if (cc < 0 || cc >= ncols) continue;
-
-	      int d = (m*m + k*k + l*l);
-	      if (d >= 2) continue;
-	      u = VPixel(src,bb,rr,cc,VFloat);
-	      if (fabs(u) < tiny) continue;  /* outside of brain */
-
-	      data[n] = u;
-	      n++;
-	    }
-	  }
-	}
-	if (n < 3) continue;
-	z = Median(data,n);
-	VPixel(dst,b,r,c,VFloat) = z;
-      }
-    }
-  }
-  VCopyImagePixels(dst,src,VAllBands);
-  VDestroyImage(dst);
+  float *x = (float *) a;
+  float *y = (float *) b;
+  return (*x) - (*y);
 }
+
+/* get histogram range */
+void VGetHistRange(VImage src,double *hmin,double *hmax)
+{
+
+  /* count number of nonzero voxels */
+  float zmin = (float)(VRepnMaxValue(VFloatRepn)-1.0);
+  float zmax = (float)(VRepnMinValue(VFloatRepn)+1.0);
+  float u=0,tiny=1.0e-8;
+  size_t i=0,n=0;
+  VFloat *pp=VImageData(src);
+  for (i=0; i<VImageNPixels(src); i++) {
+    u = (*pp++);
+    if (fabs(u) < tiny) continue;
+    if (u < zmin) zmin = u;
+    if (u > zmax) zmax = u;
+    n++;
+  }
+  fprintf(stderr," number of nonzero voxels: %lu\n",n);
+
+  /* get every second nonzero data point */
+  size_t nn = n/2;
+  float *data = (float *) VCalloc(nn,sizeof(float));
+  n=0;
+  pp=VImageData(src);
+  for (i=0; i<VImageNPixels(src); i+=2) {
+    u = (*pp++);
+    if (fabs(u) < tiny) continue;
+    u = (*pp++);
+    if (fabs(u) < tiny) continue;
+    if (n >= nn) break;
+    data[n] = u;
+    n++;
+  }
+  if (n < 10) VError(" not enough nonzero voxels: %lu",n);
+
+
+  /* get upper and lower quantiles */
+  size_t k0 = (size_t)(0.001 * (float)n);
+  if (k0 < 3) k0 = 3;
+  size_t k1 = (size_t)(0.999 * (float)n);
+  if (k1 < n-3) k1 = n-3;
+  if (k0 >= k1) VError(" not enough nonzero voxels: %lu",n);
+  qsort(data,n,sizeof(float),compare_function);
+  float u0 = data[k0];
+  float u1 = data[k1];
+  float eps = (fabs(u1-u0))*0.05;
+  VFree(data);
+
+  /* output */
+  *hmin = (double)(u0-eps);
+  *hmax = (double)(u1+eps);
+}
+
+
+
 
 
 /* remove isolated voxels */

@@ -1,3 +1,6 @@
+#include <stdio.h>
+
+
 /*
  *  $Id: Vlib.h,v 1.1.1.1 2004/03/08 13:12:46 lohmann Exp $
  *
@@ -690,3 +693,21 @@ VRepnKind VLookupType (
 #endif
 
 #endif /* V_Vlib_h */
+
+
+
+/*
+** needed for handling gzipped vista- and nifti data
+**  G.Lohmann, May 2017
+*/
+extern int CheckGzip(VString);
+extern VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean,VBoolean,VBoolean *);
+extern char *VReadDataContainer(char *filename,VBoolean nofail,size_t *size);
+extern FILE *VOpenStream(char *databuffer,size_t size);
+extern int getformat(char *filename);
+extern VAttrList VReadAttrList(VString filename,VLong tr,VBoolean attrtype,VBoolean scaling);
+extern VImage VReadImage(VAttrList list);
+extern int VAttrListNumImages(VAttrList list);
+extern VImage *VAttrListGetImages(VAttrList list,int n);
+extern void VImageDimensions(VImage *src,int nimages,int *bands,int *rows,int *cols);
+

@@ -237,7 +237,8 @@ void VDataMatrix(VImage *src,int first,int len,VImage map,gsl_matrix_float *X)
     r = VPixel(map,0,1,i,VShort);
     c = VPixel(map,0,2,i,VShort);
 
-    if ((first+len) > VImageNBands(src[b])) VError(" illegal len addr, %d %d",first+len,VImageNBands(src[b]));
+    if ((first+len) > VImageNBands(src[b])) VError(" illegal len addr, %d  %d %d %d",
+						   b,first,len,VImageNBands(src[b]));
     if (r >= VImageNRows(src[b])) VError(" illegal row addr");
     if (c >= VImageNColumns(src[b])) VError(" illegal column addr");
 

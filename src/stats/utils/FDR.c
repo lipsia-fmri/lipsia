@@ -158,15 +158,18 @@ void FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_histogr
   /* apply FDR */
   size_t ic=0,n=0;
   double u,tiny=1.0e-8;
+  double hmin = gsl_histogram_min (realhist);
+  double hmax = gsl_histogram_max (realhist);
+
   VFillImage(dest,VAllBands,0);
   VFloat *pp0 = VImageData(src);
   VFloat *pp1 = VImageData(dest);
   for (i=0; i<VImageNPixels(src); i++) {
-    u = *pp0;
+    u = (double)(*pp0);
 
-    if (ABS(u) > tiny) {
-      if (u < gsl_histogram_min(realhist)) u = gsl_histogram_min(realhist)+0.0001;
-      if (u > gsl_histogram_max(realhist)) u = gsl_histogram_max(realhist)-0.0001;
+    if (fabs(u) > tiny) {
+      if (u < hmin) u = hmin + tiny;
+      if (u > hmax) u = hmax - tiny;
       if (gsl_histogram_find (realhist,(double)u,&j) == GSL_SUCCESS) {
 	double xFdr = CFDR(j,cdf0,cdfz);
 

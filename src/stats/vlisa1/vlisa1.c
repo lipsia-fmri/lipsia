@@ -6,12 +6,11 @@
 **
 ** G.Lohmann, 2017
 */
-
-#include "viaio/Vlib.h"
-#include "viaio/file.h"
-#include "viaio/mu.h"
-#include "viaio/option.h"
-#include "viaio/os.h"
+#include <viaio/Vlib.h>
+#include <viaio/file.h>
+#include <viaio/mu.h>
+#include <viaio/option.h>
+#include <viaio/os.h>
 #include <viaio/VImage.h>
 #include <via/via.h>
 
@@ -30,8 +29,6 @@
 #include <omp.h>
 #endif /*_OPENMP*/
 
-extern float kth_smallest(float *a, size_t n, size_t k);
-#define Median(a,n) kth_smallest(a,n,(((n)&1)?((n)/2):(((n)/2)-1)))
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
 extern void   VIsolatedVoxels(VImage src,float threshold);
@@ -43,8 +40,7 @@ extern void   ImageStats(VImage src,double *,double *,double *hmin,double *hmax)
 extern void   VBilateralFilter(VImage src,VImage dest,int radius,double var1,double var2,int);
 extern double VImageVar(VImage src);
 extern void   VImageCount(VImage src);
-extern void   VMedian6(VImage src);
-extern void   VLocalVariance(VImage src,int radius,double *,double *);
+extern void   VGetHistRange(VImage src,double *hmin,double *hmax);
 
 
 /* generate permutation table */
@@ -150,10 +146,9 @@ int main (int argc, char *argv[])
   };
 
   FILE *fp=NULL;
-  VStringConst in_filename;
+  VString in_filename;
   VAttrList list1=NULL,out_list=NULL,geolist=NULL;
-  VAttrListPosn posn;
-  VImage src=NULL,*src1;
+  VImage *src1;
   int i,nimages,npix=0;
   char *prg_name=GetLipsiaName("vlisa1");
   fprintf (stderr, "%s\n", prg_name);
@@ -183,29 +178,16 @@ int main (int argc, char *argv[])
   nimages = in_files1.number;
   src1 = (VImage *) VCalloc(nimages,sizeof(VImage));
   for (i = 0; i < nimages; i++) {
-    src1[i] = NULL;
-    in_filename = ((VStringConst *) in_files1.vector)[i];
-    fp = VOpenInputFile (in_filename, TRUE);
-    list1 = VReadFile (fp, NULL);
-    if (! list1)  VError("Error reading image");
-    fclose(fp);
+    in_filename = ((VString *) in_files1.vector)[i];
+    list1   = VReadAttrList(in_filename,0L,TRUE,FALSE);
+    src1[i] = VReadImage(list1);
+    if (src1[i] == NULL) VError(" no input image found");
+    if (VPixelRepn(src1[i]) != VFloatRepn) VError(" input pixel repn must be float");
+    if (i == 0) npix = VImageNPixels(src1[i]);
+    else if (npix != VImageNPixels(src1[i])) VError(" inconsistent image dimensions");
 
     /* use geometry info from 1st file */
-    if (geolist == NULL) geolist =  VGetGeoInfo(list1);
-
-
-    for (VFirstAttr (list1, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-      if (VGetAttrRepn (& posn) != VImageRepn) continue;
-      VGetAttrValue (& posn, NULL, VImageRepn, & src);
-      if (VPixelRepn(src) != VFloatRepn) continue;
-
-      if (i == 0) npix = VImageNPixels(src);
-      else if (npix != VImageNPixels(src)) VError(" inconsistent image dimensions");
-
-      src1[i] = src;
-      break;
-    }
-    if (src1[i] == NULL) VError(" no image found in %s",in_filename);
+    if (geolist == NULL) geolist = VGetGeoInfo(list1);
   }
 
 
@@ -222,19 +204,19 @@ int main (int argc, char *argv[])
 
 
   /* estimate null variance to adjust radiometric parameter, use first 30 permutations */
-  double vmin=0,vmax=0,hmin=0,hmax=0,gave=0,gvar=0;
+  double hmin=0,hmax=0;
   double xrvar = rvar;
   if (numperm > 0) {
     int tstperm = 30;
     if (tstperm > numperm) tstperm = numperm;
     VImage zmap = VCreateImageLike(src1[0]);
-    double vsum=0,nx=0;
+    double varsum=0,nx=0;
     for (nperm = 0; nperm < tstperm; nperm++) {
       OnesampleTest(src1,zmap,permtable[nperm],nimages);
-      vsum += VImageVar(zmap);
+      varsum += VImageVar(zmap);
       nx++;
     }    
-    double meanvar = vsum/nx;
+    double meanvar = varsum/nx;
     xrvar = (rvar * meanvar);
     fprintf(stderr," null variance: %f,  adjusted: %f  %f\n",meanvar,xrvar,svar);
     VDestroyImage(zmap);
@@ -248,21 +230,18 @@ int main (int argc, char *argv[])
   VImage zmap1 = VCreateImageLike(src1[0]);
   OnesampleTest(src1,zmap1,nopermtable,nimages);
   VBilateralFilter(zmap1,dst1,(int)radius,(double)(xrvar),(double)svar,(int)numiter);
-  /* if (cleanup) VMedian6(dst1); */
 
 
   /* ini histograms */
+  VGetHistRange(dst1,&hmin,&hmax);
+  fprintf(stderr," Histogram range:  [%.3f, %.3f]\n",hmin,hmax);
   size_t nbins = 10000;
-  ImageStats(dst1,&gave,&gvar,&vmin,&vmax);
-  hmin = vmin - 4.0;
-  hmax = vmax + 4.0;
-  if (hmin < -12.0) hmin = -12.0;
-  if (hmax > 12.0) hmax = 12.0;
   gsl_histogram *hist0 = gsl_histogram_alloc (nbins);
   gsl_histogram_set_ranges_uniform (hist0,hmin,hmax);
   gsl_histogram *histz = gsl_histogram_alloc (nbins);
   gsl_histogram_set_ranges_uniform (histz,hmin,hmax);
   HistoUpdate(dst1,histz);
+
 
 
   /* random permutations */
@@ -272,7 +251,7 @@ int main (int argc, char *argv[])
 
     VImage zmap = VCreateImageLike(src1[0]);
     VImage dst  = VCreateImageLike (zmap);
-    OnesampleTest(src1,zmap,permtable[nperm],nimages);  
+    OnesampleTest(src1,zmap,permtable[nperm],nimages);
     VBilateralFilter(zmap,dst,(int)radius,(double)(xrvar),(double)svar,(int)numiter);
 
 #pragma omp critical 

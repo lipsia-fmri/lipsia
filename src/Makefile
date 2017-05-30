@@ -6,7 +6,7 @@
 #
 
 SUBDIRS  = $(shell ls -d */)
-VIA_LIBS = lib_viaio lib_via lib_niftiio
+VIA_LIBS = lib_viaio lib_via
 
 # VIA_LIBS are a global prequisite, so we make the dependency explicit
 # here and below, to enable parallel builds like "make -j 4"

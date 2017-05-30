@@ -1,5 +1,5 @@
 
-LDLIBS = -lfftw3 -lgsl -lgslcblas -lvia3.0 -lviaio3.0 -lm
+LDLIBS = -lfftw3 -lgsl -lgslcblas -lvia3.0 -lviaio3.0 -lm -lz
 
 PROG = vpreprocess
 SRC = vpreprocess.c Convolve.c FreqFilter.c GaussConv.c MinVals.c SpatialFilter.c

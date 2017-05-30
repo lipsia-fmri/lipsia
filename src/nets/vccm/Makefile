@@ -1,5 +1,5 @@
 
-LDLIBS = -lgsl -lgslcblas -lvia3.0 -lviaio3.0 -lm
+LDLIBS = -lgsl -lgslcblas -lvia3.0 -lviaio3.0 -lm -lz
 
 PROG = vccm
 SRC = vccm.c CCC.c Kendall.c OCCC.c

@@ -1,4 +1,4 @@
-LDLIBS = -lgsl -lgslcblas -lblas -lviaio3.0 -lm -fopenmp
+LDLIBS = -lgsl -lgslcblas -lblas -lviaio3.0 -lm -fopenmp -lz
 
 #CFLAGS  = -g
 CFLAGS  += -fopenmp

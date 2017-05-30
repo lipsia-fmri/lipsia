@@ -29,6 +29,8 @@
 #include <viaio/Vlib.h>
 #include <viaio/mu.h>
 #include <viaio/option.h>
+
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -50,8 +52,9 @@ int main(int argc, char *argv[]) {
     {"stop",  VBooleanRepn, 1, (VPointer) &stop, VOptionalOpt, NULL, "Temporal Filter: Stop insted of pass filter"},
     {"minval", VShortRepn, 1, (VPointer) &minval, VOptionalOpt, NULL, "Signal threshold"}
   };
-  FILE *in_file = NULL, *out_file = NULL;
-  VAttrList list = NULL;
+  FILE *out_file = NULL;
+  VString in_file=NULL;
+
 
   extern void VSpatialFilter(VAttrList, VDouble);
   extern void VApplyMinval(VAttrList, VShort);
@@ -60,35 +63,27 @@ int main(int argc, char *argv[]) {
   fprintf (stderr, "%s\n", prg);
 
 
-  VParseFilterCmd(VNumber(options), options, argc, argv, &in_file, &out_file);
+  VParseFilterCmdX(VNumber(options), options, argc, argv, &in_file, &out_file);
 
-  if(fwhm < 0)
-    VError("fwhm must be non-negative");
-  if(low > high && high > 0)
-    VError("low must be less than high");
-  if(low < 0 || high < 0)
-    VError("high and low must be non-negative");
-  if(sharp < 0.01)
-    VError(" sharp too small", sharp);
+  if (fwhm < 0) VError("fwhm must be non-negative");
+  if (low > high && high > 0) VError("low must be less than high");
+  if (low < 0 || high < 0) VError("high and low must be non-negative");
+  if (sharp < 0.01) VError(" sharp too small", sharp);
 
 
-  /*
-  ** read the file
-  */
-  if(!(list = VReadFile(in_file, NULL)))
-    exit(1);
-  fclose(in_file);
+  /* read the file */
+  VLong tr=1628;
+  VAttrList list = VReadAttrList(in_file,tr,TRUE,FALSE);
+  if (list == NULL) VError(" error reading input file %s",in_file);
 
-  if(low > 0 || high > 0)
-    VFreqFilter(list, high, low, stop, sharp);
-  if(fwhm > 0)
-    VSpatialFilter(list, fwhm);
-  if(minval > 0)
-    VApplyMinval(list, minval);
 
-  /*
-  ** output
-  */
+  /* apply filtering */
+  if (low > 0 || high > 0) VFreqFilter(list, high, low, stop, sharp);
+  if (fwhm > 0) VSpatialFilter(list, fwhm);
+  if (minval > 0) VApplyMinval(list, minval);
+
+
+  /* write output */
   VHistory(VNumber(options), options, prg, &list, &list);
   if(! VWriteFile(out_file, list)) exit(1);
   fprintf(stderr, "%s: done.\n", argv[0]);

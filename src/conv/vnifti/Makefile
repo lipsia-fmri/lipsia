@@ -1,9 +1,9 @@
 
-LDLIBS = -lgsl -lgslcblas -lniftiio -lviaio3.0 -lvia3.0 -lm -lz
-#CFLAGS = -g
+LDLIBS = -lviaio3.0 -lm -lgsl -lgslcblas -lz -lm 
+#CFLAGS += -g
 
 PROG = vnifti
-SRC = vnifti.c Vista2Nii.c Nii2Vista.c ByteSwap.c newfile_io.c
+SRC = vnifti.c Vista2Nii.c
 OBJ=$(SRC:.c=.o)
 
 ${PROG}: ${OBJ}

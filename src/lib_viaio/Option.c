@@ -625,6 +625,75 @@ void VParseFilterCmd (int noptions, VOptionDescRec opts[],
 }
     
 
+
+/*
+ *  VParseFilterCmdX
+ *
+ *  Similar to VParseFilterCmd, but input filename is preserved.
+ *  Thus, the parameter *inp is now a VString, not a FILE-pointer.
+ *
+ *  G.Lohmann, MPI-KYB, May 2017
+ */
+
+void VParseFilterCmdX (int noptions, VOptionDescRec opts[],
+		      int argc, char **argv, VString *inp, FILE **outp)
+{
+  static VString in_file, out_file;
+  static VBoolean in_found, out_found;
+  static VOptionDescRec io_opts[] = {
+    { "in", VStringRepn, 1, & in_file, & in_found, NULL, "Input file" },
+    { "out", VStringRepn, 1, & out_file, & out_found, NULL, "Output file" }
+  };
+  int i, n;
+  VOptionDescRec options[100];
+    
+  /* Check that number of options will not overflow the options array. */
+  if (noptions >= 98) {
+    VWarning("VParseFilterCmd: Too many options allowed");
+    noptions = 98;
+  }
+
+  /* Copy options into a new list and add the "in" and "out" options. */
+  n = 0;
+  if (inp)
+    options[n++] = io_opts[0];
+  if (outp)
+    options[n++] = io_opts[1];
+  for (i = 0; i < noptions; i++, n++)
+    options[n] = opts[i];
+    
+  /* Parse command line arguments and identify the input and output files: */
+  if (! VParseCommand (n, options, & argc, argv) ||
+      (inp && ! VIdentifyFiles (n, options, "in", & argc, argv, 0)) ||
+      (outp && ! VIdentifyFiles (n, options, "out", & argc, argv, 1)))
+    goto Usage;
+
+  /* Any remaining unparsed arguments are erroneous: */
+  if (argc > 1) {
+    VReportBadArgs (argc, argv);
+  Usage:  VReportUsage (argv[0], n, options,
+			inp ? (outp ? "[infile] [outfile]" : "[infile]") :
+			(outp ? "[outfile]" : NULL));
+    exit (EXIT_FAILURE);
+  }
+  
+  *inp = in_file;
+
+  if (outp)
+    *outp = VOpenOutputFile (out_file, TRUE);
+
+
+  /* Open the input and output files: */
+  /*
+  if (inp)
+    *inp = VOpenInputFile (in_file, TRUE);
+  if (outp)
+    *outp = VOpenOutputFile (out_file, TRUE);
+    */
+}
+    
+
+
 /*
  *  VPrintOptions
  *
@@ -875,3 +944,4 @@ void VReportValidOptions (int noptions, VOptionDescRec options[])
     fputc ('\n', stderr);
   }
 }
+

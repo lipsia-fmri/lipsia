@@ -180,7 +180,7 @@ size_t EdgeDensity(float *E,int *I,int *J,size_t nedges_estimated,
       double z2 = EdgeCorr(datax2,datay2,nt,metric);
       double z = (z1-z2);
       if (z < zthreshold) continue;
-
+ 
       int nadjy = VEdgeNeigbours(j,map,mapimage,adjdef,y);
       if (nadjy < minadj) continue;
 
@@ -276,7 +276,10 @@ size_t EstimateEdges(float *E,int *I,int *J,size_t old_estimate,
   gsl_histogram_reset(TedHist);
   EdgeDensity(E,I,J,old_estimate,TedHist,SNR1,SNR2,n1,n2,roi,map,mapimage,(int)adjdef,elength,zthr,
 	      nperm,numperm,step,tmp_cutoff,metric);
-  
+
+  double sd = gsl_histogram_sigma (TedHist);
+  if (sd < 1.0e-6) VError(" stdev of TedHist: %f",sd);
+
   size_t i0 = 0;
   if (gsl_histogram_find (TedHist,(double)noise_cutoff,&i0) != GSL_SUCCESS)
     VError (" err finding noise cutoff index, %f",noise_cutoff);
@@ -285,7 +288,9 @@ size_t EstimateEdges(float *E,int *I,int *J,size_t old_estimate,
   gsl_histogram_pdf *cdf = gsl_histogram_pdf_alloc(hbins);
   gsl_histogram_pdf_init (cdf,TedHist);
 
+
   double qx = 1.0 - cdf->sum[i0];
+  if (qx > 1) qx = 1.0;
   size_t new_estimate = (size_t) (qx*(double)old_estimate);
 
   gsl_histogram_reset(TedHist);
