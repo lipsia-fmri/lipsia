@@ -510,7 +510,6 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
   char *voxelstr = (char *) VCalloc(blen,sizeof(char));
   memset(voxelstr,0,blen);
   sprintf(voxelstr,"%f %f %f",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
-  fprintf(stderr," voxel: %.4f %.4f %.4f\n",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
 
 
   /* geometry information */

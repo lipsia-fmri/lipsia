@@ -82,31 +82,31 @@ void VImageCount(VImage src)
 }
 
 
+/* needed for qsort */
 int compare_function(const void *a,const void *b) 
 {
   float *x = (float *) a;
   float *y = (float *) b;
-  return (*x) - (*y);
+  float d = ((*x) - (*y));
+  if (d > 0) return 1;
+  else if (d < 0) return -1;
+  else return 0;
 }
 
 /* get histogram range */
 void VGetHistRange(VImage src,double *hmin,double *hmax)
 {
-
   /* count number of nonzero voxels */
-  float zmin = (float)(VRepnMaxValue(VFloatRepn)-1.0);
-  float zmax = (float)(VRepnMinValue(VFloatRepn)+1.0);
   float u=0,tiny=1.0e-8;
   size_t i=0,n=0;
   VFloat *pp=VImageData(src);
   for (i=0; i<VImageNPixels(src); i++) {
     u = (*pp++);
     if (fabs(u) < tiny) continue;
-    if (u < zmin) zmin = u;
-    if (u > zmax) zmax = u;
     n++;
   }
   fprintf(stderr," number of nonzero voxels: %lu\n",n);
+
 
   /* get every second nonzero data point */
   size_t nn = n/2;

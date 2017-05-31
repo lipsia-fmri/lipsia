@@ -141,7 +141,7 @@ int main (int argc, char *argv[])
     {"svar",VFloatRepn,1,(VPointer) &svar,VOptionalOpt,NULL,"Bilateral parameter (spatial)"},
     {"numiter",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Number of iterations in bilateral filter"},  
     {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to apply cleanup"},      
-    {"filename",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"Name of output fdr txt-file"},    
+    {"fdrfile",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"Name of output fdr txt-file"},    
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
   };
 
@@ -218,7 +218,6 @@ int main (int argc, char *argv[])
     }    
     double meanvar = varsum/nx;
     xrvar = (rvar * meanvar);
-    fprintf(stderr," null variance: %f,  adjusted: %f  %f\n",meanvar,xrvar,svar);
     VDestroyImage(zmap);
   }
 

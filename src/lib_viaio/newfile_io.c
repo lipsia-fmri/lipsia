@@ -83,7 +83,7 @@ char *VReadUnzippedData(char *filename,VBoolean nofail,size_t *size)
   char *data = (char *) malloc(buflen);
   FILE *fp = VOpenInputFile (filename,nofail);
   if (fp == NULL) VError("Error opening file %s\n", filename);
-  int ret = fread(data,1,buflen,fp);
+  size_t ret = fread(data,1,buflen,fp);
   if (ret != buflen) 
     VError("Error reading from %s, fread error= %ld\n",filename,ret);
   fclose(fp);
