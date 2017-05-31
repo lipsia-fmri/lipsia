@@ -3,7 +3,8 @@ LIPSIA 3.0: fMRI analysis tools
 ======================================
 
 Lipsia is a collection of tools for the analysis of fMRI data. Its main focus is on new algorithms
-such as TED (Task-related edge density) and ECM (Eigenvector centrality mapping).
+such as TED (Task-related edge density), ECM (Eigenvector centrality mapping) and statistical
+inference (LISA).
 
 The current release contains only a rudimentary set of preprocessing tools.
 Preprocessing should therefore be performed beforehand using other software packages.
@@ -25,6 +26,9 @@ Find the lipsia documentation here: `documentation`_.
 Lipsia file format
 ```````````````````````````````````````
 Lipsia uses its own data format, which is called vista (extension *.v*).
+Some programs also accept gzipped files or nifti-files as input (*.v.gz or *.nii.gz).
+These programs are: vnifti, vecm, vlisa1 and vpreprocess.
+The output is always in unzipped vista-format.
 You can easily convert your nifti data from and to lipsia with the program *vnifti*::
 
   vnifti -in data.nii -out data.v
@@ -39,10 +43,10 @@ Getting started: 30 seconds to Lipsia
 ```````````````````````````````````````
 Convert fmri data file into lipsia format::
 
-  vnifti -in fmri.nii -out fmri.v
+  vnifti -in fmri.nii.gz -out fmri.v
 
 
-Convert rfegion of interest mask file into lipsia format::
+Convert region of interest mask file into lipsia format::
 
   vnifti -in mask.nii -out mask.v
 
