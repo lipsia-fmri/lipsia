@@ -270,9 +270,13 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 	  const size_t src_index = (col + row*ncols + slice*nrnc + ti*npix + 1)*nsize;
 	 
 	  if (!do_scaling) {
-	    const size_t dst_index = (col + row*ncols + ti*nrnc - 1)*nsize;
-	    if (dst_index >= 0)
+	    /*
+	      const size_t dst_index = (col + row*ncols + ti*nrnc - 1)*nsize;
+	      if (dst_index >= 0)
 	      memcpy(&pp[dst_index],&data[src_index],nsize);
+	    */
+	    double u = VGetValue(data,src_index,datatype);
+	    VSetPixel(dst[slice],ti,row,col,u);
 	  }
 	  else {
 	    double u = VGetValue(data,src_index,datatype);
