@@ -24,7 +24,7 @@
 #include "viaio/os.h"
 #include "viaio/VList.h"
 #include "viaio/mu.h"
-
+#include <limits.h>
 
 /*
  *  Information about built-in types.
@@ -38,11 +38,11 @@ static VRepnInfoRec builtin_repn_info[] = {
     { "unknown" },
 
     /* Integer and floating-point numbers: */
-    { "bit",	   sizeof (VBit),         1, 0.0, 1.0 },
-    { "ubyte",	   sizeof (VUByte),	  8, 0.0, 255.0 },
-    { "sbyte",	   sizeof (VSByte),	  8, -128.0, 127.0 },
+    { "bit",	   sizeof (VBit),         1, 0, 1 },
+    { "ubyte",	   sizeof (VUByte),	  8, 0, UCHAR_MAX },
+    { "sbyte",	   sizeof (VSByte),	  8, CHAR_MIN, CHAR_MAX },
     { "short",	   sizeof (VShort),      16, -32768.0, 32767.0 },
-    { "long",	   sizeof (VLong),       64, -9223372036854775807, 9223372036854775807 },
+    { "long",	   sizeof (VLong),       64, LONG_MIN,LONG_MAX }, 
     { "float",	   sizeof (VFloat),      32, 
 	  -3.40282346638528860e+38, 3.40282346638528860e+38 },
     { "double",	   sizeof (VDouble),   64,
@@ -62,10 +62,10 @@ static VRepnInfoRec builtin_repn_info[] = {
     
     /* new object types */
     { "volumes",   sizeof (VPointer),   0, 0.0, 0.0, & VolumesMethods },
-    { "ushort",	   sizeof (VUShort),     16, 0, 65536},
-    { "int",	   sizeof (VInteger),    32, -2147483648, 2147483647 },
-    { "uint",	   sizeof (VUInteger),   32, 0, 4294967295 },
-    { "ulong",	   sizeof (VULong),      64, 0, 1.844674e+19},
+    { "ushort",	   sizeof (VUShort),     16, 0, USHRT_MAX },
+    { "int",	   sizeof (VInteger),    32, INT_MIN, INT_MAX },
+    { "uint",	   sizeof (VUInteger),   32, 0, UINT_MAX },
+    { "ulong",	   sizeof (VULong),      64, 0, ULONG_MAX }
 };
 
 VRepnInfoRec *VRepnInfo = builtin_repn_info;

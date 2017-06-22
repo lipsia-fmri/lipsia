@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
 
   /* read the file */
-  VLong tr=1628;
+  VLong tr=0L;
   VAttrList list = VReadAttrList(in_file,tr,TRUE,FALSE);
   if (list == NULL) VError(" error reading input file %s",in_file);
 

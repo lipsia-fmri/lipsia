@@ -1,6 +1,3 @@
-#include <stdio.h>
-
-
 /*
  *  $Id: Vlib.h,v 1.1.1.1 2004/03/08 13:12:46 lohmann Exp $
  *
@@ -30,6 +27,7 @@
 
 /* Get definition of size_t and NULL: */
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,12 +59,12 @@ typedef char VBit;			             /* 0 or 1 */
 typedef double VDouble;		        	/* >= 64-bit IEEE floating point */
 typedef float VFloat;			          /* >= 32-bit IEEE floating point */
 
-typedef short VShort;			/* >= 16-bit signed integer */
-typedef unsigned short VUShort;		  /* >= 16-bit unsigned integer */
-typedef int VInteger;		            /* >= 32-bit signed integer */
-typedef unsigned int VUInteger;		  /* >= 32-bit unsigned integer */
-typedef long VLong;	              	/* >= 64-bit signed integer */
-typedef unsigned long VULong;		    /* >= 64-bit unsigned integer */
+typedef int16_t VShort;			 /* >= 16-bit signed integer */
+typedef uint16_t VUShort;		 /* >= 16-bit unsigned integer */
+typedef int32_t VInteger;		 /* >= 32-bit signed integer */
+typedef uint32_t VUInteger;		 /* >= 32-bit unsigned integer */
+typedef int64_t VLong;	                 /* >= 64-bit signed integer */
+typedef uint64_t VULong;		 /* >= 64-bit unsigned integer */
 
 
 #if __STDC__ 
@@ -540,6 +538,19 @@ extern void VSetGeoDim(VAttrList,double *);
 extern void VGetSlicetimes(int,int,int,double,double *);
 
 
+/* new: file IO, May 2017 */
+extern int CheckGzip(char *filename);
+extern char *VReadGzippedData(char *filename,size_t *len);
+extern char *VReadUnzippedData(char *filename,VBoolean nofail,size_t *size);
+extern int getformat(char *filename);
+extern VAttrList VReadAttrList(VString filename,VLong tr,VBoolean attrtype,VBoolean do_scaling);
+extern VImage VReadImage(VAttrList list);
+extern int VAttrListNumImages(VAttrList list);
+extern VImage *VAttrListGetImages(VAttrList list,int n);
+extern void VImageDimensions(VImage *src,int nimages,int *bands,int *rows,int *cols);
+
+
+
 /* From Dictionary.c: */
 
 extern VDictEntry *VLookupDictKeyword (
@@ -693,21 +704,3 @@ VRepnKind VLookupType (
 #endif
 
 #endif /* V_Vlib_h */
-
-
-
-/*
-** needed for handling gzipped vista- and nifti data
-**  G.Lohmann, May 2017
-*/
-extern int CheckGzip(VString);
-extern VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean,VBoolean,VBoolean *);
-extern char *VReadDataContainer(char *filename,VBoolean nofail,size_t *size);
-extern FILE *VOpenStream(char *databuffer,size_t size);
-extern int getformat(char *filename);
-extern VAttrList VReadAttrList(VString filename,VLong tr,VBoolean attrtype,VBoolean scaling);
-extern VImage VReadImage(VAttrList list);
-extern int VAttrListNumImages(VAttrList list);
-extern VImage *VAttrListGetImages(VAttrList list,int n);
-extern void VImageDimensions(VImage *src,int nimages,int *bands,int *rows,int *cols);
-

@@ -38,7 +38,11 @@
 #include <nifti/nifti1_io.h>
 #include <zlib.h>
 
+extern char *VReadDataContainer(char *filename,VBoolean nofail,size_t *size);
+extern FILE *VOpenStream(char *databuffer,size_t size);
 extern void Vista_to_Nifti1(VAttrList list,VString filename);
+extern VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean do_scaling,VBoolean *ok);
+
 
 int main(int argc,char *argv[])
 {
@@ -46,11 +50,11 @@ int main(int argc,char *argv[])
   static VString out_filename = "";
   static VLong tr=0;
   static VBoolean attrtype = TRUE;
-  static VBoolean do_scaling = TRUE;
+  static VBoolean do_scaling = FALSE;
   static VOptionDescRec  options[] = {
     {"in",VStringRepn,1,(VPointer) &in_filename,VRequiredOpt,NULL,"Input file"},
     {"out",VStringRepn,1,(VPointer) &out_filename,VRequiredOpt,NULL,"Output file"},
-    {"tr",VLongRepn,1,(VPointer) &tr,VOptionalOpt,NULL,"Repetition time in milliseconds"},
+    {"tr",VLongRepn,1,(VPointer) &tr,VOptionalOpt,NULL,"Repetition time in milliseconds, use '0' to rely on header info"},
     {"attrtype",VBooleanRepn,1,(VPointer) &attrtype,VOptionalOpt,NULL,"Whether to output 4D data to lipsia 4D format"},
     {"scale",VBooleanRepn,1,(VPointer) &do_scaling,VOptionalOpt,NULL,"Whether to scale 4D data to 16bit integer"},
   };
@@ -78,7 +82,7 @@ int main(int argc,char *argv[])
 
 
   /* nifti-1 to vista */
-  if (itype == 1 && otype == 0) {
+  if (itype == 1 && otype == 0) {    
     VBoolean ok=FALSE;
     VAttrList out_list = Nifti1_to_Vista(databuffer,tr,attrtype,do_scaling,&ok);
     if (ok) VFree(databuffer);

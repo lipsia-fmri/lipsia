@@ -263,18 +263,12 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
     if (slicetime != NULL)
       VSetAttr(VImageAttrList(dst[slice]),"slice_time",NULL,VShortRepn,(VShort)slicetime[slice]);
 
-    char *pp = (char *)VImageData(dst[slice]);
     for (ti=0; ti<nt; ti++) {
       for (row=0; row<nrows; row++) {
 	for (col=0; col<ncols; col++) {
 	  const size_t src_index = (col + row*ncols + slice*nrnc + ti*npix + 1)*nsize;
 	 
 	  if (!do_scaling) {
-	    /*
-	      const size_t dst_index = (col + row*ncols + ti*nrnc - 1)*nsize;
-	      if (dst_index >= 0)
-	      memcpy(&pp[dst_index],&data[src_index],nsize);
-	    */
 	    double u = VGetValue(data,src_index,datatype);
 	    VSetPixel(dst[slice],ti,row,col,u);
 	  }

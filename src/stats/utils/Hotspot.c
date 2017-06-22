@@ -20,30 +20,44 @@ extern float kth_smallest(float *a, size_t n, size_t k);
 #define Median(a,n) kth_smallest(a,n,(((n)&1)?((n)/2):(((n)/2)-1)))
 
 
-/* get image statistics */
-void ImageStats(VImage src,double *ave,double *var,double *hmin,double *hmax)
+/* scale z-values */
+void VZScale(VImage src,float stddev)
 {
   size_t i=0;
-  double umin = 99999.9;
-  double umax = -99999.9;
-  double u=0,s1=0,s2=0,nx=0,mean=0,tiny=1.0e-8;
+  float u=0,tiny=1.0e-8;
+  VFloat *pp=VImageData(src);
+  for (i=0; i<VImageNPixels(src); i++) {
+    u = (*pp);
+    if (fabs(u) > tiny) (*pp) = u/stddev;
+    pp++;
+  }  
+}
+
+
+/* scaling and centering of z-values */
+void VZNormalize(VImage src,float stddev)
+{
+  size_t i=0;
+  float u=0,s1=0,nx=0,tiny=1.0e-8;
 
   VFloat *pp=VImageData(src);
   for (i=0; i<VImageNPixels(src); i++) {
-    u = (double)(*pp++);
-    if (u < umin) umin = u;
-    if (u > umax) umax = u;
-    if (fabs(u) < tiny) continue;
-    s1 += u;
-    s2 += u*u;
-    nx++;
+    u = (*pp);
+    if (fabs(u) > tiny) {
+      s1 += u;
+      nx++;
+    }
+    pp++;
   }
   if (nx < 3.0) VError(" nx: %f\n",nx);
-  *hmin = umin;
-  *hmax = umax;  
-  mean = s1/nx;
-  *ave = mean;
-  *var = (s2 - nx * mean * mean) / (nx - 1.0);
+  float mean = s1/nx;
+
+  pp=VImageData(src);
+  for (i=0; i<VImageNPixels(src); i++) {
+    u = (*pp);
+    if (fabs(u) > tiny) (*pp) = (u-mean)/stddev;
+    pp++;
+  }
 }
 
 
@@ -97,7 +111,7 @@ int compare_function(const void *a,const void *b)
 void VGetHistRange(VImage src,double *hmin,double *hmax)
 {
   /* count number of nonzero voxels */
-  float u=0,tiny=1.0e-8;
+  float u=0,v=0,tiny=1.0e-8;
   size_t i=0,n=0;
   VFloat *pp=VImageData(src);
   for (i=0; i<VImageNPixels(src); i++) {
@@ -115,9 +129,8 @@ void VGetHistRange(VImage src,double *hmin,double *hmax)
   pp=VImageData(src);
   for (i=0; i<VImageNPixels(src); i+=2) {
     u = (*pp++);
-    if (fabs(u) < tiny) continue;
-    u = (*pp++);
-    if (fabs(u) < tiny) continue;
+    v = (*pp++);
+    if (fabs(u) < tiny || fabs(v) < tiny) continue;
     if (n >= nn) break;
     data[n] = u;
     n++;

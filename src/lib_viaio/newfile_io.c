@@ -19,7 +19,8 @@
 
 #include <zlib.h>
 
-#define N 1048576  /* one megabyte */
+#define N 5242880  /* five megabyte */
+
 
 extern VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean,VBoolean,VBoolean *);
 
@@ -39,23 +40,15 @@ char *VReadGzippedData(char *filename,size_t *len)
 {
   int i=0,err=0,ulen=0;
   char *buf = (char *) VCalloc(N,sizeof(char));
-  gzFile *fp = (gzFile *)gzopen(filename,"rb");
+  gzFile fp = (gzFile) gzopen(filename,"rb");
   if (fp == NULL) VError("Error: Failed to gzopen %s\n", filename);
 
   char *data = (char *)malloc(sizeof(char));
-  /* int gflag = 0; */
+
   size_t n=0,m=0;
   while(!gzeof(fp)) {
     ulen = gzread(fp,buf,(unsigned int)N);
     if (ulen == Z_NULL) VError(" gzread error, %s",gzerror(fp, &err));
-
-    /* check gzip magic number */
-    /*
-    if (gflag == 0) {
-      if ((data[0] == 0x1f) && (data[1] == 0x8b)) gflag = 1;
-      else VError(" not in gzip format, magic number incorrect, %x %x ",data[0],data[1]);
-    }
-    */
 
     m = n;
     n += (size_t)ulen;
@@ -219,6 +212,7 @@ VImage *VAttrListGetImages(VAttrList list,int n)
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
     if (i >= n) break;
     VGetAttrValue (& posn, NULL,VImageRepn, & images[i]);
+    if (VPixelRepn(images[0]) != VPixelRepn(images[i])) VError(" inconsistent pixel repn");
     i++;
   }
   return images;

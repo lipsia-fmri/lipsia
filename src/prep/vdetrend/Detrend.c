@@ -24,10 +24,10 @@
 void VGetStats(double *data,int nt,int i0,double *ave,double *sigma)
 {
   int i;
-  double sum1,sum2,nx;
+  double u,sum1,sum2,nx;
   sum1 = sum2 = 0;
   for (i=i0; i<nt; i++) {
-    double u = data[i];
+    u = data[i];
     sum1 += u;
     sum2 += u*u;
   }
@@ -40,38 +40,23 @@ void VGetStats(double *data,int nt,int i0,double *ave,double *sigma)
 
 void VDetrend(VAttrList list,VFloat minval,VShort type,VShort i0)
 { 
-  VImage tmp=NULL;
-  VAttrListPosn posn;
-  int row,col,i,j,ntimesteps,nrows,ncols,nslices;
+  int slice,row,col,i,j;
 
 
-  /* get image dimensions, read functional data */
-  nslices = 0;
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & tmp);
-    if (VPixelRepn(tmp) != VShortRepn) continue;
-    nslices++;
-  }
-  /* VDestroyImage(tmp); */
+  /* get image dimensions */
+  int nslices = VAttrListNumImages(list);
+  VImage *src = VAttrListGetImages(list,nslices);
+  int nrows  = VImageNRows (src[0]);
+  int ncols  = VImageNColumns (src[0]);
+  int ntimesteps = VImageNBands (src[0]);
   if (nslices < 1) VError(" no slices");
 
-  VImage *src = (VImage *) VCalloc(nslices,sizeof(VImage));
-  i = ntimesteps = nrows = ncols = 0;
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src[i]);
-    if (VPixelRepn(src[i]) != VShortRepn) continue;
-    if (VImageNBands(src[i]) > ntimesteps) ntimesteps = VImageNBands(src[i]);
-    if (VImageNRows(src[i])  > nrows)  nrows = VImageNRows(src[i]);
-    if (VImageNColumns(src[i]) > ncols) ncols = VImageNColumns(src[i]);
-    i++;
-  }
-  nslices = i;
-  if (nslices < 1) VError(" no slices in image data");
-  if (ntimesteps < 3) VError(" no timesteps in image data");
+  double smax = VPixelMaxValue(src[0]);
+  double smin = VPixelMinValue(src[0]);
 
 
+
+  /* ini regression matrix */
   int p = 4;
   if (type == 2) p = 6;
   gsl_vector *y = gsl_vector_calloc(ntimesteps);
@@ -93,29 +78,26 @@ void VDetrend(VAttrList list,VFloat minval,VShort type,VShort i0)
 
 
   double *x = (double *) VCalloc(ntimesteps,sizeof(double));
-  for (j=0; j<ntimesteps; j++) x[j] = (float)j;
+  for (j=0; j<ntimesteps; j++) x[j] = (double)j;
 
   gsl_vector *w = gsl_vector_calloc(ntimesteps);
-  for (j=0; j<ntimesteps; j++) w->data[j] = (float)1.0;
+  for (j=0; j<ntimesteps; j++) w->data[j] = (double)1.0;
   for (i=0; i<=i0; i++) w->data[i] = 0.01; /* ignore initial time steps */
 
-
-  double smin = VRepnMinValue(VShortRepn);
-  double smax = VRepnMaxValue(VShortRepn);
 
 
   /* remove baseline drift */
   double c0=0,c1=0,c2=0,c3=0,c4=0,c5=0,cov00,cov01,cov11,chisq;
-  for (i=0; i<nslices; i++) {
-    if (i%5==0)fprintf(stderr," slice  %5d  of  %d\r",i,nslices);
+  for (slice=0; slice<nslices; slice++) {
+    if (slice%5==0)fprintf(stderr," slice  %5d  of  %d\r",slice,nslices);
     for (row=0; row<nrows; row++) {
       for (col=0; col<ncols; col++) {
     
 	for (j=0; j<ntimesteps; j++) {
-	  y->data[j] = (double) VPixel(src[i],j,row,col,VShort);
+	  y->data[j] = VGetPixel(src[slice],j,row,col);
 	}
-	if (y->data[0] < minval) {
-	  for (j=0; j<ntimesteps; j++) VPixel(src[i],j,row,col,VShort) = 0;
+	if (y->data[0] < minval+1.0e-8) {
+	  for (j=0; j<ntimesteps; j++) VSetPixel(src[slice],j,row,col,0.0);
 	  goto skip;
 	}
 	double mean=0,sigma=0;
@@ -171,13 +153,12 @@ void VDetrend(VAttrList list,VFloat minval,VShort type,VShort i0)
 	}
 	if (nx > 0) sum /= nx;
 	
-	for (j=0; j<i0; j++) VPixel(src[i],j,row,col,VShort) = sum;
+	for (j=0; j<i0; j++) VSetPixel(src[slice],j,row,col,sum);
 	for (j=i0; j<ntimesteps; j++) {
 	  double u = a*y->data[j] + mean;
-	  VShort v = (int)(u+0.5);
-	  if (v > smax) v = smax;
-	  if (v < smin) v = smin;
-	  VPixel(src[i],j,row,col,VShort) = v;
+	  if (u > smax) u = smax;
+	  if (u < smin) u = smin;
+	  VSetPixel(src[slice],j,row,col,u);
 	}
       skip: ;
       }

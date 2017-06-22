@@ -27,6 +27,7 @@ MY_PLACE=${I_AM%/*} # does 'dirname' exist on a mac ?
 
 # LIPSIA DEVELOPMENT BASE DIRECTORY
 export LIPSIA_DEV=${LIPSIA_DEV:=${MY_PLACE}}
+
 #############################################
 # LIPSIA INSTALLATION FOLDER
 LIPSIA_DEFAULT_INST_DIR=/opt/lipsia3.0
@@ -163,10 +164,10 @@ else
 fi
 
 ####################################################################################
-if [ ${PWD} != ${LIPSIA_DEV}/src ];
-then
-    echo "\"cd \${LIPSIA_DEV}/src\" and try \"make -j 4\"."
-else
-    echo Ok, try \"make\"
-fi
+#if [ ${PWD} != ${LIPSIA_DEV}/src ];
+#then
+#    echo "\"cd \${LIPSIA_DEV}/src\" and try \"make -j 4\"."
+#else
+#    echo Ok, try \"make\"
+#fi
 ####################################################################################

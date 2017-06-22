@@ -12,7 +12,6 @@
 #include <viaio/option.h>
 #include <viaio/os.h>
 #include <viaio/VImage.h>
-#include <via/via.h>
 
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_errno.h>
@@ -41,6 +40,8 @@ extern void   VBilateralFilter(VImage src,VImage dest,int radius,double var1,dou
 extern double VImageVar(VImage src);
 extern void   VImageCount(VImage src);
 extern void   VGetHistRange(VImage src,double *hmin,double *hmax);
+extern void   VZScale(VImage src,float stddev);
+extern double t2z(double,double);
 
 
 /* generate permutation table */
@@ -82,38 +83,43 @@ void HistoUpdate(VImage src1,gsl_histogram *hist)
 void OnesampleTest(VImage *src1,VImage dest,int *permtable,int n)
 {
   int i,k,b,r,c,nslices,nrows,ncols;
-  double s1,s2,nx,mean,var,u,t;
+  double nx,ave,var,u,t,z,df;
   double tiny=1.0e-8;
+  extern void avevar(double *data,int n,double *a,double *v);
 
   nslices = VImageNBands(src1[0]);
   nrows   = VImageNRows(src1[0]);
   ncols   = VImageNColumns(src1[0]);
   VFillImage(dest,VAllBands,0);
+  double *data = (double *) VCalloc(n,sizeof(double));
 
   for (b=0; b<nslices; b++) {
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
 	k = 0;
-	s1 = s2 = 0;
 	for (i=0; i<n; i++) {
 	  u = (double)VPixel(src1[i],b,r,c,VFloat);
 	  if (ABS(u) > tiny) {
 	    if (permtable[i] > 0) u = -u;
-	    s1 += u;
-	    s2 += u*u;
+	    data[k] = u;
 	    k++;
 	  }
 	}
-	if (k < n-2) continue;
-	nx   = (double)k;
-	mean = s1/nx;
-	var  = (s2 - nx * mean * mean) / (nx - 1.0);
-	t    = sqrt(nx) * mean/sqrt(var);
-	VPixel(dest,b,r,c,VFloat) = t;
+	if (k < n-2) continue;	
+	avevar(data,k,&ave,&var);
+	if (var < tiny) continue;
+	nx   = (double)k;	
+	t    = sqrt(nx) * ave/sqrt(var);	
+	df   = nx - 1.0;
+	z    = t2z(t,df);
+	if (t < 0) z = -z;
+	VPixel(dest,b,r,c,VFloat) = z;
       }
     }
   }
+  VFree(data);
 }
+
 
 
 int main (int argc, char *argv[])
@@ -141,7 +147,7 @@ int main (int argc, char *argv[])
     {"svar",VFloatRepn,1,(VPointer) &svar,VOptionalOpt,NULL,"Bilateral parameter (spatial)"},
     {"numiter",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Number of iterations in bilateral filter"},  
     {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to apply cleanup"},      
-    {"fdrfile",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"Name of output fdr txt-file"},    
+    {"filename",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"Name of output fdr txt-file"},    
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
   };
 
@@ -205,7 +211,7 @@ int main (int argc, char *argv[])
 
   /* estimate null variance to adjust radiometric parameter, use first 30 permutations */
   double hmin=0,hmax=0;
-  double xrvar = rvar;
+  float stddev=1.0;
   if (numperm > 0) {
     int tstperm = 30;
     if (tstperm > numperm) tstperm = numperm;
@@ -217,7 +223,8 @@ int main (int argc, char *argv[])
       nx++;
     }    
     double meanvar = varsum/nx;
-    xrvar = (rvar * meanvar);
+    stddev = sqrt(meanvar);
+    fprintf(stderr," null variance:  %f\n",stddev);
     VDestroyImage(zmap);
   }
 
@@ -227,8 +234,14 @@ int main (int argc, char *argv[])
   int *nopermtable = (int *) VCalloc(n,sizeof(int));
   VImage dst1  = VCreateImageLike (src1[0]);
   VImage zmap1 = VCreateImageLike(src1[0]);
-  OnesampleTest(src1,zmap1,nopermtable,nimages);
-  VBilateralFilter(zmap1,dst1,(int)radius,(double)(xrvar),(double)svar,(int)numiter);
+  OnesampleTest(src1,zmap1,nopermtable,nimages); 
+
+  if (numperm == 0) {
+    double z = VImageVar(zmap1);
+    stddev = (float)(sqrt(z)); /* update stddev */
+  }
+  VZScale(zmap1,stddev);
+  VBilateralFilter(zmap1,dst1,(int)radius,(double)(rvar),(double)svar,(int)numiter);
 
 
   /* ini histograms */
@@ -250,8 +263,9 @@ int main (int argc, char *argv[])
 
     VImage zmap = VCreateImageLike(src1[0]);
     VImage dst  = VCreateImageLike (zmap);
-    OnesampleTest(src1,zmap,permtable[nperm],nimages);
-    VBilateralFilter(zmap,dst,(int)radius,(double)(xrvar),(double)svar,(int)numiter);
+    OnesampleTest(src1,zmap,permtable[nperm],nimages);    
+    VZScale(zmap,stddev);
+    VBilateralFilter(zmap,dst,(int)radius,(double)(rvar),(double)svar,(int)numiter);
 
 #pragma omp critical 
     {

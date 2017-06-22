@@ -29,37 +29,43 @@
 #define SQR(x) ((x)*(x))
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
+#define HMIN 0
+#define HMAX 1.001
 
-gsl_histogram *ReadHistogram(VString filename)
+#define NBINS 10000
+
+size_t CountLines(FILE *fp)
 {
-  double fz=0,mx=0,lower,binsize=0;
-  size_t i,nbins;
-  
-  FILE *fp=fopen(filename,"r");
-  if (!fp) VError(" error reading file %f",filename);
-
-  double zmin = 999999;
-  double zmax = -999999;
-  nbins = 0;
+  char ch;
+  size_t numlines=0;
   while(!feof(fp)) {
-    if (fscanf(fp, "%lf %lf %lf", &lower, &fz, &mx) != 3) break;
-    if (lower < zmin) zmin = lower;
-    if (lower > zmax) zmax = lower;
-    nbins++;
+    ch = fgetc(fp);
+    if(ch == '\n') {
+      numlines++;
+    }
   }
-
-  binsize = (zmax-zmin)/(double)(nbins-1);
-  zmax += binsize;
-  gsl_histogram *hist = gsl_histogram_alloc(nbins);
-  gsl_histogram_set_ranges_uniform (hist,zmin,zmax);
-
   rewind(fp);
+  return numlines;
+}
+
+
+void ReadTxtHist(char *filename,gsl_histogram *hist)
+{
+  FILE *fp=fopen(filename,"r");
+  if (!fp) VError("err opening %s",filename);
+
+  size_t nbins = CountLines(fp);
+  if (nbins != (size_t)NBINS)
+    VError(" inconsistent bins: %lu",gsl_histogram_bins (hist));
+
+  size_t i=0;
+  double lower=0,hz=0,mx=0;
   for (i=0; i<nbins; i++) {
-    if (fscanf(fp, "%lf %lf %lf", &lower, &fz, &mx) != 3) break;
+    if (fscanf(fp,"%lf %lf %lf",&lower,&hz,&mx) != 3) VError(" read error");
+    if (lower < HMIN || lower >= HMAX) VError(" value out of histogram range: %f",lower);
     hist->bin[i] = mx;
   }
   fclose(fp);
-  return hist;
 }
 
 
@@ -82,13 +88,14 @@ int main(int argc, char *argv[])
   gsl_set_error_handler_off();
 
 
-  /* read real histogram */
-  gsl_histogram *realhist = ReadHistogram(realfilename);
-  size_t nbins = gsl_histogram_bins(realhist);
+  /* ini histogram structs */
+  size_t nbins = NBINS;
+  double hmin = HMIN,hmax = HMAX;
+  gsl_histogram *realhist = gsl_histogram_alloc (nbins);
+  gsl_histogram_set_ranges_uniform (realhist,hmin,hmax);
+  gsl_histogram *nullhist = gsl_histogram_alloc (nbins);
+  gsl_histogram_set_ranges_uniform (nullhist,hmin,hmax);
 
-  /* read null histogram */
-  gsl_histogram *nullhist = ReadHistogram(nullfilename);
-  if (nbins != gsl_histogram_bins(nullhist)) VError(" inconsistent histogram bins");
 
 
   /* cumulative distribution functions */
