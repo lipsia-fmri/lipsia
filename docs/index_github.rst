@@ -9,6 +9,7 @@ Converter
 LISA statistical inference
 ``````````````````````````````````
 
+`vlisa0`_: generic LISA statistical inference
 `vlisa1`_: onesample LISA statistical inference
 
 
@@ -23,6 +24,7 @@ Network tools
 .. _vnifti: conv/vnifti.rst
 .. _vdicom: conv/vdicom.rst
 
+.. _vlisa0: stats/vlisa0.rst
 .. _vlisa1: stats/vlisa1.rst
 
 .. _vted: ted/vted.rst
