@@ -15,22 +15,7 @@ Ubuntu:
 
 OSX:
  ::
-
-     #install homebrew package manager
-     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-
-     #install GCC
-     brew tap homebrew/versions
-     brew install [flags] gcc48
-
-     #install gsl
-     brew install gsl
-
-     #install fftw
-     brew install fftw
-
-     Furthermore, make sure the last line in the file "lipsia-setup.sh" should be:
-     export CC="/usr/local/bin/gcc-4.8"
+     at the moment, lipsia does not support Mac OSX. We are working on the issue...
 
 
 2) Execute the script "lipsia-setup.sh" (in a shell)
