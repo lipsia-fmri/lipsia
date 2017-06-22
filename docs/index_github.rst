@@ -10,6 +10,7 @@ LISA statistical inference
 ``````````````````````````````````
 
 `vlisa0`_: generic LISA statistical inference
+
 `vlisa1`_: onesample LISA statistical inference
 
 
