@@ -22,12 +22,12 @@ SHARED = ${LIPSIA_LIB}/libviaio3.0.so
 default: $(STATIC) $(SHARED)
 
 $(SHARED): $(OBJ)
-        gcc -shared -o $@ $^ $(LDLIBS)
+		gcc -shared -o $@ $^ $(LDLIBS)
 
 $(STATIC): $(OBJ)
-        ar rcs $@ $^
+		ar rcs $@ $^
 clean:
-        rm -f ${OBJ} $(STATIC) $(SHARED) *~
+		rm -f ${OBJ} $(STATIC) $(SHARED) *~
 
 
 
