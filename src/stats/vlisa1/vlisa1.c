@@ -40,7 +40,8 @@ extern void   VBilateralFilter(VImage src,VImage dest,int radius,double var1,dou
 extern double VImageVar(VImage src);
 extern void   VImageCount(VImage src);
 extern void   VGetHistRange(VImage src,double *hmin,double *hmax);
-extern void   VZScale(VImage src,float stddev);
+extern void   VZScale(VImage src,float mode,float stddev);
+extern float  VGetMode(VImage src);
 extern double t2z(double,double);
 
 
@@ -134,11 +135,12 @@ int main (int argc, char *argv[])
   static VShort   numiter = 2;
   static VShort   numperm = 2000;
   static VLong    seed = 99402622;
+  static VBoolean centering = FALSE;
   static VBoolean cleanup = TRUE;
   static VShort   nproc = 0;
   static VOptionDescRec options[] = {
     {"in", VStringRepn, 0, & in_files1, VRequiredOpt, NULL,"Input files" },
-    {"out", VStringRepn, 1, & out_filename, VOptionalOpt, NULL,"Output file" },
+    {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
     {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},    
     {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},    
@@ -146,7 +148,8 @@ int main (int argc, char *argv[])
     {"rvar",VFloatRepn,1,(VPointer) &rvar,VOptionalOpt,NULL,"Bilateral parameter (radiometric)"},
     {"svar",VFloatRepn,1,(VPointer) &svar,VOptionalOpt,NULL,"Bilateral parameter (spatial)"},
     {"numiter",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Number of iterations in bilateral filter"},  
-    {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to apply cleanup"},      
+    {"centering",VBooleanRepn,1,(VPointer) &centering,VOptionalOpt,NULL,"Whether to do mode centering"}, 
+    {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to apply cleanup"},
     {"filename",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"Name of output fdr txt-file"},    
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
   };
@@ -240,7 +243,9 @@ int main (int argc, char *argv[])
     double z = VImageVar(zmap1);
     stddev = (float)(sqrt(z)); /* update stddev */
   }
-  VZScale(zmap1,stddev);
+  float mode=0;
+  if (centering) mode = VGetMode(zmap1); 
+  VZScale(zmap1,mode,stddev);
   VBilateralFilter(zmap1,dst1,(int)radius,(double)(rvar),(double)svar,(int)numiter);
 
 
@@ -263,8 +268,10 @@ int main (int argc, char *argv[])
 
     VImage zmap = VCreateImageLike(src1[0]);
     VImage dst  = VCreateImageLike (zmap);
-    OnesampleTest(src1,zmap,permtable[nperm],nimages);    
-    VZScale(zmap,stddev);
+    OnesampleTest(src1,zmap,permtable[nperm],nimages);
+    float mode=0;
+    if (centering) mode = VGetMode(zmap);
+    VZScale(zmap,mode,stddev);
     VBilateralFilter(zmap,dst,(int)radius,(double)(rvar),(double)svar,(int)numiter);
 
 #pragma omp critical 

@@ -20,44 +20,51 @@ extern float kth_smallest(float *a, size_t n, size_t k);
 #define Median(a,n) kth_smallest(a,n,(((n)&1)?((n)/2):(((n)/2)-1)))
 
 
+/* In moderately skewed or asymmetrical distribution (Pearson) */
+float VGetMode(VImage src)
+{
+  size_t i,n=0;
+  float u,tiny=1.0e-8;
+  VFloat *pp = VImageData(src);
+  for (i=0; i<VImageNPixels(src); i++) {
+    u = (*pp++);
+    if (fabs(u) > tiny) n++;
+  }
+  float *data = (float *) VCalloc(n,sizeof(float));
+  
+  double sum=0,nx=0;
+  n=0;
+  pp = VImageData(src);
+  for (i=0; i<VImageNPixels(src); i++) {
+    u = (*pp++);
+    if (fabs(u) > tiny) { 
+      data[n] = u;
+      sum += u;
+      n++;
+    }
+  }
+  nx = (double)n;
+  float median = Median(data,n);
+  float mean = (float)(sum/nx);
+  float mode = 3.0*median - 2.0*mean;
+  /* fprintf(stderr," mean: %f,  median: %f,  mode: %f\n",mean,median,mode); */
+  VFree(data);
+  return mode;
+}
+
+
+
 /* scale z-values */
-void VZScale(VImage src,float stddev)
+void VZScale(VImage src,float mode,float stddev)
 {
   size_t i=0;
   float u=0,tiny=1.0e-8;
   VFloat *pp=VImageData(src);
   for (i=0; i<VImageNPixels(src); i++) {
     u = (*pp);
-    if (fabs(u) > tiny) (*pp) = u/stddev;
+    if (fabs(u) > tiny) (*pp) = (u-mode)/stddev;
     pp++;
   }  
-}
-
-
-/* scaling and centering of z-values */
-void VZNormalize(VImage src,float stddev)
-{
-  size_t i=0;
-  float u=0,s1=0,nx=0,tiny=1.0e-8;
-
-  VFloat *pp=VImageData(src);
-  for (i=0; i<VImageNPixels(src); i++) {
-    u = (*pp);
-    if (fabs(u) > tiny) {
-      s1 += u;
-      nx++;
-    }
-    pp++;
-  }
-  if (nx < 3.0) VError(" nx: %f\n",nx);
-  float mean = s1/nx;
-
-  pp=VImageData(src);
-  for (i=0; i<VImageNPixels(src); i++) {
-    u = (*pp);
-    if (fabs(u) > tiny) (*pp) = (u-mean)/stddev;
-    pp++;
-  }
 }
 
 
@@ -122,7 +129,7 @@ void VGetHistRange(VImage src,double *hmin,double *hmax)
   fprintf(stderr," number of nonzero voxels: %lu\n",n);
 
 
-  /* get every second nonzero data point */
+  /* get every other nonzero data point */
   size_t nn = n/2;
   float *data = (float *) VCalloc(nn,sizeof(float));
   n=0;

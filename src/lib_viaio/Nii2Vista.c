@@ -187,6 +187,24 @@ double VGetValue(char *data,size_t index,int datatype)
 }
 
 
+void VCleanData(VImage src)
+{
+  int b,r,c;
+  double u=0;
+  for (b=0; b<VImageNBands(src); b++) {
+    for (r=0; r<VImageNRows(src); r++) {
+      for (c=0; c<VImageNColumns(src); c++) {
+	u = VGetPixel(src,b,r,c);
+	if (gsl_isinf(u) || gsl_isnan(u)) {
+	  u = 0;
+	  VSetPixel(src,b,r,c,u);
+	}
+      }
+    }
+  }
+}
+
+
 /* get image statistics for re-scaling parameters */
 void VDataStats(char *data,size_t ndata,size_t nsize,int datatype,double *xmin,double *xmax)
 {
@@ -216,16 +234,21 @@ void Nii2Vista3DList(char *data,size_t nsize,size_t nslices,size_t nrows,size_t 
 {
   size_t i;
   size_t npix = nrows*ncols*nslices;
+  size_t add=0;
+  if (nsize == 1) add=4;
+  if (nsize == 2) add=2;
+  if (nsize == 4) add=1;
 
   VImage *dst = (VImage *) VCalloc(nt,sizeof(VImage));
   VAppendAttr(out_list,"nimages",NULL,VLongRepn,(VLong) nt);
 
   for (i=0; i<nt; i++) {
-    const size_t index = i*npix*nsize;
+    const size_t index = (i*npix-add)*nsize;
     dst[i] = VIniImage(nslices,nrows,ncols,dst_repn,&data[index]);
     VSetAttr(VImageAttrList(dst[i]),"voxel",NULL,VStringRepn,voxelstr);
     if (tr > 0) VSetAttr(VImageAttrList(dst[i]),"repetition_time",NULL,VLongRepn,(VLong)tr);
     VAppendAttr(out_list,"image",NULL,VImageRepn,dst[i]);
+    VCleanData(dst[i]);
   }
 }
 
@@ -239,12 +262,13 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
   size_t slice,row,col,ti;
   size_t nrnc = nrows*ncols;
   size_t npix = nrnc*nslices;
+  size_t ndata = nt * npix * nsize;
+  size_t add=0;
 
   /* rescale to 16bit integer if needed */
   double xmin=0,xmax=0,umin=0,umax=0;
   if (do_scaling && dst_repn != VShortRepn) {
     dst_repn = VShortRepn;
-    size_t ndata = nt * npix * nsize;
     VDataStats(data,ndata,nsize,datatype,&xmin,&xmax);
     fprintf(stderr," data range: [%f, %f]\n",xmin,xmax);
     umin = 0;
@@ -266,8 +290,9 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
     for (ti=0; ti<nt; ti++) {
       for (row=0; row<nrows; row++) {
 	for (col=0; col<ncols; col++) {
-	  const size_t src_index = (col + row*ncols + slice*nrnc + ti*npix + 1)*nsize;
-	 
+	  const size_t src_index = (col + row*ncols + slice*nrnc + ti*npix + add)*nsize;
+	  if (src_index >= ndata || src_index < 0) continue;
+
 	  if (!do_scaling) {
 	    double u = VGetValue(data,src_index,datatype);
 	    VSetPixel(dst[slice],ti,row,col,u);
@@ -282,6 +307,7 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 	}
       }
     }
+    VCleanData(dst[slice]);
     VAppendAttr(out_list,"image",NULL,VImageRepn,dst[slice]);
   }
 }
@@ -291,6 +317,7 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 /* copy nifti header infos to geolist in vista header */
 double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
 {
+  /* if (hdr.sizeof_hdr != 348) VError(" incorrect header size %lu",hdr.sizeof_hdr); */
 
   /* units in lipsia: mm and sec */
   char xyzt = hdr.xyzt_units;
@@ -301,7 +328,7 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
   if (spaceunits == NIFTI_UNITS_MICRON) xscale=1000.0;
   if (timeunits == NIFTI_UNITS_SEC) tscale=1000.0;
 
- 
+
   /* dim info */
   VSetAttr(geolist,"dim_info",NULL,VShortRepn,(VShort)hdr.dim_info);
 
@@ -330,28 +357,12 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
     D[4] = (double)xtr;
     fprintf(stderr," TR= %.4f ms\n",D[4]);
   }
+  if (fabs(D[0]) < 0.0001) D[0] = 1.0;  /* if not specified, assume pixdim[0] = 1 */
 
   for (i=5; i<8; i++) D[i] = 0; 
   VAttrList dlist = VCreateAttrList();
   VBundle dbundle = VCreateBundle ("bundle",dlist,8*sizeof(float),(VPointer)D);
   VSetAttr(geolist,"pixdim",NULL,VBundleRepn,dbundle);
-
-
-
-  /* qform */
-  size_t dim=6;
-  float *Q = VCalloc(dim,sizeof(float));
-  VAttrList qlist = VCreateAttrList();
-  VBundle qbundle = VCreateBundle ("bundle",qlist,dim*sizeof(float),(VPointer)Q);
-  Q[0] = hdr.quatern_b;
-  Q[1] = hdr.quatern_c;
-  Q[2] = hdr.quatern_d;
-  Q[3] = hdr.qoffset_x;
-  Q[4] = hdr.qoffset_y;
-  Q[5] = hdr.qoffset_z;
-  VSetAttr(geolist,"qform_code",NULL,VShortRepn,(VShort)hdr.qform_code);
-  VSetAttr(geolist,"qform",NULL,VBundleRepn,qbundle);
-
 
 
   /* sform */
@@ -367,6 +378,24 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
   VSetAttr(geolist,"sform",NULL,VImageRepn,sform);
 
 
+  /* qform */
+  size_t dim=6;
+  float *Q = VCalloc(dim,sizeof(float));
+  VAttrList qlist = VCreateAttrList();
+  VBundle qbundle = VCreateBundle ("bundle",qlist,dim*sizeof(float),(VPointer)Q);
+  Q[0] = hdr.quatern_b;
+  Q[1] = hdr.quatern_c;
+  Q[2] = hdr.quatern_d;
+  Q[3] = hdr.qoffset_x;
+  Q[4] = hdr.qoffset_y;
+  Q[5] = hdr.qoffset_z;
+
+  VShort qform_code = hdr.qform_code;
+  if (hdr.sform_code==0 && qform_code==0) qform_code = 1;    /* if both codes are unspecified, assume scanner coord */
+  VSetAttr(geolist,"qform_code",NULL,VShortRepn,(VShort)qform_code);
+  VSetAttr(geolist,"qform",NULL,VBundleRepn,qbundle);
+
+  
   /* MRI encoding directions */
   int freq_dim=0,phase_dim=0,slice_dim=0;
   if (hdr.dim_info != 0) {
@@ -378,6 +407,8 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
     VSetAttr(geolist,"slice_dim",NULL,VShortRepn,(VShort)slice_dim);
   }
   if (slice_dim == 0) return NULL;
+
+
 
   /* slicetiming information */
   int slice_start = hdr.slice_start;
@@ -478,9 +509,10 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
   size_t nsize   = hdr.bitpix/bytesize;
   size_t npixels = nslices * nrows * ncols;
   size_t ndata   = nt * npixels * nsize;
-  size_t hdrsize = MIN_HEADER_SIZE;
-  char *data = &databuffer[hdrsize];
-  
+  size_t vox_offset = (size_t)hdr.vox_offset;
+  size_t startdata = MIN_HEADER_SIZE;
+  if (vox_offset > 0) startdata = vox_offset;
+  char *data = &databuffer[startdata];
 
 
   /* byte swap image data, if needed */
@@ -501,7 +533,6 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
     fprintf(stderr," nt=%ld,  TR= %ld\n",nt,tr);
     if (tr < 1) VWarning(" implausible TR (%d ms), use parameter '-tr' to set correct TR",tr);
   }
-
   
   /* voxel reso */
   int blen=512;
@@ -513,7 +544,7 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
   /* geometry information */
   VAttrList geolist = VCreateAttrList();
   double *slicetime = VGetNiftiHeader(geolist,hdr,tr);
-  
+
 
   /* read nii image into vista attrlist */
   VAttrList out_list = VCreateAttrList();

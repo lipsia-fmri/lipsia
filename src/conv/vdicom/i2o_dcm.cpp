@@ -22,6 +22,7 @@
 #include <libgen.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/param.h>
 #include <stdint.h>
 
 #include "i2o_dcm.h"
@@ -2774,7 +2775,13 @@ i2o_dcm::DicomDir( DicomDirHead& dcmDir ) // fill scan result into a dicomDir ob
   string        dirName;
   char          imgFilename[ PATH_MAX + 1 ];
 
-  char*         cwd = get_current_dir_name();
+  char          cwd[MAXPATHLEN+1];
+
+  if( getcwd( cwd, MAXPATHLEN+1 ) == nullptr )
+    {
+      cerr << "getcwd()\" failed: " << strerror(errno) << endl;
+      return 0;
+    }
 
   // extract the path from dicomdir's name
   strncpy( imgFilename, m_filename.c_str(), PATH_MAX + 1 );
@@ -3118,11 +3125,7 @@ i2o_dcm::DicomDir( DicomDirHead& dcmDir ) // fill scan result into a dicomDir ob
   cout << "studyCnt: " << studyCnt << endl;
 #endif
 
-  if( cwd )
-    {
-      chdir( cwd );
-      free( cwd );
-    }
+  chdir( cwd );
 
   return imageCnt;
 }

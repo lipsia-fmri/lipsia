@@ -40,8 +40,11 @@ extern void FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_
 extern void ImageStats(VImage src,double *,double *,double *hmin,double *hmax);
 extern void VBilateralFilter(VImage src,VImage dest,int radius,double var1,double var2,int);
 extern double VImageVar(VImage src);
-extern void VImageCount(VImage src);
-extern void VGetHistRange(VImage src,double *hmin,double *hmax);
+extern void  VImageCount(VImage src);
+extern void  VGetHistRange(VImage src,double *hmin,double *hmax);
+extern float VGetMode(VImage src);
+extern void  VZScale(VImage src,float mode,float stddev);
+
 
 /* update histogram */
 void HistoUpdate(VImage src1,gsl_histogram *hist)
@@ -84,6 +87,7 @@ int main (int argc, char *argv[])
   static VFloat   rvar = 2.0;
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
+  static VBoolean centering = FALSE;
   static VBoolean cleanup = TRUE;
   static VShort   nproc = 0;
   static VOptionDescRec  options[] = {
@@ -92,7 +96,8 @@ int main (int argc, char *argv[])
     {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Neighbourhood radius in voxels"},
     {"rvar",VFloatRepn,1,(VPointer) &rvar,VOptionalOpt,NULL,"Bilateral parameter (radiometric)"},
     {"svar",VFloatRepn,1,(VPointer) &svar,VOptionalOpt,NULL,"Bilateral parameter (spatial)"},
-    {"numiter",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Number of iterations in bilateral filter"},  
+    {"numiter",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Number of iterations in bilateral filter"},     
+    {"centering",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to do mode centering"},  
     {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to apply cleanup"},      
     {"fdrfile",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"Name of output fdr txt-file"},    
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
@@ -127,7 +132,7 @@ int main (int argc, char *argv[])
 
   /* estimate null variance to adjust radiometric parameter, use first 30 permutations */
   double zvar=0,hmin=0,hmax=0;
-  double xrvar = rvar;
+  float stddev=1.0;
   int nperm=0;
   if (numperm > 0) {
     int tstperm = 30;
@@ -139,13 +144,18 @@ int main (int argc, char *argv[])
       nx++;
     }    
     double meanvar = varsum/nx;
-    xrvar = (rvar * meanvar);
+    stddev = sqrt(meanvar);
+    fprintf(stderr," null variance:  %f\n",stddev);
   }
 
 
   /* get non-permuted hotspot map */
+  float mode=0;
+  if (centering) mode = VGetMode(zmap1); 
+  VZScale(zmap1,mode,stddev);
+
   VImage dst1 = VCreateImageLike(zmap1);
-  VBilateralFilter(zmap1,dst1,(int)radius,(double)xrvar,(double)svar,(int)numiter);
+  VBilateralFilter(zmap1,dst1,(int)radius,(double)rvar,(double)svar,(int)numiter);
 
 
 
@@ -165,8 +175,12 @@ int main (int argc, char *argv[])
   for (nperm = 0; nperm < numperm; nperm++) {
     if (nperm%20 == 0) fprintf(stderr," perm  %4d  of  %d\r",nperm,(int)numperm);
 
+    float mode=0;
+    if (centering) mode = VGetMode(zmap[nperm]);
+    VZScale(zmap[nperm],mode,stddev);
+
     VImage dst = VCreateImageLike (zmap1);
-    VBilateralFilter(zmap[nperm],dst,(int)radius,(double)xrvar,(double)svar,(int)numiter);
+    VBilateralFilter(zmap[nperm],dst,(int)radius,(double)rvar,(double)svar,(int)numiter);
 
     #pragma omp critical 
     {

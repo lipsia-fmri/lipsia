@@ -97,6 +97,11 @@ int main(int argc, char *argv[])
   gsl_histogram_set_ranges_uniform (nullhist,hmin,hmax);
 
 
+  /* read input histograms */
+  ReadTxtHist(realfilename,realhist);
+  ReadTxtHist(nullfilename,nullhist);
+
+
 
   /* cumulative distribution functions */
   gsl_histogram_pdf *cdfz = gsl_histogram_pdf_alloc(nbins);
@@ -130,7 +135,7 @@ int main(int argc, char *argv[])
     }
     fprintf(fp," %12.8f  %12.8f  %12.8f  %12.8f\n",z,F0,Fz,Fdr);
   }
-  fprintf(fp," Fdr < %.3f  if ted > %lf\n",alpha,cutoff);
+  fprintf(fp,"# Fdr < %.3f  if ted > %lf\n",alpha,cutoff);
   fprintf(stderr," Fdr < %.3f  if ted > %lf\n",alpha,cutoff);
 
   fclose(fp);

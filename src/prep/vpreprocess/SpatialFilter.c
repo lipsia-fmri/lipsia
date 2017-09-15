@@ -282,7 +282,6 @@ void VSpatialFilter(VAttrList list,VDouble fwhm)
       
       VFillImage(tmp,VAllBands,0);
       for (b=0; b<nslices; b++) {
-	if (VImageNRows(src[b]) < 2) continue;
 	for (r=0; r<nrows; r++) {
 	  for (c=0; c<ncols; c++) {
 	    u = VGetPixel(src[b],i,r,c);
@@ -294,7 +293,6 @@ void VSpatialFilter(VAttrList list,VDouble fwhm)
       dest = VGauss3d (tmp,dest,kernel);
       
       for (b=0; b<nslices; b++) {
-	if (VImageNRows(src[b]) < 2) continue;
 	for (r=0; r<nrows; r++) {
 	  for (c=0; c<ncols; c++) {
 	    u = VPixel(dest,b,r,c,VFloat);

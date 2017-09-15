@@ -37,27 +37,30 @@
 #include <stdlib.h>
 #include <fftw3.h>
 
+#define MINVAL 1.0e+6
+#define ABS(x) ((x) > 0 ? (x) : -(x))
 
-int main(int argc, char *argv[]) {
+
+int main(int argc, char *argv[]) 
+{
   static VDouble  fwhm     =  0;
   static VFloat   high     =  0;
   static VFloat   low      =  0;
   static VBoolean stop     =  FALSE;
   static VFloat   sharp    =  0.8;
-  static VShort   minval   =  0;
+  static VFloat   minval   =  MINVAL;
   static VOptionDescRec  options[] = {
     {"fwhm", VDoubleRepn, 1, (VPointer) &fwhm, VOptionalOpt, NULL, "Spatial filter: FWHM in mm"},
     {"high", VFloatRepn, 1, (VPointer) &high, VOptionalOpt, NULL, "Temporal Filter: Cutoff for high pass/stop in seconds"},
     {"low",  VFloatRepn, 1, (VPointer) &low, VOptionalOpt, NULL, "Temporal Filter: Cutoff for low pass/stop in seconds"},
     {"stop",  VBooleanRepn, 1, (VPointer) &stop, VOptionalOpt, NULL, "Temporal Filter: Stop insted of pass filter"},
-    {"minval", VShortRepn, 1, (VPointer) &minval, VOptionalOpt, NULL, "Signal threshold"}
+    {"minval", VFloatRepn, 1, (VPointer) &minval, VOptionalOpt, NULL, "Signal threshold"}
   };
   FILE *out_file = NULL;
   VString in_file=NULL;
 
 
   extern void VSpatialFilter(VAttrList, VDouble);
-  extern void VApplyMinval(VAttrList, VShort);
   extern void VFreqFilter(VAttrList, VFloat, VFloat, VBoolean, VFloat);
   char *prg=GetLipsiaName("vpreprocess");
   fprintf (stderr, "%s\n", prg);
@@ -68,7 +71,7 @@ int main(int argc, char *argv[]) {
   if (fwhm < 0) VError("fwhm must be non-negative");
   if (low > high && high > 0) VError("low must be less than high");
   if (low < 0 || high < 0) VError("high and low must be non-negative");
-  if (sharp < 0.01) VError(" sharp too small", sharp);
+
 
 
   /* read the file */
@@ -77,10 +80,19 @@ int main(int argc, char *argv[]) {
   if (list == NULL) VError(" error reading input file %s",in_file);
 
 
+  /* if default minval is set, use heuristics to compute new minval threshold for brain mask */
+  if (ABS(minval - MINVAL) < 0.1) {
+    minval = VGetMinval(list);
+    fprintf(stderr," Brain mask threshold,  minval: %f\n",minval);
+  }
+
+  /* apply minval */
+  if (minval > -MINVAL) VApplyMinval(list, (VFloat)minval);
+
+
   /* apply filtering */
   if (low > 0 || high > 0) VFreqFilter(list, high, low, stop, sharp);
   if (fwhm > 0) VSpatialFilter(list, fwhm);
-  if (minval > 0) VApplyMinval(list, minval);
 
 
   /* write output */

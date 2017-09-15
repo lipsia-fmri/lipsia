@@ -50,7 +50,7 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
   float freq,alpha,tr=0;
   double *highp=NULL, *lowp=NULL;
   double x_high, x_low, x;
-  double eps=0.00000001;
+  double tiny=1.0e-8;
 
 
   /* dialog messages */
@@ -125,11 +125,12 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
     VGetAttrValue (& posn, NULL,VImageRepn, & src);
     k++;
 
-    if (VImageNRows(src) < 2) continue;
-
     if (k%2 == 0) fprintf(stderr," slice %4d\r",k);
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
+
+	double u = VGetPixel(src,0,r,c);
+	if (fabs(u) < tiny) continue;
 
 
 	/* get data */
@@ -149,7 +150,7 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
 	}
 
 	/*  fft */
-	if ( ABS(sum)>eps ) {
+	if (fabs(sum)>tiny ) {
 	  fftw_execute(p1);
 	  
 	  /* remove specified frequencies */

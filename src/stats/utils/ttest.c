@@ -9,11 +9,43 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include <gsl/gsl_cdf.h>
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_math.h>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
+
+
+
 #define TINY 1.0e-10
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 #define SQR(x) ((x)*(x))
 
-extern double t2z(double,double);
+
+/* 
+** convert t to z values 
+*/
+double t2z(double t,double df)
+{
+  double p=0,z=0;
+  double a,b,x;
+  extern double gsl_sf_beta_inc(double,double,double);
+
+
+  /* t to p */
+  x = df/(df+(t*t));
+  if (x <= 0 || x > 1) return 0;
+
+  a = 0.5*df;
+  b = 0.5;
+  p = 0.5 * gsl_sf_beta_inc(a,b,x);
+
+
+  /* p to z */
+  z = gsl_cdf_ugaussian_Qinv(p);
+  return z;
+}
+
 
 void avevar(double *data,int n,double *a,double *v)
 {

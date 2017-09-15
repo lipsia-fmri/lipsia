@@ -33,6 +33,10 @@
 extern "C" {
 #endif
 
+#ifdef __APPLE__
+  #include <stdio.h>
+  FILE *fmemopen(void *buf, size_t size, const char *mode);
+#endif
 
 /*
  *  Basic constants.
@@ -549,6 +553,11 @@ extern int VAttrListNumImages(VAttrList list);
 extern VImage *VAttrListGetImages(VAttrList list,int n);
 extern void VImageDimensions(VImage *src,int nimages,int *bands,int *rows,int *cols);
 
+/* automatic minval, July 2017 */
+extern float VGetMinval(VAttrList list);
+extern float VGetMinvalNlists(VAttrList *list,int nlists);
+extern void  VApplyMinval(VAttrList list,VFloat minval);
+extern void  VApplyMinvalNlists(VAttrList *list,int nlists,float minval);
 
 
 /* From Dictionary.c: */

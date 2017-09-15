@@ -18,6 +18,8 @@
 #include <cerrno>
 #include <cmath>
 
+#include <libgen.h>
+
 #include <sys/stat.h>
 
 #include <viaio/Vlib.h>
