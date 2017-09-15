@@ -1,6 +1,6 @@
 
 CFLAGS+=-fPIC
-LDLIBS=-lz
+LDLIBS=-lgsl -lgslcblas -lz
 
 SRC = Alloc.c Attr.c ConvertC.c ConvertL.c ConvertR.c ConvertO.c Crop.c \
       Dictionary.c Error.c FileIO.c GetVersion.c Image.c ImageType.c\
@@ -11,7 +11,7 @@ SRC = Alloc.c Attr.c ConvertC.c ConvertL.c ConvertR.c ConvertO.c Crop.c \
       newfile_io.c ByteSwap.c Nii2Vista.c Minval.c nifti1_io.c znzlib.c
 
 ifeq ($(shell uname),Darwin)
-	SRC += fmemopen.c
+        SRC += fmemopen.c
 endif
 
 OBJ = $(SRC:.c=.o)
@@ -22,9 +22,12 @@ SHARED = ${LIPSIA_LIB}/libviaio3.0.so
 default: $(STATIC) $(SHARED)
 
 $(SHARED): $(OBJ)
-	gcc -shared -o $@ $^ $(LDLIBS)
+        gcc -shared -o $@ $^ $(LDLIBS)
 
 $(STATIC): $(OBJ)
-	ar rcs $@ $^
+        ar rcs $@ $^
 clean:
-	rm -f ${OBJ} $(STATIC) $(SHARED) *~
+        rm -f ${OBJ} $(STATIC) $(SHARED) *~
+
+
+
