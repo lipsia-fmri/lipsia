@@ -21,7 +21,7 @@ The program is typically called as follows:
 
   vnifti -in data.v -out data.nii 
   vnifti -in data.nii -out data.v 
-	
+  vnifti -in data.nii.gz -out data.v
 
 
 
@@ -33,7 +33,7 @@ Parameters of *vnifti*
  -in           Input image. 
  -out          Output image.
  -tr           Repetition time in seconds. Default: 0
- -scale        Whether to allow scaling. Default: false
-
+ -scale        Whether to scale 4D data to 16bit integer. Default: false
+ -attrtype     Whether to output 4D data to lipsia 4D format. Default: true
 
 .. index:: nifti

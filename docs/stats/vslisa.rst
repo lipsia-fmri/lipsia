@@ -7,8 +7,13 @@ including a correction for multiple comparisons using the LISA algorithm.
 The program expects one or more preprocessed 4D fMRI files as input.
 The files typically represent runs of an experiment acquired within the same session.
 Design files in txt-format are also required as input. The number of design files must match the number of runs.
-They should not include any hemodynamic modelling.
+The design files should not include any hemodynamic modelling.
 The user must supply a contrast vector whose dimension matches that of the design files.
+
+Hemodynamic modelling is typically done using the canonical response function ("gamma_0").
+Optionally, first and/or second derivatives can be used as well ("gamma_1" or "gamma_2). 
+In this case, the contrast vector must be extended
+to accomodate the extra dimensions. Instead of the canonical response function, a gaussian can be used ("gauss").
 
 A txt-file containing additional covariates (e.g. motion parameters) may be added as a separate file.
 It must have one line per time volume and one column per covariate. 
@@ -17,8 +22,8 @@ The covariates are added to the end of the design matrix
 and are exempt from random permutations.
 If such covariates are added, the contrast vector must be extended accordingly.
 
-By default, the global mean is also regressed out. The last value in the contrast vector corresponds
-to the global mean, and should generally be set to zero.
+Optionally, the global mean can be regressed out. In this case, the last value in the contrast vector corresponds
+to the global mean, and should be set to zero.
 
 The output is a map that gives the voxel-wise statistical significance of 
 an effect (FDR corrected).
@@ -26,7 +31,12 @@ Examples:
 
 ::
 
-   vslisa -in run_*.v -design des_*.txt -contrast 0 1 -1 -out zmap.v -alpha 0.05 -globalmean false
+   vslisa -in run_*.v -design des_*.txt -contrast 0 1 -1 -out zmap.v -alpha 0.05 -hemo gamma_0
+
+
+::
+
+   vslisa -in run_*.v -design des_*.txt -contrast 0 1 0 -1 0 -out zmap.v -alpha 0.05 -hemo gamma_1
 
 ::
 
@@ -64,7 +74,7 @@ Parameters of 'vslisa':
     -rvar    Bilateral parameter (radiometric). Default: 2.0
     -svar    Bilateral parameter (spatial). Default: 2.0
     -numiter Number of iterations in bilateral filter. Default: 2
-    -cleanup  Whether to delete isolated voxels. Default: false
+    -cleanup  Whether to delete isolated voxels. Default: true
     -globalmean  Whether to regress out global mean. Default: true
     -fdrfile  Name of output fdr txt-file. Default: 
     -j        Number of processors to use, '0' to use all. Default: 10

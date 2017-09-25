@@ -35,7 +35,8 @@ Parameters of 'vlisa1':
     -rvar    Bilateral parameter (radiometric). Default: 2.0
     -svar    Bilateral parameter (spatial). Default: 2
     -numiter Number of iterations in bilateral filter. Default: 2
-    -cleanup  Whether to delete isolated voxels. Default: false
+    -cleanup  Whether to delete isolated voxels. Default: true
+    -centering Whether to do mode centering. Default: false
     -fdrfile  Name of output fdr txt-file. Default: 
     -j        Number of processors to use, '0' to use all. Default: 10
 
