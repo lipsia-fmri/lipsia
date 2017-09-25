@@ -1,6 +1,6 @@
 
 CFLAGS+=-fPIC
-LDLIBS=-lgsl -lgslcblas -lz
+LDLIBS=
 
 SRC = Alloc.c Attr.c ConvertC.c ConvertL.c ConvertR.c ConvertO.c Crop.c \
       Dictionary.c Error.c FileIO.c GetVersion.c Image.c ImageType.c\

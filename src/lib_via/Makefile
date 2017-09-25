@@ -1,6 +1,7 @@
 
 CFLAGS+=-fPIC
-LDLIBS=-lgsl -lviaio3.0
+#LDLIBS=-lgsl -lviaio3.0
+LDLIBS=
 
 SRC = Aniso2d.c Aniso3d.c Bicubic.c Binarize.c Binmorph3d.c Border3d.c BorderPoint.c \
       Canny.c CDT3d.c ChamferDist3d.c Contrast.c Convolve.c DeleteSmall.c Dist2d.c \

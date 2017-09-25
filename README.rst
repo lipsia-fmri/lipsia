@@ -18,6 +18,7 @@ Installation
 ```````````````````````
 Follow the instructions here: `install`_.
 
+
 Documentation
 ```````````````````````
 Find the lipsia documentation here: `documentation`_.
@@ -27,13 +28,14 @@ Lipsia file format
 ```````````````````````````````````````
 Lipsia uses its own data format, which is called vista (extension *.v*).
 Some programs also accept gzipped files or nifti-files as input (*.v.gz or *.nii.gz).
-These programs are: vnifti, vecm, vlisa1 and vpreprocess.
 The output is always in unzipped vista-format.
 You can easily convert your nifti data from and to lipsia with the program *vnifti*::
 
   vnifti -in data.nii -out data.v
+  vnifti -in data.nii.gz -out data.v
   vnifti -in result.v -out result.nii
-
+	
+	
 Alternatively, you can import a folder with DICOM files into the vista format::
 
   vdicom -in dir_dicom
