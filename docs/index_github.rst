@@ -10,7 +10,9 @@ LISA statistical inference
 ``````````````````````````````````
 
 `vlisa0`_: generic LISA statistical inference
+
 `vlisa1`_: onesample LISA statistical inference
+
 `vslisa`_: single subject LISA statistical inference
 
 
@@ -25,12 +27,17 @@ Network tools
 .. _vdicom: conv/vdicom.rst
 
 .. _vlisa0: stats/vlisa0.rst
+
 .. _vlisa1: stats/vlisa1.rst
+
 .. _vslisa: stats/vslisa.rst
 
 .. _vted: ted/vted.rst
+
 .. _vtedfdr: ted/vtedfdr.rst
+
 .. _vcuttrials: ted/vcuttrials.rst
+
 .. _vhubness: ted/vhubness.rst
 
 .. _vecm: nets/vecm.rst
