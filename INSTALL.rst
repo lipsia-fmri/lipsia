@@ -38,17 +38,19 @@ OSX:
 ``````````````````````````````````````````````````````
  ::
 
-   cd <lipsa_dir>
+   cd <lipsia_dir>
    source ./lipsia-setup.sh
+
 
 3) Compile lipsia
 `````````````````````````
  ::
 
-   cd <lipsa_dir>/src
+   cd <lipsia_dir>/src
    make
-where <lipsa_dir> is the directory of the lipsia repository.
-All executables can be found in <lipsa_dir>/bin.
+where <lipsia_dir> is the directory of the lipsia repository.
+All executables can be found in <lipsia_dir>/bin.
+
 
 4) Change bash profile
 `````````````````````````
