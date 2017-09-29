@@ -139,14 +139,14 @@ VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float
 
 
 
-VAttrList VECM(VAttrList list,VImage mask,VFloat minval,VShort first,VShort length,VShort type)
+VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type)
 {
   VAttrList out_list=NULL;
   VAttrListPosn posn;
   VImage src[NSLICES],map=NULL;
   VImage dest=NULL;
   int b,r,c,ntimesteps,nrows,ncols,nslices,nt,last;
-  size_t i,j,i1,n,m;
+  size_t i,j,n,m;
   gsl_matrix_float *mat=NULL;
   float *A=NULL,*ev=NULL;
   float tiny=1.0e-6;
@@ -181,7 +181,6 @@ VAttrList VECM(VAttrList list,VImage mask,VFloat minval,VShort first,VShort leng
   if (first < 0) first = 0;
 
   nt = last - first + 1;
-  i1 = first;
   if (nt < 2) VError(" not enough timesteps, nt= %d",nt);
   fprintf(stderr,"# ntimesteps: %d, first= %d, last= %d, nt= %d\n",
 	  (int)ntimesteps,(int)first,(int)last,(int)nt);
@@ -193,7 +192,6 @@ VAttrList VECM(VAttrList list,VImage mask,VFloat minval,VShort first,VShort leng
     if (VImageNRows(src[b]) < 2) continue;
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-	if (VGetPixel(src[b],i1,r,c) < minval) continue;
 	if (VGetPixel(mask,b,r,c) < 0.5) continue;
 	n++;
       }
@@ -218,7 +216,6 @@ VAttrList VECM(VAttrList list,VImage mask,VFloat minval,VShort first,VShort leng
     if (VImageNRows(src[b]) < 2) continue;
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-	if (VGetPixel(src[b],i1,r,c) < minval) continue;
 	if (VGetPixel(mask,b,r,c) < 0.5) continue;
 
 	VPixel(map,0,0,i,VFloat) = b;
@@ -334,11 +331,9 @@ int main (int argc,char *argv[])
   static VShort   first  = 0;
   static VShort   length = 0;
   static VShort   type   = 1;
-  static VFloat   minval = 0;
   static VShort   nproc  = 10;
   static VOptionDescRec  options[] = {
     {"mask",VStringRepn,1,(VPointer) &mask_filename,VRequiredOpt,NULL,"mask"},
-    {"minval",VFloatRepn,1,(VPointer) &minval,VOptionalOpt,NULL,"Signal threshold"},
     {"first",VShortRepn,1,(VPointer) &first,VOptionalOpt,NULL,"First timestep to use"},
     {"length",VShortRepn,1,(VPointer) &length,VOptionalOpt,NULL,"Length of time series to use, '0' to use full length"},
     {"type",VShortRepn,1,(VPointer) &type,VOptionalOpt,TYPDict,"type of scaling to make correlations positive"},
@@ -376,7 +371,7 @@ int main (int argc,char *argv[])
 
 
   /* main process */
-  VAttrList out_list = VECM(list,mask,minval,first,length,type);
+  VAttrList out_list = VECM(list,mask,first,length,type);
 
 
   /* update geoinfo, 4D to 3D */
