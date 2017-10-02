@@ -70,7 +70,6 @@ Parameters of 'vecm'
  -in      Input file.
  -out     Output file.
  -mask    Region of interest mask.
- -minval  Signal threshold. Default: 0
  -first   First timestep to use. Default: 0
  -length  Length of time series to use, '0' to use full length. Default: 0
  -type    Type of scaling [ pos | add | abs | neg ]. Default: add
