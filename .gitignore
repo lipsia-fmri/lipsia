@@ -20,6 +20,7 @@
 !lipsia-setup.sh
 !tar_lipsia.sh
 !version_history.txt
+!Dockerfile
 
 !/data/*.v
 !/src/mvpa/vmvpa_svm/vmvpa_singletrialdesign
