@@ -36,26 +36,72 @@ void VWriteNiftiHeader(FILE *fp,nifti_1_header *hdr)
 }
 
 
+#define xsetval(datatype) \
+{ \
+  datatype *A = (datatype *) VCalloc(ndata,nsize); \
+  size_t ret=0,slice,row,col,ti;		   \
+  size_t index = 0; \
+  for (ti=0; ti<nt; ti++) {		  \
+    for (slice=0; slice<nslices; slice++) { \
+      for (row=0; row<nrows; row++) { \
+	for (col=0; col<ncols; col++) {	  \
+	  double val = VPixel(src[slice],ti,row,col,datatype); \
+	  A[index] = (datatype)val; \
+	  index++; \
+	} \
+      } \
+    } \
+  } \
+  ret = fwrite(A,nsize,ndata,fp); \
+  if (ret != ndata) VError("Error writing data"); \
+  VFree(A); \
+}
 
-void Vista2Nii3D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
-{  
-  VAttrListPosn posn;
-  VImage src=NULL;
-  size_t ncols   = (size_t) D[1];
-  size_t nrows   = (size_t) D[2];
-  size_t nslices = (size_t) D[3];
-  fprintf(stderr," image dims: %ld %ld %ld\n",ncols,nrows,nslices);
-
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src);
+void VWriteData(VImage *src,int nslices,int nrows,int ncols,int nt,
+		int datatype,size_t ndata,size_t nsize,FILE *fp)
+{
+  switch(datatype) {
+  case DT_BINARY:
+    xsetval(VBit);
     break;
+  case DT_UNSIGNED_CHAR:
+    xsetval(VUByte);
+    break;
+  case DT_SIGNED_SHORT:
+    xsetval(short);
+    break;
+  case DT_SIGNED_INT:
+    xsetval(int);
+    break;
+  case DT_FLOAT:
+    xsetval(float);
+    break;
+  case DT_DOUBLE:
+    xsetval(double);
+    break;
+  case DT_INT8:
+    xsetval(VSByte);
+    break;
+  case DT_UINT16:
+    xsetval(unsigned short);
+    break;
+  case DT_UINT32:
+    xsetval(unsigned int);
+    break;
+  case DT_INT64:
+    xsetval(long);
+    break;
+  case DT_UINT64:
+    xsetval(unsigned long);
+    break;
+  default:
+    VError(" unknown datatype %d",datatype);
   }
-  if (src == NULL) VError(" no image found");
-
+}
 
   /* get data type */
-  VRepnKind repn = VPixelRepn(src);
+int GetDataType(VRepnKind repn)
+{
   int datatype = 0;
   switch (repn) {
   case VBitRepn:
@@ -91,6 +137,29 @@ void Vista2Nii3D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
   default:
     VError(" unknown datatype");
   }
+  return datatype;
+}
+
+void Vista2Nii3D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
+{  
+  VAttrListPosn posn;
+  VImage src=NULL;
+  size_t ncols   = (size_t) D[1];
+  size_t nrows   = (size_t) D[2];
+  size_t nslices = (size_t) D[3];
+  fprintf(stderr," image dims: %ld %ld %ld\n",ncols,nrows,nslices);
+
+  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
+    if (VGetAttrRepn (& posn) != VImageRepn) continue;
+    VGetAttrValue (& posn, NULL,VImageRepn, & src);
+    break;
+  }
+  if (src == NULL) VError(" no image found");
+
+  /* data type */
+  VRepnKind repn = VPixelRepn(src);
+  int datatype = GetDataType(repn);
+  
 
   /* header infos */
   hdr->dim[0] = 3;
@@ -133,11 +202,17 @@ void Vista2Nii4D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
     VGetAttrValue (& posn, NULL,VImageRepn, & src[i]);
-    if (VPixelRepn(src[i]) != VShortRepn) continue;
     i++;
-  }
+  }    
+
+
+  /* data type */
+  VRepnKind repn = VPixelRepn(src[0]);
+  int datatype = GetDataType(repn);
+
 
   /* image dims */
+  size_t bytesize = 8;
   hdr->dim[0] = 4;
   hdr->dim[1] = D[1];
   hdr->dim[2] = D[2];
@@ -146,37 +221,19 @@ void Vista2Nii4D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
   hdr->dim[5] = 0;
   hdr->dim[6] = 0;
   hdr->dim[7] = 0;
-  hdr->datatype = DT_SIGNED_SHORT;
+  hdr->datatype = datatype;
   hdr->bitpix   = VPixelPrecision(src[0]);
-
-  size_t nrnc  = nrows*ncols;
-  size_t npix  = nrnc*nslices;
-  size_t ndata = (npix*nt);
-  VShort *data = (VShort *) VCalloc(ndata,sizeof(VShort));
-  if (!data) VError(" err allocating data ");
-
-  size_t slice,row,col,ti;
-  for (slice=0; slice<nslices; slice++) {
-    for (ti=0; ti<nt; ti++) {
-      for (row=0; row<nrows; row++) {
-	for (col=0; col<ncols; col++) {
-	  VShort val = (VShort) VPixel(src[slice],ti,row,col,VShort);
-	  const size_t index = col + row*ncols + slice*nrnc + ti*npix;
-	  data[index] = val;
-	}
-      }
-    }
-  }
 
   /* write header */
   VWriteNiftiHeader(fp,hdr);
 
+  size_t nsize  = hdr->bitpix/bytesize;
+  size_t nrnc = nrows*ncols;
+  size_t npix = nrnc*nslices;
+  size_t ndata = nt * npix;
+
   /* write to disk */
-  size_t bytesize = 8;
-  size_t nsize = VPixelPrecision(src[0])/bytesize;
-  size_t ret = fwrite(data,nsize,ndata,fp);
-  if (ret != ndata) VError("Error writing data");
-  VFree(data);
+  VWriteData(src,nslices,nrows,ncols,nt,datatype,ndata,nsize,fp);
 }
 
 

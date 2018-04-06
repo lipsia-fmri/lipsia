@@ -245,3 +245,4 @@ void VReportValidParamOptions (
 **  G.Lohmann, May 2017
 */
 extern void VParseFilterCmdX (int,VOptionDescRec opts[],int,char **,VString *,FILE **);
+extern void VParseFilterCmdZ (int, VOptionDescRec opts[],int,char **,FILE **,FILE **,VString *);

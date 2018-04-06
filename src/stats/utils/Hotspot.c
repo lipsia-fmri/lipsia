@@ -67,6 +67,19 @@ void VZScale(VImage src,float mode,float stddev)
   }  
 }
 
+/* get max z-value */
+float VZMax(VImage src)
+{
+  size_t i=0;
+  float u=0,umax=0;
+  VFloat *pp=VImageData(src);
+  for (i=0; i<VImageNPixels(src); i++) {
+    u = (*pp++);
+    if (u > umax) umax = u;
+  }
+  return umax;
+}
+
 
 
 /* get image variance */

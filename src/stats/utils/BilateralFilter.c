@@ -96,10 +96,19 @@ void VBilateralFilter(VImage src,VImage dest,int radius,double var1,double var2,
   double u=0,x=0,w=0,d=0,s1=0,s2=0,tiny=1.0e-10;
   int b,r,c,bb,rr,cc,m,k,l,iter;
 
+  /* no filtering */
+  if (numiter==0) {
+    VCopyImagePixels(src,dest,VAllBands);
+    return;
+  }
+
+
+  /* ini dest image */
   int nbands = VImageNBands(src);
   int nrows  = VImageNRows(src);
   int ncols  = VImageNColumns(src);
   VFillImage(dest,VAllBands,0);
+
 
 
   /* get max neighbourhood size */

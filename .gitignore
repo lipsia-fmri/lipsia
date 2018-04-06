@@ -13,14 +13,12 @@
 !publish_selection.sh
 !publish_config.txt
 !INSTALL.rst
-!LICENSE.md
 !Makefile
 !README.rst
 !COPYRIGHT
 !lipsia-setup.sh
 !tar_lipsia.sh
 !version_history.txt
-!Dockerfile
 
 !/data/*.v
 !/src/mvpa/vmvpa_svm/vmvpa_singletrialdesign

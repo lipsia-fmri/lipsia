@@ -158,9 +158,25 @@ VSmoothImage3d (VImage src, VImage dest, VLong neighb, VLong numiter)
     case VShortRepn:
       Smooth3d(VShort);
       break;
+
+    case VUShortRepn:
+      Smooth3d(VUShort);
+      break;
+
+    case VIntegerRepn:
+      Smooth3d(VInteger);
+      break;
+
+    case VUIntegerRepn:
+      Smooth3d(VUInteger);
+      break;
 		
     case VLongRepn:
       Smooth3d(VLong);
+      break;
+
+    case VULongRepn:
+      Smooth3d(VULong);
       break;
 
     case VFloatRepn:

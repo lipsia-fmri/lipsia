@@ -64,16 +64,15 @@ double Determinant3x3(double **a)
 }
 
 
-VImage VTriLinearResample(VImage src,VImage dest,double **transform,double *shift,double *fixpoint,
+VImage VTriLinearResample(VImage src,VImage dest,double **transform,double *shift,
 			  int dst_nbands,int dst_nrows,int dst_ncolumns)
 {
-  int   b,r,c;
-  float bp,rp,cp,bx,rx,cx;
-  int   sx, sy, sz;   /* origin of subcube    */
-  float px, py, pz;   /* fractions of subcube */
-  float qx, qy, qz;   /* fractions of subcube */
-  int   lx, ly, lz;     /* lengths */
-  int   ox, oy, oz;     /* offsets */
+  int   b,r,c,bb,rr,cc;
+  double c000,c100,c001,c101,c010,c110,c011,c111;
+  double c00,c01,c10,c11,c0,c1;
+  double x,y,z,xd,yd,zd,x0,y0,z0;
+  double bx,rx,cx;
+  double val;
 
   VRepnKind repn = VPixelRepn(src);
   int src_nrows  = VImageNRows(src);
@@ -94,92 +93,66 @@ VImage VTriLinearResample(VImage src,VImage dest,double **transform,double *shif
   VFillImage(dest,VAllBands,0);
 
 
-#define GetValues(type) \
-{ \
-  type *src_pp; \
-  src_pp = (type *) VPixelPtr (src, sz, sy, sx); \
-  val += (float) pz * py * px * (*src_pp); src_pp += ox; \
-  val += (float) pz * py * qx * (*src_pp); src_pp += oy; \
-  val += (float) pz * qy * px * (*src_pp); src_pp += ox; \
-  val += (float) pz * qy * qx * (*src_pp); src_pp += oz; \
-  val += (float) qz * py * px * (*src_pp); src_pp += ox; \
-  val += (float) qz * py * qx * (*src_pp); src_pp += oy; \
-  val += (float) qz * qy * px * (*src_pp); src_pp += ox; \
-  val += (float) qz * qy * qx * (*src_pp); \
-  VPixel(dest,b,r,c,type) = (type)val;		\
-}
-
-
   /* Determines the value of each pixel in the destination image: */
   for (b=0; b<dst_nbands; b++) {
-    bx = (float) b - shift[2];
+    bx = (double) b - shift[2];
 
     for (r=0; r<dst_nrows; r++) {
-      rx = (float) r - shift[1];
+      rx = (double) r - shift[1];
 
       for (c=0; c<dst_ncolumns; c++) {
-	cx = (float) c - shift[0];
+	cx = (double) c - shift[0];
 
-	cp = ainv[0][0] * cx + ainv[0][1] * rx + ainv[0][2] * bx;
-	rp = ainv[1][0] * cx + ainv[1][1] * rx + ainv[1][2] * bx;
-	bp = ainv[2][0] * cx + ainv[2][1] * rx + ainv[2][2] * bx;
 
-	cp += fixpoint[0];
-	rp += fixpoint[1];
-	bp += fixpoint[2];
+	/* interpolation point */
+	x = ainv[0][0] * cx + ainv[0][1] * rx + ainv[0][2] * bx;
+	y = ainv[1][0] * cx + ainv[1][1] * rx + ainv[1][2] * bx;
+	z = ainv[2][0] * cx + ainv[2][1] * rx + ainv[2][2] * bx;
+	
 
-	/* fprintf(stderr," %3d %3d %3d,  %f %f %f\n",b,r,c,bp,rp,cp); */
+	/* check range */
+	cc = (int)x;
+	rr = (int)y;
+	bb = (int)z;
+	if (cc < 1 || cc >= src_ncols-1) continue;
+	if (rr < 1 || rr >= src_nrows-1) continue;
+	if (bb < 1 || bb >= src_nbands-1) continue;
 
-	if (bp < 0 || bp > src_nbands) continue;
-	if (rp < 0 || rp > src_nrows) continue;
-	if (cp < 0 || cp > src_ncols) continue;
 
-	/* compute origin of subcube */
-	sx = (int) (cp);
-	sy = (int) (rp);
-	sz = (int) (bp);
+	/* cube */
+	x0 = (int) (x);
+	y0 = (int) (y);
+	z0 = (int) (z);
 
-	/* check subcube */
-	if ((sx < -1) || (sx > src_ncols  - 1)) continue;
-	if ((sy < -1) || (sy > src_nrows  - 1)) continue;
-	if ((sz < -1) || (sz > src_nbands - 1)) continue;
 
-	/* compute fractions of subcube */
-	qx = cp - sx; px = 1 - qx;
-	qy = rp - sy; py = 1 - qy;
-	qz = bp - sz; pz = 1 - qz;
+	/* distance to corners of cube */
+	xd = (x-x0);
+	yd = (y-y0);
+	zd = (z-z0);
 
-	/* compute lengths and offsets */
-	lx = 1;
-	ly = src_ncols;
-	lz = src_nrows * src_ncols;
-	if (sx == -1) {sx = 0; lx = 0;};
-	if (sy == -1) {sy = 0; ly = 0;};
-	if (sz == -1) {sz = 0; lz = 0;};
-	if (sx == src_ncols  - 1) lx = 0;
-	if (sy == src_nrows  - 1) ly = 0;
-	if (sz == src_nbands - 1) lz = 0;
-	ox = lx;
-	oy = ox + ly - 2 * lx;
-	oz = oy + lz - 2 * ly;
-	double val = 0;
 
-	switch(repn) {
-	case VShortRepn:
-	  GetValues(VShort);
-	  break;
-	case VUByteRepn:
-	  GetValues(VUByte);
-	  break;
-	case VFloatRepn:
-	  GetValues(VFloat);
-	  break;
-	case VSByteRepn:
-	  GetValues(VSByte);
-	  break;
-	default:
-	  VError(" illegal pixel repn");
-	}
+	/* function values at corners of cube */
+	c000 = VGetPixel(src,bb,rr,cc);
+	c100 = VGetPixel(src,bb,rr,cc+1);
+	c001 = VGetPixel(src,bb+1,rr,cc);
+	c101 = VGetPixel(src,bb+1,rr,cc+1);
+	c010 = VGetPixel(src,bb,rr+1,cc);
+	c110 = VGetPixel(src,bb,rr+1,cc+1);
+	c011 = VGetPixel(src,bb+1,rr+1,cc);
+	c111 = VGetPixel(src,bb+1,rr+1,cc+1);
+
+
+	/* interpolate */
+	c00 = c000*(1.0-xd) + c100*xd;
+	c01 = c001*(1.0-xd) + c101*xd;
+	c10 = c010*(1.0-xd) + c110*xd;
+	c11 = c011*(1.0-xd) + c111*xd;
+
+	c0 = c00*(1.0-yd) + c10*yd;
+	c1 = c01*(1.0-yd) + c11*yd;
+	val = c0*(1.0-zd) + c1*zd;
+
+	VSetPixel(dest,b,r,c,(double)val);
       }
     }
   }

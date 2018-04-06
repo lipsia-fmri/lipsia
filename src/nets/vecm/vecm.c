@@ -339,12 +339,12 @@ int main (int argc,char *argv[])
     {"type",VShortRepn,1,(VPointer) &type,VOptionalOpt,TYPDict,"type of scaling to make correlations positive"},
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"number of processors to use, '0' to use all"}
   };
-  FILE *out_file=NULL;
-  VString in_file=NULL;
+  FILE *in_file=NULL,*out_file=NULL;
+  VString in_filename=NULL;
   char *prg_name=GetLipsiaName("vecm");
   fprintf(stderr, "%s\n", prg_name);
 
-  VParseFilterCmdX (VNumber (options),options,argc,argv,&in_file,&out_file);
+  VParseFilterCmdZ (VNumber (options),options,argc,argv,&in_file,&out_file,&in_filename);
   if (type > 3) VError(" illegal type");
 
 
@@ -355,7 +355,7 @@ int main (int argc,char *argv[])
 
 
   /* read functional data */
-  VAttrList list = VReadAttrList(in_file,0L,TRUE,FALSE);
+  VAttrList list = VReadAttrListZ(in_file,in_filename,0L,TRUE,FALSE);
   if (list == NULL) VError(" error reading input file %s",in_file);
   VAttrList geolist = VGetGeoInfo(list);
 

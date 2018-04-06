@@ -28,6 +28,7 @@
 /* Get definition of size_t and NULL: */
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -542,12 +543,11 @@ extern void VSetGeoDim(VAttrList,double *);
 extern void VGetSlicetimes(int,int,int,double,double *);
 
 
-/* new: file IO, May 2017 */
+/* new: file IO, May 2017, updated Feb 2018 */
 extern int CheckGzip(char *filename);
-extern char *VReadGzippedData(char *filename,size_t *len);
-extern char *VReadUnzippedData(char *filename,VBoolean nofail,size_t *size);
-extern int getformat(char *filename);
 extern VAttrList VReadAttrList(VString filename,VLong tr,VBoolean attrtype,VBoolean do_scaling);
+extern VAttrList VReadAttrListZ(FILE *,VString,VLong,VBoolean,VBoolean);
+
 extern VImage VReadImage(VAttrList list);
 extern int VAttrListNumImages(VAttrList list);
 extern VImage *VAttrListGetImages(VAttrList list,int n);

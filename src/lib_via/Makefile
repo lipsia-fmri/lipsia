@@ -4,8 +4,8 @@ CFLAGS+=-fPIC
 LDLIBS=
 
 SRC = Aniso2d.c Aniso3d.c Bicubic.c Binarize.c Binmorph3d.c Border3d.c BorderPoint.c \
-      Canny.c CDT3d.c ChamferDist3d.c Contrast.c Convolve.c DeleteSmall.c Dist2d.c \
-      EuclideanDist3d.c Filter.c GenusLee.c Label2d.c Label3d.c Magnitude.c\
+      CDT3d.c ChamferDist3d.c Contrast.c Convolve.c DeleteSmall.c Dist2d.c \
+      EuclideanDist3d.c GaussFilter.c GenusLee.c Label2d.c Label3d.c Magnitude.c\
       MatrixInverse.c Median.c NNSample3d.c NNScale3d.c Pixel.c QuickMorph.c\
       Rotate2d.c RotationMatrix.c Sample2d.c Sample3d.c Scale2d.c Scale3d.c \
       SelectBig.c ShapeMoments.c Shear.c SimplePoint.c Skel2d.c Skel3d.c Smooth3d.c \

@@ -102,20 +102,19 @@ int main (int argc, char *argv[])
     {"fdrfile",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"Name of output fdr txt-file"},    
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
   };
-  FILE *out_file=NULL;
-  VString in_file=NULL;
+  FILE *out_file=NULL,*in_file=NULL;
+  VString in_filename=NULL;
   char *prg_name=GetLipsiaName("vlisa0");
   fprintf (stderr, "%s\n", prg_name);
   gsl_set_error_handler_off ();
 
 
   /* Parse command line arguments and identify files: */
-  VParseFilterCmdX (VNumber (options), options, argc, argv,&in_file,&out_file);
-  fprintf(stderr," in_file= %s\n",in_file);
+  VParseFilterCmdZ (VNumber (options), options, argc, argv,&in_file,&out_file,&in_filename);
 
 
   /* Read the input zmap file: */
-  VAttrList list = VReadAttrList(in_file,0L,TRUE,FALSE);
+  VAttrList list = VReadAttrListZ(in_file,in_filename,0L,TRUE,FALSE);
   VImage zmap1 = VReadImage(list);
   if (zmap1 == NULL) VError(" no input zmap image found");
   if (VPixelRepn(zmap1) != VFloatRepn) VError(" input pixel repn must be float");

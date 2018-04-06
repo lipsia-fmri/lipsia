@@ -1,5 +1,5 @@
 
- Hubness maps resulting from TED
+Hubness maps resulting from TED
 ===================================
 
 The program **vhubness** produces a hubness map resulting from the output of :doc:`vted <vted>`.
@@ -15,11 +15,11 @@ An example calling sequence is shown below:
 Example:
 ``````````
 
- :: 
+ ::
 
    vted -in1 A*.v -in2 B*.v -mask mask.v -perm   0 -q 0.99 -hist realhist.txt -out edgelist.v 
-	 vted -in1 A*.v -in2 B*.v -mask mask.v -perm 100 -q 0.99 -hist nullhist.txt
-	 vtedfdr -real realhist.txt -null nullhist.txt -out fdr.txt -alpha 0.05
+   vted -in1 A*.v -in2 B*.v -mask mask.v -perm 100 -q 0.99 -hist nullhist.txt
+   vtedfdr -real realhist.txt -null nullhist.txt -out fdr.txt -alpha 0.05
    vhubness -in edgelist.v -out image.v -min 0.3
 	 
 

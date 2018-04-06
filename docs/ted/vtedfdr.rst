@@ -10,7 +10,6 @@ The program expects two histogram files as input representing the permuted and n
 outputs of "vted". It produces as output a txt-file containing the false discovery rates (Fdr)
 for very edge density value. The cutoff above which Fdr falls below the predetermined significance
 level alpha is also reported.
-
 An example calling sequence is shown below:
 
 

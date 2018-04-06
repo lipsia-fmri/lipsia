@@ -30,14 +30,15 @@ the second stage can be specified using the parameter -perm (e.g. -perm 200).
 An example calling sequence is shown below:
 
 
+
 Example:
-``````````
+````````````
 
  ::
 
    vted -in1 A*.v -in2 B*.v -mask mask.v -perm   0 -q 0.99 -hist realhist.txt -out edgelist.v
-	vted -in1 A*.v -in2 B*.v -mask mask.v -perm 100 -q 0.99 -hist nullhist.txt
-	vtedfdr -real realhist.txt -null nullhist.txt -out fdr.txt -alpha 0.05
+   vted -in1 A*.v -in2 B*.v -mask mask.v -perm 100 -q 0.99 -hist nullhist.txt
+   vtedfdr -real realhist.txt -null nullhist.txt -out fdr.txt -alpha 0.05
    vhubness -in edgelist.v -out image.v -min 0.3
 
 The first stage has two outputs: a file "edgelist.v" containing a list of candidate edges (voxels pairs) and a histogram file "realhist.txt", which is later used for statistical inference. It also produces a histogram file "realhist.txt"
@@ -64,7 +65,7 @@ Task-Related Edge Density (TED) - A New Method for Revealing Dynamic Network For
 
 
 Parameters of 'vted'
-````````````````````````````````
+`````````````````````````
 
  -help    Prints usage information.
  -in1     Input files 1.

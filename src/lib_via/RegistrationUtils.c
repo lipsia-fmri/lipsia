@@ -253,8 +253,7 @@ void Normalize(VImage src)
 
 
 /* set up transformation info */
-void ReadTransformation(VImage transimage,double **trans,double *fixpoint,double *shift,
-			double *ref_pixdim,double *src_pixdim,double *ref_offset,double *src_offset)
+void ReadTransformation(VImage transimage,double **trans,double *shift,double *ref_pixdim,double *ref_dim)			
 {
   int i,j;
   for (i=0; i<3; i++) {
@@ -263,23 +262,13 @@ void ReadTransformation(VImage transimage,double **trans,double *fixpoint,double
     }
   }
   for (i=0; i<3; i++)
-    shift[i] = VPixel(transimage,0,i,3,VDouble);
+    shift[i] = VGetPixel(transimage,0,i,3);
 
   for (i=0; i<3; i++)
-    fixpoint[i] = VPixel(transimage,0,i,4,VDouble);
-  if (VImageNColumns(transimage) < 8) return;
+    ref_pixdim[i] = VGetPixel(transimage,0,i,4);
 
-  for (i=0; i<3; i++)
-    ref_pixdim[i] = VPixel(transimage,0,i,6,VDouble);
-
-  for (i=0; i<3; i++)
-    src_pixdim[i] = VPixel(transimage,0,i,7,VDouble);
-
-  for (i=0; i<3; i++)
-    ref_offset[i] = VPixel(transimage,0,i,8,VDouble);
-
-  for (i=0; i<3; i++)
-    src_offset[i] = VPixel(transimage,0,i,9,VDouble);
+  for (i=0; i<3; i++) 
+    ref_dim[i] = VGetPixel(transimage,0,i,5);
 }
 
 

@@ -176,6 +176,7 @@ void FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_histogr
 	*pp1 = 0;
 	if (alpha < 0.5) {
 	  if (u >= cutoff) {
+	    if (xFdr > alpha) xFdr=0.0;
 	    *pp1=(1.0-xFdr);
 	    ic++;
 	  }

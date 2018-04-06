@@ -30,8 +30,7 @@ John Wiley & Sons, Chichester, England.
   \param dest  output image (bit repn)
   \param radius radius of the spherical structural element
 */
-VImage
-VDTErode(VImage src,VImage dest,VDouble radius)
+VImage VDTErode(VImage src,VImage dest,VDouble radius)
 {
   VImage float_image;
   VBit *bin_pp,*src_pp;
@@ -80,8 +79,7 @@ VDTErode(VImage src,VImage dest,VDouble radius)
   \param dest  output image (bit repn)
   \param radius radius of the spherical structural element
 */
-VImage
-VDTDilate(VImage src,VImage dest,VDouble radius)
+VImage VDTDilate(VImage src,VImage dest,VDouble radius)
 {
   VImage float_image;
   VBit *bin_pp;
@@ -122,16 +120,13 @@ VDTDilate(VImage src,VImage dest,VDouble radius)
   \param dest  output image (bit repn)
   \param radius radius of the spherical structural element
 */
-VImage
-VDTClose(VImage src,VImage dest,VDouble radius)
+VImage VDTClose(VImage src,VImage dest,VDouble radius)
 {
   VImage float_image=NULL,tmp=NULL;
   VBit *bin_pp;
   VFloat *float_pp;
   int i,nbands,nrows,ncols,npixels,b,r,c;
-  int border = 7;
-
-  border = (int) (radius - 1);
+  int border = (int) (radius - 1);
 
   if (VPixelRepn(src) != VBitRepn) 
     VError("Input image must be of type VBit");
@@ -142,6 +137,7 @@ VDTClose(VImage src,VImage dest,VDouble radius)
   npixels = nbands * nrows * ncols;
 
   tmp = VCreateImage(nbands,nrows,ncols,VBitRepn);
+  VFillImage(tmp,VAllBands,0);
 
   for (b=border; b<nbands-border; b++) {
     for (r=border; r<nrows-border; r++) {

@@ -8,7 +8,7 @@ SRC = Alloc.c Attr.c ConvertC.c ConvertL.c ConvertR.c ConvertO.c Crop.c \
       Fill.c stringtoken.c Edges.c EdgesType.c Volumes.c VolumesType.c \
       Flip.c Op.c Invert.c History.c BlockFileIO.c \
       GeoInfo.c slicetime.c Transpose.c \
-      newfile_io.c ByteSwap.c Nii2Vista.c Minval.c nifti1_io.c znzlib.c
+      newfile_io.c ByteSwap.c Nii2Vista.c Minval.c nifti1_io.c Vzfile_io.c znzlib.c
 
 ifeq ($(shell uname),Darwin)
         SRC += fmemopen.c

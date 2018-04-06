@@ -52,6 +52,9 @@ VImage VBinarizeImage (VImage src,VImage dest,VDouble xmin,VDouble xmax)
 
   switch(VPixelRepn(src)) {
 
+  case VBitRepn:
+    VError(" Binarize: image is already binarized");
+    break;
   case VUByteRepn:
     binarize(VUByte);
     break;
@@ -62,19 +65,19 @@ VImage VBinarizeImage (VImage src,VImage dest,VDouble xmin,VDouble xmax)
     binarize(VShort);
     break;
   case VUShortRepn:
-    binarize(VShort);
+    binarize(VUShort);
     break;
   case VIntegerRepn:
-    binarize(VShort);
+    binarize(VInteger);
     break;
   case VUIntegerRepn:
-    binarize(VShort);
+    binarize(VUInteger);
     break;
   case VLongRepn:
     binarize(VLong);
     break;
   case VULongRepn:
-    binarize(VLong);
+    binarize(VULong);
     break;
   case VFloatRepn:
     binarize(VFloat);

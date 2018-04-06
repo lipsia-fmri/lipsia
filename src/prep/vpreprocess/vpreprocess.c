@@ -56,9 +56,8 @@ int main(int argc, char *argv[])
     {"stop",  VBooleanRepn, 1, (VPointer) &stop, VOptionalOpt, NULL, "Temporal Filter: Stop insted of pass filter"},
     {"minval", VFloatRepn, 1, (VPointer) &minval, VOptionalOpt, NULL, "Signal threshold"}
   };
-  FILE *out_file = NULL;
-  VString in_file=NULL;
-
+  FILE *out_file = NULL,*in_file=NULL;
+  VString in_filename=NULL;
 
   extern void VSpatialFilter(VAttrList, VDouble);
   extern void VFreqFilter(VAttrList, VFloat, VFloat, VBoolean, VFloat);
@@ -66,7 +65,7 @@ int main(int argc, char *argv[])
   fprintf (stderr, "%s\n", prg);
 
 
-  VParseFilterCmdX(VNumber(options), options, argc, argv, &in_file, &out_file);
+  VParseFilterCmdZ(VNumber(options), options, argc, argv, &in_file, &out_file,&in_filename);
 
   if (fwhm < 0) VError("fwhm must be non-negative");
   if (low > high && high > 0) VError("low must be less than high");
@@ -76,7 +75,7 @@ int main(int argc, char *argv[])
 
   /* read the file */
   VLong tr=0L;
-  VAttrList list = VReadAttrList(in_file,tr,TRUE,FALSE);
+  VAttrList list = VReadAttrListZ(in_file,in_filename,tr,TRUE,FALSE);
   if (list == NULL) VError(" error reading input file %s",in_file);
 
 
