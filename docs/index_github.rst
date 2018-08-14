@@ -30,6 +30,8 @@ Network tools
 
 .. _vlisa1: stats/vlisa1.rst
 
+.. _vlisa2: stats/vlisa2.rst
+
 .. _vslisa: stats/vslisa.rst
 
 .. _vted: ted/vted.rst
