@@ -13,6 +13,8 @@ LISA statistical inference
 
 `vlisa1`_: onesample LISA statistical inference
 
+`vlisa2`_: onesample LISA statistical inference
+
 `vslisa`_: single subject LISA statistical inference
 
 
