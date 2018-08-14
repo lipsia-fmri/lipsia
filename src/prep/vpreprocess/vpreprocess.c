@@ -37,8 +37,9 @@
 #include <stdlib.h>
 #include <fftw3.h>
 
-#define MINVAL 1.0e+6
 #define ABS(x) ((x) > 0 ? (x) : -(x))
+extern void Gauss4d(VAttrList list,double *sigma);
+
 
 
 int main(int argc, char *argv[]) 
@@ -48,7 +49,7 @@ int main(int argc, char *argv[])
   static VFloat   low      =  0;
   static VBoolean stop     =  FALSE;
   static VFloat   sharp    =  0.8;
-  static VFloat   minval   =  MINVAL;
+  static VFloat   minval   =  0;
   static VOptionDescRec  options[] = {
     {"fwhm", VDoubleRepn, 1, (VPointer) &fwhm, VOptionalOpt, NULL, "Spatial filter: FWHM in mm"},
     {"high", VFloatRepn, 1, (VPointer) &high, VOptionalOpt, NULL, "Temporal Filter: Cutoff for high pass/stop in seconds"},
@@ -79,19 +80,30 @@ int main(int argc, char *argv[])
   if (list == NULL) VError(" error reading input file %s",in_file);
 
 
-  /* if default minval is set, use heuristics to compute new minval threshold for brain mask */
-  if (ABS(minval - MINVAL) < 0.1) {
-    minval = VGetMinval(list);
-    fprintf(stderr," Brain mask threshold,  minval: %f\n",minval);
+  /* apply minval */
+  if (minval > 0) VApplyMinval(list, (VFloat)minval);
+
+
+  /* apply freq filter */
+  if (low > 0 || high > 0) {
+    VFreqFilter(list, high, low, stop, sharp);
   }
 
-  /* apply minval */
-  if (minval > -MINVAL) VApplyMinval(list, (VFloat)minval);
 
-
-  /* apply filtering */
-  if (low > 0 || high > 0) VFreqFilter(list, high, low, stop, sharp);
-  if (fwhm > 0) VSpatialFilter(list, fwhm);
+  /* apply spatial filter */
+  if (fwhm > 0) {
+    int i;
+    double *sigma = (double *)VCalloc(3,sizeof(double));
+    double *pixdim = (double *)VCalloc(8,sizeof(double));
+    for (i=0; i<8; i++) pixdim[i] = 1.0;
+    VAttrList geolist = VGetGeoInfo(list);
+    if (geolist != NULL) pixdim = VGetGeoPixdim(geolist,pixdim);
+    for (i=0; i<3; i++) sigma[i] = fwhm/2.355;
+    for (i=0; i<3; i++) sigma[i] /= pixdim[i+1];
+    fprintf(stderr," resolution: %.3f %.3f %.3f\n",pixdim[1],pixdim[2],pixdim[3]);
+    fprintf(stderr," sigma: %.3f %.3f %.3f\n",sigma[0],sigma[1],sigma[2]);
+    Gauss4d(list,sigma);
+  }
 
 
   /* write output */

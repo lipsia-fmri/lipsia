@@ -2,7 +2,7 @@
   Smoothing filters using convolutions
 
 \par Author:
-Gabriele Lohmann, MPI-KYB,
+Gabriele Lohmann, MPI-CBS
 */
 
 /* From the Vista library: */

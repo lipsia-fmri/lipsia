@@ -40,12 +40,12 @@ extern int getformat(char *filename);
 int main(int argc,char *argv[])
 {
   static VString out_filename = "";
-  static VLong tr=0;
+  static VFloat xtr=0;
   static VBoolean attrtype = TRUE;
   static VBoolean do_scaling = FALSE;
   static VOptionDescRec  options[] = {
     {"out",VStringRepn,1,(VPointer) &out_filename,VRequiredOpt,NULL,"Output file"},
-    {"tr",VLongRepn,1,(VPointer) &tr,VOptionalOpt,NULL,"Repetition time in milliseconds, use '0' to rely on header info"},
+    {"tr",VFloatRepn,1,(VPointer) &xtr,VOptionalOpt,NULL,"Repetition time in seconds, use '0' to rely on header info"},
     {"attrtype",VBooleanRepn,1,(VPointer) &attrtype,VOptionalOpt,NULL,"Whether to output 4D data to lipsia 4D format"},
     {"scale",VBooleanRepn,1,(VPointer) &do_scaling,VOptionalOpt,NULL,"Whether to scale 4D data to 16bit integer"},
   };
@@ -58,6 +58,14 @@ int main(int argc,char *argv[])
   /* parse command line */
   VParseFilterCmdZ (VNumber (options),options,argc,argv,&in_file,NULL,&in_filename);
 
+
+  /* get TR */
+  if (fabs(xtr) > 0 && xtr > 50) VError(" implausible TR (%.3f sec), TR must be specified in seconds",xtr);
+  VLong tr=0;
+  if (xtr > 0) tr = (VLong)(xtr*1000.0);
+
+
+  /* get format types */
   int itype = getformat(in_filename);
   int otype = getformat(out_filename);
 
@@ -79,11 +87,11 @@ int main(int argc,char *argv[])
   else if ((itype < 2) && (otype == 2 || otype == 3)) {
     Vista_to_Nifti1(list,out_filename);
   }
-
+  
   else if (itype == otype) {
     VError(" input equals output format");
   }
-
+  
   else {
     VError(" illegal formats: %d %d\n",itype,otype);
   }

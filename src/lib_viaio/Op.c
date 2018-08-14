@@ -24,6 +24,7 @@
 
 /* From the standard C library: */
 #include <math.h>
+#include <stdlib.h>
 
 extern double rint(double);
 
@@ -38,7 +39,7 @@ static VStringConst clip_msg = "%s: Destination pixel value(s) clipped";
 
 #define DoBinaryOps(type, arg2, logical_ops)				\
     {									\
-	type t1, t2;							\
+      type t1, t2, t3=0;							\
 	type local_min = min, local_max = max;				\
 									\
 	switch (op) {							\
@@ -53,9 +54,12 @@ static VStringConst clip_msg = "%s: Destination pixel value(s) clipped";
 									\
 	case VImageOpDiv:						\
 	    for (i = 0; i < npixels; i++) {				\
-		t1 = (type) *src1_pp++ / (type) arg2;			\
-		Clip (t1, local_min, local_max);			\
-		*res_pp++ = t1;						\
+	      t1 = 0;                                                   \
+	      t3 = (type)arg2;						\
+              if (fabs(t3) > 0) t1  = (type) *src1_pp / t3;     	\
+	      src1_pp++;						\
+	      Clip (t1, local_min, local_max);				\
+	      *res_pp++ = t1;						\
 	    }								\
 	    break;							\
 									\

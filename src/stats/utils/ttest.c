@@ -75,7 +75,7 @@ double welchtest(double *data1,double *data2,int n1,int n2)
 {
   double tiny=TINY;
   double ave1,ave2,var1,var2;
-  double t=0;
+  double z=0,t=0,df=0;
   double nx1 = (double)n1;
   double nx2 = (double)n2;
 
@@ -84,7 +84,10 @@ double welchtest(double *data1,double *data2,int n1,int n2)
   avevar(data2,n2,&ave2,&var2);
   if (var2 < tiny) return 0;
   t = (ave1 - ave2)/sqrt(var1/nx1 + var2/nx2);
-  return t;
+  df = SQR(var1/nx1+var2/nx2)/(SQR(var1/nx1)/(nx1-1)+SQR(var2/nx2)/(nx2-1));
+  z  = t2z((double) t,(double) df);
+  if (t < 0) z = -z;
+  return z;
 }
 
 /* paired twosample test */

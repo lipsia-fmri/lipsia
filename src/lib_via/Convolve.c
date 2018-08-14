@@ -45,7 +45,7 @@ VImage VConvolveCol(VImage src,VImage dest,float *kernel,int dim)
   nbands = VImageNBands (src);
 
   dest = VSelectDestImage("VConvolveCol",dest,nbands,nrows,ncols,VFloatRepn);
-  dest = VCopyImage(src,dest,VAllBands);
+  VFillImage(dest,VAllBands,0);
 
   for (b=0; b<nbands; b++) {
     for (r=0; r<nrows; r++) {
@@ -92,10 +92,10 @@ VImage VConvolveRow (VImage src,VImage dest,float *kernel,int dim)
   nbands = VImageNBands (src);
 
   dest = VSelectDestImage("VConvolveRow",dest,nbands,nrows,ncols,VFloatRepn);
-  dest = VCopyImage(src,dest,VAllBands);
+  VFillImage(dest,VAllBands,0);
 
   for (b=0; b<nbands; b++) {
-    for (r=0; r<nrows; r++) {
+    for (r=d; r<nrows-d; r++) {
       for (c=0; c<ncols; c++) {
 
 	sum = 0;
@@ -139,7 +139,7 @@ VImage VConvolveBand (VImage src,VImage dest,float *kernel,int dim)
   nbands = VImageNBands (src);
 
   dest = VSelectDestImage("VConvolveBand",dest,nbands,nrows,ncols,VFloatRepn);
-  dest = VCopyImage(src,dest,VAllBands);
+  VFillImage(dest,VAllBands,0);
 
   for (b=0; b<nbands; b++) {
     for (r=0; r<nrows; r++) {

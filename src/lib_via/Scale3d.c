@@ -1,149 +1,100 @@
-/*! \file
-  3D scaling using trilinear interpolation.
-
-Scale a 3D image using trilinear interpolation.
-
-
-\par Author:
-Gabriele Lohmann, MPI-CBS
-*/
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <float.h>
 
 /* From the Vista library: */
-#include <viaio/Vlib.h>
-#include <viaio/mu.h>
-#include <viaio/os.h>
 #include <viaio/VImage.h>
+#include <viaio/Vlib.h>
+#include <viaio/file.h>
+#include <viaio/mu.h>
 
-#include <stdio.h>
-#include <math.h>
-
-
-/*!
-\fn VImage VTriLinearScale3d (VImage src,VImage dest,int dst_nbands,int dst_nrows,int dst_ncols,
-                              float shift[3],float scale[3])
-\brief 3D scaling using trilinear interpolation, where Ax+b = y, and A is the scaling matrix.
-\param src        input image (any repn)
-\param dest       output image (any repn)
-\param dst_nbands number of output slices
-\param dst_nrows  number of output rows
-\param dst_ncols  number of output columns
-\param shift[3]   translation vector (band,row,column)
-\param scale[3]   scaling vector (band,row,column)
-*/
-VImage 
-VTriLinearScale3d (VImage src,VImage dest,int dst_nbands,int dst_nrows,int dst_ncols,
-		   float shift[3],float scale[3])
+VImage VTriLinearScale3d(VImage src,VImage dest,
+			 int dst_nbands,int dst_nrows,int dst_ncolumns,
+			 float *shift,float *scale)
 {
-  int   b,r,c;
-  float bp,rp,cp;
-  int   sx, sy, sz;   /* origin of subcube    */
-  float px, py, pz;   /* fractions of subcube */
-  float qx, qy, qz;   /* fractions of subcube */
-  int   lx, ly, lz;   /* lengths */
-  int   ox, oy, oz;   /* offsets */
-  float val;
-  int   src_nrows,src_ncols,src_nbands;
-  float xscale,yscale,zscale;
-  VRepnKind repn;
+  int   b,r,c,bb,rr,cc;
+  double c000,c100,c001,c101,c010,c110,c011,c111;
+  double c00,c01,c10,c11,c0,c1;
+  double x,y,z,xd,yd,zd,x0,y0,z0;
+  double val;
+
+  VRepnKind repn = VPixelRepn(src);
+  int src_nrows  = VImageNRows(src);
+  int src_ncols  = VImageNColumns(src);
+  int src_nbands = VImageNBands(src);
+
+  double zscale = 1.0 / scale[2];
+  double yscale = 1.0 / scale[1];
+  double xscale = 1.0 / scale[0];
 
 
-  /* Extract data from source image */
-  src_nrows  = VImageNRows(src);
-  src_ncols  = VImageNColumns(src);
-  src_nbands = VImageNBands(src);
-  repn   = VPixelRepn(src);
-
-
-  dest = VSelectDestImage("VTriLinearScale3d",dest,dst_nbands,dst_nrows,dst_ncols,repn);
+  /* create output image */
+  if (dest == NULL) {
+    dest = VCreateImage(dst_nbands,dst_nrows,dst_ncolumns,repn);
+  }
   if (! dest) return NULL;
   VFillImage(dest,VAllBands,0);
 
 
+  /* Determines the value of each pixel in the destination image: */
+  for (b=0; b<dst_nbands; b++) {
+    z = zscale * ((double)b - shift[2]);
+    if (z < 0 || z > src_nbands) continue;
+
+    for (r=0; r<dst_nrows; r++) {
+      y = yscale * ((double) r - shift[1]);
+      if (y < 0 || y > src_nrows) continue;
+
+      for (c=0; c<dst_ncolumns; c++) {
+	x = xscale * ((double) c - shift[0]);
+	if (x < 0 || x > src_ncols) continue;
+
+	
+	/* check range */
+	cc = (int)x;
+	rr = (int)y;
+	bb = (int)z;
+	if (cc < 1 || cc >= src_ncols-1) continue;
+	if (rr < 1 || rr >= src_nrows-1) continue;
+	if (bb < 1 || bb >= src_nbands-1) continue;
+
+	/* function values at corners of cube */
+	c000 = VGetPixel(src,bb,rr,cc);
+	c100 = VGetPixel(src,bb,rr,cc+1);
+	c001 = VGetPixel(src,bb+1,rr,cc);
+	c101 = VGetPixel(src,bb+1,rr,cc+1);
+	c010 = VGetPixel(src,bb,rr+1,cc);
+	c110 = VGetPixel(src,bb,rr+1,cc+1);
+	c011 = VGetPixel(src,bb+1,rr+1,cc);
+	c111 = VGetPixel(src,bb+1,rr+1,cc+1);
 
 
-#define GetValues(type) \
-{ \
-  type *src_pp; \
-  src_pp = (type *) VPixelPtr (src, sz, sy, sx); \
-  val += (float) pz * py * px * *src_pp; src_pp += ox; \
-  val += (float) pz * py * qx * *src_pp; src_pp += oy; \
-  val += (float) pz * qy * px * *src_pp; src_pp += ox; \
-  val += (float) pz * qy * qx * *src_pp; src_pp += oz; \
-  val += (float) qz * py * px * *src_pp; src_pp += ox; \
-  val += (float) qz * py * qx * *src_pp; src_pp += oy; \
-  val += (float) qz * qy * px * *src_pp; src_pp += ox; \
-  val += (float) qz * qy * qx * *src_pp; \
-  VPixel(dest,b,r,c,type) = val; \
-}
-    
+	/* lower corner of cube */
+	x0 = (int) (x);
+	y0 = (int) (y);
+	z0 = (int) (z);
 
-  zscale = 1.0 / scale[2];
-  yscale = 1.0 / scale[1];
-  xscale = 1.0 / scale[0];
 
-  for (b = 0; b < dst_nbands; b++) {
-    bp = zscale * ((float) b - shift[2]);
-    if (bp < 0 || bp > src_nbands) continue;
+	/* distance to corners of cube */
+	xd = (x-x0);
+	yd = (y-y0);
+	zd = (z-z0);
 
-    for (r = 0; r < dst_nrows; r++) {
-      rp = yscale * ((float) r - shift[1]);
-      if (rp < 0 || rp > src_nrows) continue;
+	/* interpolate */
+	c00 = c000*(1.0-xd) + c100*xd;
+	c01 = c001*(1.0-xd) + c101*xd;
+	c10 = c010*(1.0-xd) + c110*xd;
+	c11 = c011*(1.0-xd) + c111*xd;
 
-      for (c = 0; c < dst_ncols; c++) {
-	cp = xscale * ((float) c - shift[0]);
-	if (cp < 0 || cp > src_ncols) continue;
+	c0 = c00*(1.0-yd) + c10*yd;
+	c1 = c01*(1.0-yd) + c11*yd;
+	val = c0*(1.0-zd) + c1*zd;
 
-	/* compute origin of subcube */
-	sx = (int) (cp);
-	sy = (int) (rp);
-	sz = (int) (bp);
-
-	/* check subcube */
-	if ((sx < -1) || (sx >= src_ncols)) continue;
-	if ((sy < -1) || (sy >= src_nrows)) continue;
-	if ((sz < -1) || (sz >= src_nbands)) continue;
-
-	/* compute fractions of subcube */
-	qx = cp - sx; px = 1 - qx;
-	qy = rp - sy; py = 1 - qy;
-	qz = bp - sz; pz = 1 - qz;
-
-	/* compute lengths and offsets */
-	lx = 1;
-	ly = src_ncols;
-	lz = src_nrows * src_ncols;
-	if (sx == -1) {sx = 0; lx = 0;};
-	if (sy == -1) {sy = 0; ly = 0;};
-	if (sz == -1) {sz = 0; lz = 0;};
-	if (sx == src_ncols  - 1) lx = 0;
-	if (sy == src_nrows  - 1) ly = 0;
-	if (sz == src_nbands - 1) lz = 0;
-	ox = lx;
-	oy = ox + ly - 2 * lx;
-	oz = oy + lz - 2 * ly;
-	val = 0;
-
-	switch(repn) {
-	case VShortRepn:
-	  GetValues(VShort);
-	  break;
-	case VUByteRepn:
-	  GetValues(VUByte);
-	  break;
-	case VFloatRepn:
-	  GetValues(VFloat);
-	  break;
-	case VSByteRepn:
-	  GetValues(VSByte);
-	  break;
-	default:
-	  VError(" illegal pixel repn");
-	}
+	VSetPixel(dest,b,r,c,(double)val);
       }
     }
   }
 
-  VCopyImageAttrs (src, dest);
   return dest;
 }

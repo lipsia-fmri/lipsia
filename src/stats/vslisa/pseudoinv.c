@@ -45,7 +45,7 @@ gsl_matrix *PseudoInv(gsl_matrix *A,gsl_matrix *B)
   for (j=0; j<n; j++) {
     if (fabs(w->data[j]) > 1.0e-6) k++;
   }
-  if (k < 2) VError(" svd, k= %d =f n\n",k,n);
+  if (k < 1) VError(" Design matrix is singular");
   
 
   for (k=0; k<n; k++) {

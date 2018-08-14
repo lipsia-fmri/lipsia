@@ -35,22 +35,18 @@
 #include <stdlib.h>
 #include <fftw3.h>
 
-#define ABS(x) ((x) < 0 ? -(x) : (x))
-
 
 void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat sharp)
 {
-  VAttrListPosn posn;
-  VImage src=NULL;
-  VString str=NULL, str1=NULL;
-  double *in=NULL, sum=0;
+  VString str1=NULL;
+  double *in=NULL;
   fftw_complex *out;
   fftw_plan p1,p2;
-  int i,j,k,n,nc,r,c,nrows,ncols,not=0,tail=0;
-  float freq,alpha,tr=0;
+  int i,j,nc,b,r,c,tail=0;
+  float freq=0,alpha=0;
   double *highp=NULL, *lowp=NULL;
   double x_high, x_low, x;
-  double tiny=1.0e-8;
+  double tiny=1.0e-6;
 
 
   /* dialog messages */
@@ -65,46 +61,44 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
   }
 
 
-  /* get image dimensions */
-  n = nrows = ncols = 0;
-  str = VMalloc(100);
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src);
-    if (VImageNBands(src) > n) n = VImageNBands(src);
-    if (VImageNRows(src) > nrows) nrows = VImageNRows(src);
-    if (VImageNColumns(src) > ncols) ncols = VImageNColumns(src);
-    
-    /* Get TR */
-    if (VGetAttr(VImageAttrList(src),"repetition_time",NULL,VFloatRepn,&tr) == VAttrFound)
-      tr /= 1000.0;
-    else {
-      if (VGetAttr (VImageAttrList (src), "MPIL_vista_0", NULL,VStringRepn, (VPointer) & str) == VAttrFound) {
-	sscanf(str," repetition_time=%f",&tr);
-	tr /= 1000.0;
-      } else
-	VError(" TR unknown");
-    }
-  }
-  if (tr < 0.01 || tr > 100) VError(" illegal TR %f",tr);
- 
+  
+  /* read functional data */
+  int nrows=0,ncols=0,nt=0;
+  int nslices = VAttrListNumImages(list);
+  VImage *src = VAttrListGetImages(list,nslices);
+  VImageDimensions(src,nslices,&nt,&nrows,&ncols);
+
+
+  /* read header info */
+  double *D = (double *)VCalloc(8,sizeof(double));
+  for (i=0; i<8; i++) D[i] = 1.0;
+  VAttrList geolist = VGetGeoInfo(list);
+  if (geolist != NULL) D = VGetGeoPixdim(geolist,D);
+  double tr = D[4];  
+  if (tr > 100) tr /= 1000.0;  /* convert to seconds */
+  if (tr < 0.01) VError("FreqFilter: implausible TR (%f seconds)",tr);
+  fprintf(stderr," image dimensions: %d x %d x %d,  nt= %d,  TR= %.3f secs\n",nslices,nrows,ncols,nt,tr);  
+
 
   /* alloc memory */
+  double nx = (double)nt;
   tail = 50;
-  if (n<tail) tail=n-2;
-  n  += 2 * tail;
-  nc  = (n / 2) + 1;
-  in  = (double *)fftw_malloc(sizeof(double) * n);
+  if (nt<tail) tail=nt-2;
+  nt  += 2 * tail;
+  nc  = (nt / 2) + 1;
+  in  = (double *)fftw_malloc(sizeof(double) * nt);
   out = fftw_malloc (sizeof (fftw_complex ) * nc);
-  for (i=0; i<n; i++) in[i] = 0;
+  for (i=0; i<nt; i++) in[i] = 0;
 
 
   /* make plans */
-  p1 = fftw_plan_dft_r2c_1d (n,in,out,FFTW_ESTIMATE);
-  p2 = fftw_plan_dft_c2r_1d (n,out,in,FFTW_ESTIMATE);
+  p1 = fftw_plan_dft_r2c_1d (nt,in,out,FFTW_ESTIMATE);
+  p2 = fftw_plan_dft_c2r_1d (nt,out,in,FFTW_ESTIMATE);
+
 
   /* repetition time */
-  alpha = (double)n * tr;
+  alpha = (double)nt * tr;
+
 
   /* filter function */
   if (sharp > 0) {
@@ -113,89 +107,72 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
     for (i=1; i <nc; i++) {
       highp[i] = 1.0 / (1.0 +  exp( (alpha/high -(double)i)*sharp )   );
       lowp[i]  = 1.0 / (1.0 +  exp( ((double)i - alpha/low)*sharp )   );
-      /* Butterworth example
-	 lowp[i]  = ( (gain*gain) / (1 + pow(((double)i*low/alpha),2*(double)order)) );
-	 highp[i] = ( (gain*gain) / (1 + pow((alpha/high/(double)i),2*(double)order)) ); */
     }
   }
   
-  k = -1;
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src);
-    k++;
 
-    if (k%2 == 0) fprintf(stderr," slice %4d\r",k);
+  for (b=0; b<nslices; b++) {
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
 
-	double u = VGetPixel(src,0,r,c);
+	double u = VGetPixel(src[b],0,r,c);
 	if (fabs(u) < tiny) continue;
 
-
-	/* get data */
-	sum=0;
-
 	for (j=0; j<tail; j++) {
-	  in[j] = (double)VGetPixel(src,tail-j,r,c); 
-	  sum += in[j];
+	  in[j] = (double)VGetPixel(src[b],tail-j,r,c); 
 	}
-	for (j=tail; j<n-tail; j++) {
-	  in[j] = (double)VGetPixel(src,j-tail,r,c); 
-	  sum += in[j];
+	for (j=tail; j<nt-tail; j++) {
+	  in[j] = (double)VGetPixel(src[b],j-tail,r,c); 
 	}
-	for (j=n-tail; j<n; j++) {
-	  in[j] = (double)VGetPixel(src,2*n-3*tail-2-j,r,c); 
-	  sum += in[j];
+	for (j=nt-tail; j<nt; j++) {
+	  in[j] = (double)VGetPixel(src[b],2*nt-3*tail-2-j,r,c); 
 	}
+
 
 	/*  fft */
-	if (fabs(sum)>tiny ) {
-	  fftw_execute(p1);
+	fftw_execute(p1);
 	  
-	  /* remove specified frequencies */
-	  for (i=1; i <nc; i++) {
+	/* remove specified frequencies */
+	for (i=1; i <nc; i++) {
 	    
-	    if (sharp > 0) {
+	  if (sharp > 0) {
 	      
-	      /* highpass */
-	      if (high > 0) x_high = highp[i];
-	      else x_high = 1.0;
+	    /* highpass */
+	    if (high > 0) x_high = highp[i];
+	    else x_high = 1.0;
 	      
-	      /* lowpass */
-	      if (low > 0) x_low = lowp[i];
-	      else x_low = 1.0;
+	    /* lowpass */
+	    if (low > 0) x_low = lowp[i];
+	    else x_low = 1.0;
 	      
-	      x = x_high + x_low - 1.0;
-	      if (stop) x = ABS(1-x);
+	    x = x_high + x_low - 1.0;
+	    if (stop) x = fabs(1.0-x);
 	      
-	      out[i][0] *= x;
-	      out[i][1] *= x;
+	    out[i][0] *= x;
+	    out[i][1] *= x;
 	      
-	    } else {
-	      
-	      /* hard thresholding */	    
-	      freq = 1.0/(double)i * alpha;     /* 1/frequency */
-	      
-	      if ((!stop && (freq < low || (freq > high && high>0)))
-		  || (stop && !(freq < low || (freq > high && high>0))))
-		out[i][0] = out[i][1] = 0;
-	    }
 	  }
-	  
-	  
-	  /* inverse fft */
-	  fftw_execute(p2);
-	  for (i=0; i<n; i++) in[i] /= (double)n;
-
-	  for (j=tail; j<n-tail; j++) 
-	    VSetPixel(src,j-tail,r,c,in[j]);
-	  
+	  else {
+	      
+	    /* hard thresholding */	    
+	    freq = 1.0/(double)i * alpha;     /* 1/frequency */
+	      
+	    if ((!stop && (freq < low || (freq > high && high>0)))
+		|| (stop && !(freq < low || (freq > high && high>0))))
+	      out[i][0] = out[i][1] = 0;
+	  }
 	}
-	else not++;
+
+	  
+	/* inverse fft */
+	fftw_execute(p2);
+	for (i=0; i<nt; i++) in[i] /= nx;
+
+	for (j=tail; j<nt-tail; j++) {
+	  VSetPixel(src[b],j-tail,r,c,in[j]);
+	}
       }
     }
   }
-  /* fprintf(stderr,"\n %d voxels excluded (mean == 0)\n",not); */
 }
 

@@ -28,17 +28,19 @@ int main(int argc, char *argv[])
     {"type", VShortRepn, 1, (VPointer) &type, VOptionalOpt,TypeDict, "Type of detrending"},
     {"minval", VFloatRepn, 1, (VPointer) &minval, VOptionalOpt, NULL, "Signal threshold"}
   };
-  FILE *in_file = NULL, *out_file = NULL;
-  VAttrList list = NULL;
+  VString in_file=NULL;
+  FILE *out_file = NULL;
   char *prg=GetLipsiaName("vdetrend");
   fprintf(stderr, "%s\n", prg);
 
-  VParseFilterCmd(VNumber(options), options, argc, argv, &in_file, &out_file);
+  VParseFilterCmdX(VNumber(options), options, argc, argv, &in_file, &out_file);
  
 
-  /* read the file */
-  if(!(list = VReadFile(in_file, NULL))) exit(1);
-  fclose(in_file);
+  /* read the file */ 
+  VLong tr=0L;
+  VAttrList list = VReadAttrList(in_file,tr,TRUE,FALSE);
+  if (list == NULL) VError(" error reading input file %s",in_file);
+
 
   /* perform detrending */
   VDetrend(list,minval,type,del);

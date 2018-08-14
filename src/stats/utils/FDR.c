@@ -8,7 +8,6 @@
 #include <viaio/Vlib.h>
 #include <viaio/mu.h>
 #include <viaio/option.h>
-#include <via/via.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -19,125 +18,15 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_histogram.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_math.h>
 
-#define SQR(x) ((x)*(x))
-#define ABS(x) ((x) > 0 ? (x) : -(x))
 
-
-void HistParams(gsl_histogram *histogram,double *hx,double *nhx)
-{
-  double alpha = 1.06;  /* silverman's rule */
-  double sig = gsl_histogram_sigma(histogram);
-  double kx = gsl_histogram_sum(histogram);
-  double h  = alpha * sig * pow(kx,-0.2);
-  double nh = h*kx;
-  *hx = h;
-  *nhx = nh;
-}
-
-double GaussKernel(double x)
-{
-  return exp(-0.5*x*x)/sqrt(2.0*M_PI);
-}
-
-double VKernelDensity(double x,double h,double nh,gsl_histogram *histogram)
-{
-  size_t i;
-  double sum,upper,lower;
-
-  sum = 0;
-  for (i=0; i<gsl_histogram_bins(histogram); i++) {
-    double nx = gsl_histogram_get (histogram,i);
-    gsl_histogram_get_range (histogram,i,&lower,&upper);
-    double xi = lower + (upper-lower)*0.5;
-    double u = (x-xi)/h;
-    sum += nx * GaussKernel(u);
-  }
-  return sum/nh;
-}
-
-
-double CFDR(size_t j,gsl_histogram_pdf *cdf0,gsl_histogram_pdf *cdfz)
-{
-  double F0 = 1.0-cdf0->sum[j];
-  double Fz = 1.0-cdfz->sum[j];
-  double Fdr = 1.0;
-  if (Fz  > 0.0) Fdr = F0/Fz;
-  if (Fdr > 1.0) Fdr = 1.0;
-  if (Fdr < 0.0) Fdr = 0.0;
-  return Fdr;
-}
-
-
-/* get cutoff, tail-area FDR */
-double GetCutoff(gsl_histogram *realhist,gsl_histogram_pdf *cdf0,gsl_histogram_pdf *cdfz,double alpha)
-{
-  size_t i=0;
-  size_t nbins = gsl_histogram_bins (realhist);
-  int flag1 = 0;
-  double lower=0,upper=0;
-  double cutoff=VRepnMaxValue(VFloatRepn);
-
-  for (i=0; i<nbins; i++) {
-    if (gsl_histogram_get(realhist,i) < 0.0001) continue;
-
-    gsl_histogram_get_range (realhist,i,&lower,&upper);
-    double z = lower + 0.5*(upper-lower); 
-    double Fdr = CFDR(i,cdf0,cdfz);
-
-    if (Fdr < alpha && flag1 == 0 && z > 0) {
-      flag1 = 1;
-      cutoff = z;
-    }
-  }
-  return cutoff;
-}
-
-/* print histograms as txt-file */
-void PrintHistogram(gsl_histogram *nullhist,gsl_histogram *realhist,gsl_histogram_pdf *cdf0,gsl_histogram_pdf *cdfz,VString filename)
+/* get array of FDR values */
+double *GetFdr(gsl_histogram *nullhist,gsl_histogram *realhist)
 {
   size_t i=0;
   size_t nbins = gsl_histogram_bins (nullhist);
-  double hr,h0,nhr,nh0;
-  double lower=0,upper=0;
-  HistParams(realhist,&hr,&nhr);
-  HistParams(nullhist,&h0,&nh0);
-
-  FILE *fp = fopen(filename,"w");
-  if (!fp) VError(" err opening file %s",filename);
-  fprintf(fp,"#       z            f0            fz            F0             Fz           FDR\n");
-  fprintf(fp,"#----------------------------------------------------------------------------------\n");
-
-  for (i=0; i<nbins; i++) {
-    if (gsl_histogram_get(realhist,i) < 0.0001) continue;
-    gsl_histogram_get_range (realhist,i,&lower,&upper);
-    double z = lower + 0.5*(upper-lower); 
-    double fz = VKernelDensity(z,hr,nhr,realhist);
-    double f0 = VKernelDensity(z,h0,nh0,nullhist);
-
-    double Fz = 1.0-cdfz->sum[i];
-    double F0 = 1.0-cdf0->sum[i];
-    double Fdr = 1.0;
-    if (Fz  > 1.0e-12) Fdr = F0/Fz;
-    if (Fdr > 1.0) Fdr = 1.0;
-    if (Fdr < 0.0) Fdr = 0.0;
-
-    fprintf(fp," %12.8lf  %12.8lf  %12.8lf  %12.8lf  %12.8lf  %12.8lf\n",z,f0,fz,F0,Fz,Fdr);
-  }
-  fclose(fp);
-}
-
-
-/* estimage false discovery rates */
-void FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_histogram *realhist,VString filename)
-{
-  size_t i,j;
-  size_t nbins = gsl_histogram_bins (nullhist);
-
 
   /* cumulative distribution functions (CDF) */
   gsl_histogram_pdf *cdfz = gsl_histogram_pdf_alloc(nbins);
@@ -145,51 +34,76 @@ void FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_histogr
   gsl_histogram_pdf_init (cdfz,realhist);
   gsl_histogram_pdf_init (cdf0,nullhist);
 
-  if (strlen(filename) > 2) {
-    PrintHistogram(nullhist,realhist,cdf0,cdfz,filename);
+  /* fdr array */
+  double *fdr = (double *)VCalloc(nbins,sizeof(double));
+  for (i=0; i<nbins; i++) {
+    double Fz = cdfz->sum[i];
+    double F0 = cdf0->sum[i];
+    double xFdr = 1.0;
+    if (Fz  < 1.0) xFdr = (1.0-F0)/(1.0-Fz);
+    if (xFdr > 1.0) xFdr = 1.0;
+    if (xFdr < 0.0) xFdr = 0.0;
+    fdr[i] = xFdr;
   }
 
+  /* enforce monotonicity */
+  fdr[0] = 1.0;
+  for (i=1; i<nbins; i++) {
+    if (fdr[i] > fdr[i-1]) fdr[i] = fdr[i-1];
+  }
+  return fdr;
+}
 
-  /* get FDR cutoff */
-  double cutoff = GetCutoff(realhist,cdf0,cdfz,alpha);
-  
+
+/* thresholding */
+void ApplyFdrThreshold(VImage dest,double alpha)
+{
+  double u=0,beta=1.0-alpha;
+  size_t i,n=0;
+  VFloat *pp = VImageData(dest); 
+  for (i=0; i<VImageNPixels(dest); i++) {
+    u = (*pp);
+    if (u < beta) *pp = 0;
+    else n++;
+    pp++;
+  }
+  fprintf(stderr," Number of voxels at Fdr < %.4f:  %lu\n",alpha,n);
+}
 
 
-  /* apply FDR */
-  size_t ic=0,n=0;
-  double u,tiny=1.0e-8;
+/* estimage false discovery rates */
+void FDR(VImage src,VImage dest,gsl_histogram *nullhist,gsl_histogram *realhist,double alpha)
+{
+  size_t j;
+  double u=0,tiny=1.0e-8;
   double hmin = gsl_histogram_min (realhist);
   double hmax = gsl_histogram_max (realhist);
 
+
+  /* compute Fdr */
+  double *Fdr = GetFdr(nullhist,realhist);
+
+
+  /* apply FDR */
   VFillImage(dest,VAllBands,0);
-  VFloat *pp0 = VImageData(src);
-  VFloat *pp1 = VImageData(dest);
-  for (i=0; i<VImageNPixels(src); i++) {
-    u = (double)(*pp0);
+  int b,r,c;
+  for (b=0; b<VImageNBands(dest); b++) {
+    for (r=0; r<VImageNRows(dest); r++) {
+      for (c=0; c<VImageNColumns(dest); c++) {
 
-    if (fabs(u) > tiny) {
-      if (u < hmin) u = hmin + tiny;
-      if (u > hmax) u = hmax - tiny;
-      if (gsl_histogram_find (realhist,(double)u,&j) == GSL_SUCCESS) {
-	double xFdr = CFDR(j,cdf0,cdfz);
-
-	*pp1 = 0;
-	if (alpha < 0.5) {
-	  if (u >= cutoff) {
-	    if (xFdr > alpha) xFdr=0.0;
-	    *pp1=(1.0-xFdr);
-	    ic++;
+	u = VGetPixel(src,b,r,c);
+	if (u > hmax) u = hmax-tiny;
+	if (u < hmin) u = hmax+tiny;
+	if (fabs(u) > 0) {
+	  if (gsl_histogram_find (realhist,(double)u,&j) == GSL_SUCCESS) {
+	    VPixel(dest,b,r,c,VFloat) = 1.0 - Fdr[j];
 	  }
 	}
-	else {
-	  *pp1 = (1.0-xFdr);
-	}
-	n++;
       }
     }
-    pp0++;
-    pp1++;
   }
-  if (alpha < 0.99) fprintf(stderr," cutoff: %f\n",cutoff);
+
+  /* apply threshold if needed */
+  if (alpha < 0.99) ApplyFdrThreshold(dest,alpha);
   return;
 }

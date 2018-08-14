@@ -13,11 +13,36 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include <gsl/gsl_math.h>
+#include <gsl/gsl_histogram.h>
+
+
 #define SQR(x) ((x)*(x))
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
 extern float kth_smallest(float *a, size_t n, size_t k);
 #define Median(a,n) kth_smallest(a,n,(((n)&1)?((n)/2):(((n)/2)-1)))
+
+
+
+/* update histogram */
+void HistoUpdate(VImage src1,gsl_histogram *hist)
+{
+  float u,tiny = 1.0e-6;
+  size_t i;
+  float xmin = gsl_histogram_min (hist);
+  float xmax = gsl_histogram_max (hist);
+
+  float *pp1 = VImageData(src1);
+  for (i=0; i<VImageNPixels(src1); i++) {
+    u = *pp1++;
+    if (ABS(u) < tiny) continue;
+    if (u > xmax) u = xmax-tiny;
+    if (u < xmin) u = xmin+tiny;
+    gsl_histogram_increment (hist,u);
+  }
+}
+
 
 
 /* In moderately skewed or asymmetrical distribution (Pearson) */
@@ -139,7 +164,7 @@ void VGetHistRange(VImage src,double *hmin,double *hmax)
     if (fabs(u) < tiny) continue;
     n++;
   }
-  fprintf(stderr," number of nonzero voxels: %lu\n",n);
+  /* fprintf(stderr," number of nonzero voxels: %lu\n",n); */
 
 
   /* get every other nonzero data point */
@@ -173,6 +198,11 @@ void VGetHistRange(VImage src,double *hmin,double *hmax)
   /* output */
   *hmin = (double)(u0-eps);
   *hmax = (double)(u1+eps);
+
+
+  /* correct if implausible */
+  if ((*hmin) > -4.0) (*hmin) = -4.0;
+  if ((*hmax) < 4.0) (*hmax) = 4.0;
 }
 
 

@@ -253,7 +253,8 @@ void Normalize(VImage src)
 
 
 /* set up transformation info */
-void ReadTransformation(VImage transimage,double **trans,double *shift,double *ref_pixdim,double *ref_dim)			
+void ReadTransformation(VImage transimage,double **trans,double *shift,
+			double *ref_pixdim,double *ref_dim,double *src_pixdim,double *src_dim)			
 {
   int i,j;
   for (i=0; i<3; i++) {
@@ -269,6 +270,12 @@ void ReadTransformation(VImage transimage,double **trans,double *shift,double *r
 
   for (i=0; i<3; i++) 
     ref_dim[i] = VGetPixel(transimage,0,i,5);
+
+  for (i=0; i<3; i++)
+    src_pixdim[i] = VGetPixel(transimage,0,i,6);
+
+  for (i=0; i<3; i++) 
+    src_dim[i] = VGetPixel(transimage,0,i,7);
 }
 
 

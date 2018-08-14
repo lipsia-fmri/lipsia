@@ -1,5 +1,8 @@
 /*
-** single subject lisa algorithm
+** Implementation of LISA algorithm
+** for statistical inference of fMRI images
+**
+** single subject design
 ** no precoloring, no prewhitening
 **
 ** G.Lohmann, April 2017
@@ -43,7 +46,7 @@ typedef struct TrialStruct {
 extern void VIsolatedVoxels(VImage src,float threshold);
 extern void VHistogram(gsl_histogram *histogram,VString filename);
 extern void VCheckImage(VImage src);
-extern void FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_histogram *realhist,VString filename);
+extern void FDR(VImage src,VImage dest,gsl_histogram *nullhist,gsl_histogram *realhist,double);
 extern double ttest1(double *data1,int n);
 extern void ImageStats(VImage src,double *,double *,double *hmin,double *hmax);
 extern Trial *ReadDesign(VStringConst designfile,int *numtrials,int *nevents);
@@ -68,7 +71,8 @@ extern gsl_matrix *VReadImageData(VAttrList *list,int nlists);
 extern void VGetTimeInfos(VAttrList *list,int nlists,double *mtr,float *run_duration);
 extern void VApplyMinvalNlists(VAttrList *list,int nlists,float minval);
 extern void VRowNormalize(gsl_matrix *Data);
-
+extern void CheckTrialLabels(Trial *trial,int numtrials);
+extern void HistoUpdate(VImage,gsl_histogram *);
 
 
 void XCheckImage(VImage src,char *filename)
@@ -102,7 +106,6 @@ int **genperm(gsl_rng *rx,int *numtrials,int sumtrials,int dlists,int numperm)
       gsl_ran_shuffle (rx, perm[k]->data,numtrials[k],sizeof(size_t));
       for (j=0; j<numtrials[k]; j++) {
 	permtable[i][j+jj] = perm[k]->data[j] + jj;
-	/* fprintf(stderr," %5d:  %3d  %3d,  jj=%d\n",i,j+jj,permtable[i][j+jj],jj); */
       }
       jj += numtrials[k];
     }
@@ -114,26 +117,6 @@ int **genperm(gsl_rng *rx,int *numtrials,int sumtrials,int dlists,int numperm)
   return permtable;
 }
 
-
-
-
-/* update histogram */
-void HistoUpdate(VImage src1,gsl_histogram *hist)
-{
-  float u,tiny = 1.0e-6;
-  size_t i;
-  float xmin = gsl_histogram_min (hist);
-  float xmax = gsl_histogram_max (hist);
-
-  float *pp1 = VImageData(src1);
-  for (i=0; i<VImageNPixels(src1); i++) {
-    u = *pp1++;
-    if (fabs(u) < tiny) continue;
-    if (u > xmax) u = xmax-tiny;
-    if (u < xmin) u = xmin+tiny;
-    gsl_histogram_increment (hist,u);
-  }
-}
 
 
 
@@ -155,7 +138,6 @@ int main (int argc, char *argv[])
   static VShort   hemomodel = 0;
   static VArgVector contrast;
   static VFloat   alpha = 0.05;
-  static VString  fdrfilename= "";
   static VShort   radius = 2;
   static VFloat   rvar = 2.0;
   static VFloat   svar = 2.0;
@@ -168,23 +150,21 @@ int main (int argc, char *argv[])
   static VShort   nproc = 0;
   static VOptionDescRec options[] = {
     {"in", VStringRepn, 0, & in_files, VRequiredOpt, NULL,"Input files" },
-    {"design", VStringRepn, 0, & des_files, VRequiredOpt, NULL,"Design files" },
+    {"design", VStringRepn, 0, & des_files, VRequiredOpt, NULL,"Design files (1st level)" },
     {"covariates", VStringRepn,  1, & cova_filename, VOptionalOpt, NULL,"Additional covariates (optional)" },
     {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
     {"contrast", VFloatRepn, 0, (VPointer) &contrast, VRequiredOpt, NULL, "Contrast vector"},
     {"hemo", VShortRepn, 1, (VPointer) &hemomodel, VOptionalOpt, HemoDict,"Hemodynamic model" },
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
-    {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},  
+    {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},
+    {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},    
     {"minval",VFloatRepn,1,(VPointer) &minval,VOptionalOpt,NULL,"Signal threshold"},  
-    {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Neighbourhood radius in voxels"},    
+    {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Bilateral parameter (radius in voxels)"},
     {"rvar",VFloatRepn,1,(VPointer) &rvar,VOptionalOpt,NULL,"Bilateral parameter (radiometric)"},
     {"svar",VFloatRepn,1,(VPointer) &svar,VOptionalOpt,NULL,"Bilateral parameter (spatial)"},
-    {"numiter",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Number of iterations in bilateral filter"},  
+    {"filteriterations",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Bilateral parameter (number of iterations)"},
     {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to remove isloated voxels"},    
     {"gsr",VBooleanRepn,1,(VPointer) &globalmean,VOptionalOpt,NULL,"Global signal regression"},
-    {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"seed"},    
-    {"verbose",VBooleanRepn,1,(VPointer) &verbose,VOptionalOpt,NULL,"verbose"},    
-    {"fdrfile",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"name of output fdr file"},    
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"number of processors to use, '0' to use all"},
   };
 
@@ -288,21 +268,24 @@ int main (int argc, char *argv[])
   }
   fprintf(stderr," number of trials: %d, number of event types: %d\n",sumtrials,nevents-1);
   Trial *alltrials = ConcatenateTrials(trial,numtrials,run_duration,nlists,sumtrials);
+  CheckTrialLabels(alltrials,sumtrials);
 
 
   /* read contrast vector */
-  gsl_vector *cont = gsl_vector_alloc(contrast.number);
+  gsl_vector *cont = gsl_vector_alloc(contrast.number+1);
+  gsl_vector_set_zero(cont);
   for (i=0; i < contrast.number; i++) {
     double u = ((VFloat *)contrast.vector)[i];
-    gsl_vector_set(cont,i,u);
+    gsl_vector_set(cont,i+1,u);
   }
+
 
 
   /* alloc initial design matrix X */
   gsl_matrix *X = VCreateDesign(ntimesteps,nevents,(int)hemomodel,covariates);
   gsl_matrix *XInv = gsl_matrix_calloc(X->size2,X->size1);
-  if (X->size2 != contrast.number) 
-    VError(" dimension of contrast vector does not match design matrix %d %d",X->size2,contrast.number);
+  if (X->size2 != cont->size) 
+    VError(" dimension of contrast vector does not match design matrix %ld %ld",X->size2,cont->size);
 
   
 
@@ -361,14 +344,14 @@ int main (int argc, char *argv[])
     stddev = sqrt(z); /* update stddev */
   }
   float mode=0;
-  VZScale(zmap1,mode,stddev);
+  if (numperm > 0) VZScale(zmap1,mode,stddev);
   VBilateralFilter(zmap1,dst1,(int)radius,(double)rvar,(double)svar,(int)numiter);
 
 
   /* ini histograms */
   double hmin=0,hmax=0;
   VGetHistRange(dst1,&hmin,&hmax);
-  fprintf(stderr," Histogram range:  [%.3f, %.3f]\n",hmin,hmax);
+  if (verbose) fprintf(stderr," Histogram range:  [%.3f, %.3f]\n",hmin,hmax);
   size_t nbins = 10000;
   gsl_histogram *hist0 = gsl_histogram_alloc (nbins);
   gsl_histogram_set_ranges_uniform (hist0,hmin,hmax);
@@ -423,13 +406,12 @@ int main (int argc, char *argv[])
   /* apply fdr */
   VImage fdrimage = VCopyImage (dst1,NULL,VAllBands);
   if (numperm > 0) {
-    FDR(dst1,fdrimage,(double)alpha,hist0,histz,fdrfilename);
+    FDR(dst1,fdrimage,hist0,histz,(double)alpha);
 
     if (cleanup && alpha < 1.0) {
       VIsolatedVoxels(fdrimage,(float)(1.0-alpha));
     }
   }
-  VImageCount(fdrimage);
 
 
 

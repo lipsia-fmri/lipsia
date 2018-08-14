@@ -36,7 +36,7 @@
 extern void VIsolatedVoxels(VImage src,float threshold);
 extern void VHistogram(gsl_histogram *histogram,VString filename);
 extern void VCheckImage(VImage src);
-extern void FDR(VImage src,VImage dest,double alpha,gsl_histogram *nullhist,gsl_histogram *realhist,VString filename);
+extern void FDR(VImage src,VImage dest,gsl_histogram *nullhist,gsl_histogram *realhist,double alpha);
 extern void ImageStats(VImage src,double *,double *,double *hmin,double *hmax);
 extern void VBilateralFilter(VImage src,VImage dest,int radius,double var1,double var2,int);
 extern double VImageVar(VImage src);
@@ -44,25 +44,9 @@ extern void  VImageCount(VImage src);
 extern void  VGetHistRange(VImage src,double *hmin,double *hmax);
 extern float VGetMode(VImage src);
 extern void  VZScale(VImage src,float mode,float stddev);
+extern void HistoUpdate(VImage,gsl_histogram *);
 
 
-/* update histogram */
-void HistoUpdate(VImage src1,gsl_histogram *hist)
-{
-  double u,tiny = 1.0e-8;
-  size_t i;
-  double xmin = gsl_histogram_min (hist);
-  double xmax = gsl_histogram_max (hist);
-
-  float *pp1 = VImageData(src1);
-  for (i=0; i<VImageNPixels(src1); i++) {
-    u = (double)(*pp1++);
-    if (fabs(u) < tiny) continue;
-    if (u > xmax) u = xmax-tiny;
-    if (u < xmin) u = xmin+tiny;
-    gsl_histogram_increment (hist,u);
-  }
-}
 
 
 /* make sure all input images are in float and have the same number of pixels */
@@ -83,7 +67,6 @@ int main (int argc, char *argv[])
   static VString  filename = ""; 
   static VFloat   alpha = 0.05; 
   static VShort   radius = 2;
-  static VString  fdrfilename= "";
   static VFloat   rvar = 2.0;
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
@@ -93,13 +76,11 @@ int main (int argc, char *argv[])
   static VOptionDescRec  options[] = {
     {"permutations",VStringRepn,1,(VPointer) &filename,VRequiredOpt,NULL,"List of all permutation images"},
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
-    {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Neighbourhood radius in voxels"},
+    {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Bilateral parameter (radius in voxels)"},
     {"rvar",VFloatRepn,1,(VPointer) &rvar,VOptionalOpt,NULL,"Bilateral parameter (radiometric)"},
     {"svar",VFloatRepn,1,(VPointer) &svar,VOptionalOpt,NULL,"Bilateral parameter (spatial)"},
-    {"numiter",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Number of iterations in bilateral filter"},     
-    {"centering",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to do mode centering"},  
-    {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to apply cleanup"},      
-    {"fdrfile",VStringRepn,1,(VPointer) &fdrfilename,VOptionalOpt,NULL,"Name of output fdr txt-file"},    
+    {"filteriterations",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Bilateral parameter (number of iterations)"},
+    {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to remove isolated voxels"},      
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
   };
   FILE *out_file=NULL,*in_file=NULL;
@@ -151,7 +132,7 @@ int main (int argc, char *argv[])
   /* get non-permuted hotspot map */
   float mode=0;
   if (centering) mode = VGetMode(zmap1); 
-  VZScale(zmap1,mode,stddev);
+  if (numperm > 0) VZScale(zmap1,mode,stddev);
 
   VImage dst1 = VCreateImageLike(zmap1);
   VBilateralFilter(zmap1,dst1,(int)radius,(double)rvar,(double)svar,(int)numiter);
@@ -192,7 +173,7 @@ int main (int argc, char *argv[])
   /* apply fdr */
   VImage fdrimage = VCopyImage (dst1,NULL,VAllBands);
   if (numperm > 0) {
-    FDR(dst1,fdrimage,(double)alpha,hist0,histz,fdrfilename);
+    FDR(dst1,fdrimage,hist0,histz,(double)alpha);
 
     if (cleanup && alpha < 1.0) {
       VIsolatedVoxels(fdrimage,(float)(1.0-alpha));

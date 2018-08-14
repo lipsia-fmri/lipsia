@@ -51,6 +51,7 @@ void VGLM(gsl_matrix *Data,gsl_matrix *X,gsl_matrix *XInv,gsl_vector *con,VImage
   gsl_vector *beta = gsl_vector_calloc (n);
 
 
+
   /* compute pseudoinverse */
   XInv = PseudoInv(X,XInv);
 
@@ -97,12 +98,44 @@ int test_ascii(int val)
 }
 
 
+int line_empty(char *buf,int len)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    if (buf[i] != ' ' && buf[i] != '\n' && buf[i] != 0) return 0;
+  }
+  return 1;
+}
+
+
+int CheckBuffer(char *buf,int len)
+{
+  int j;
+
+  if(strlen(buf) < 1) return 0;
+  if (buf[0] == '%' || buf[0] == '#' || buf[0] == '/' || buf[0] == '\n') return 0;
+
+  /* remove tabs */
+  for (j=0; j<len; j++) {
+    if (buf[0] == '\t') buf[j] = ' ';
+  }
+  if (line_empty(buf,len) > 0) return 0;
+  return 1;
+}
+
+
+int VistaFormat(char *buf,int len)
+{
+  if (strncmp(buf,"V-data",6) == 0) return 1;
+  return 0;
+}
+
 
 /* parse design file */
 Trial *ReadDesign(VString designfile,int *numtrials,int *nevents)
 {
   FILE *fp=NULL;
-  int  i,j,id,len=2014;
+  int  i,id,len=2014;
   float onset=0,duration=0,height=0;
   char *buf = (char *)VCalloc(len,sizeof(char));
 
@@ -110,11 +143,11 @@ Trial *ReadDesign(VString designfile,int *numtrials,int *nevents)
   if (!fp) VError(" error opening design file %s",designfile);
   int ntrials = 0;
   while (!feof(fp)) {
-    for (j=0; j<len; j++) buf[j] = '\0';
+    memset(buf,0,len);
     if (fgets(buf,len,fp) == NULL) break;
-    if (strlen(buf) < 2) continue;
-    if (buf[0] == '%' || buf[0] == '#') continue;
-    if (! test_ascii((int)buf[0])) VError(" input file must be a text file");
+    if (VistaFormat(buf,len) > 1) VError(" Design file must be a text file");
+    if (CheckBuffer(buf,len) < 1) continue;
+    if (! test_ascii((int)buf[0])) VError(" Design file must be a text file");
     ntrials++;
   }
   *numtrials = ntrials;
@@ -124,19 +157,13 @@ Trial *ReadDesign(VString designfile,int *numtrials,int *nevents)
   i = (*nevents) = 0;
   rewind(fp);
   while (!feof(fp)) {
-    for (j=0; j<len; j++) buf[j] = '\0';
+    memset(buf,0,len);
     if (fgets(buf,len,fp) == NULL) break;
-    if (strlen(buf) < 2) continue;
-    if (buf[0] == '%' || buf[0] == '#') continue;
-    if (! test_ascii((int)buf[0])) VError(" input file must be a text file");
+    if (CheckBuffer(buf,len) < 1) continue;
 
-    /* remove non-alphanumeric characters */
-    for (j=0; j<strlen(buf); j++) {
-      if (buf[j] == '\v') buf[j] = ' '; /* remove tabs */
-      if (buf[j] == '\t') buf[j] = ' ';
-    }
-    if (sscanf(buf,"%d %f %f %f",&id,&onset,&duration,&height) != 4)
-      VError(" line %d: illegal input format",i+1);
+    if (!sscanf(buf,"%d %f %f %f",&id,&onset,&duration,&height))
+      VError("illegal text string in design file: %s", buf);
+
     if (duration < 0.5 && duration >= -0.0001) duration = 0.5;
     trial[i].id       = id;
     trial[i].onset    = onset;
@@ -187,5 +214,30 @@ Trial *ConcatenateTrials(Trial **trial,int *numtrials,float *run_duration,int dl
     add += run_duration[i];
   }
   return alltrials;
+}
+
+
+
+/* check if trial labels are complete and positive */
+void CheckTrialLabels(Trial *trial,int numtrials)
+{
+  int i,j;
+  int maxlabel = -1;
+  for (i=0; i<numtrials; i++) {
+    j = trial[i].id;
+    if (j > maxlabel) maxlabel = j;
+    if (j < 1) VError(" trial[%d] has illegal label %d",i,j);
+  }
+
+  int *tmp = (int *) VCalloc(maxlabel+1,sizeof(int));
+  for (i=0; i<numtrials; i++) {
+    j = trial[i].id;
+    tmp[j]++;
+  }
+  for (i=1; i<=maxlabel; i++) {
+    if (tmp[i] < 1) VError(" Label %d missing in design file",i);
+    if (tmp[i] < 4) VWarning(" Label %d has too few trials (%d) for random permutations",i,tmp[i]);
+  }
+  VFree(tmp);
 }
 

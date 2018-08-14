@@ -1,19 +1,25 @@
-LISA onesample test (vlisa1)
-===========================
+LISA twosample test (vlisa2)
+=============================
 
 
-The program **vlisa1** performs a one-sample t-test on a group of images
+The program **vlisa2** performs a two-sample t-test on two groups of images
 including a correction for multiple comparisons using the LISA algorithm.
-The input is a list of 3D images resulting from a 1st level computation.
 For ease of use, the input images may be specified using wildcards as shown below.
 The output is a map thresholded such that FDR < alpha for every voxel.
 Voxels that survive the threshold have values of (1-FDR) so that larger values indicate
 higher significance.
 
 
+The type of test can be specified using the option '-test'.
+The default ('-test ttest') is a twosample t-test based on pooled variance.
+The welch test ('-test welch') is a t-test applicable for unequal variances or unequal sample sizes.
+The paired test ('-test paired') can be used if the samples are paired.
+If wildcards are used to specify the input files, it is important to make sure that
+the pairs match.
+
 ::
 
-   vlisa1 -in images_*.v -out result.v -alpha 0.05 -perm 5000
+   vlisa2 -in1 images1_*.v -in2 images2_*.v -out result.v -test ttest
 
 
 
@@ -23,14 +29,16 @@ higher significance.
 bioRxiv, https://doi.org/10.1101/122788*
 
 
-Parameters of 'vlisa1':
+Parameters of 'vlisa2':
 ```````````````````````````````````
 
     -help    Prints usage information.
-    -in      Input files.
+    -in1     Input files 1.
+    -in2     Input files 2.
     -out     Output file.
     -alpha   FDR significance level. Default: 0.05
     -perm    Number of permutations. Default: 2000
+    -test    Type of test to be performed [ ttest | paired | welch ].
     -seed    Seed for random number generation. Default: 99402622
     -radius  Bilateral parameter (radius in voxels). Default: 2
     -rvar    Bilateral parameter (radiometric). Default: 2.0
@@ -40,4 +48,4 @@ Parameters of 'vlisa1':
     -j        Number of processors to use, '0' to use all. Default: 0
 
 
-.. index:: lisa1
+.. index:: lisa2

@@ -224,6 +224,10 @@ void Vista2Nii4D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
   hdr->datatype = datatype;
   hdr->bitpix   = VPixelPrecision(src[0]);
 
+  hdr->xyzt_units = SPACE_TIME_TO_XYZT(NIFTI_UNITS_MM,NIFTI_UNITS_MSEC);
+
+
+
   /* write header */
   VWriteNiftiHeader(fp,hdr);
 
