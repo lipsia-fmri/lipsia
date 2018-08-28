@@ -21,10 +21,11 @@ Find the full lipsia documentation here: `documentation`_.
 Statistical inference (LISA) in examples:
 ```````````````````````````````````````````````````
 
-*Onesample test at the 2nd level* `vlisa_onesample`_: vlisa_onesample
+*Onesample test at the 2nd level*
+
 Example: the input is a set of contrast maps called "data_*.nii.gz"::
 
-  vlisa_onesample -in data_*.nii.gz -out result.v
+  `vlisa_onesample` -in data_*.nii.gz -out result.v
   vnifti -in result.v -out result.nii
 
 
