@@ -25,7 +25,7 @@ Statistical inference (LISA) in examples:
 
 Example: the input is a set of contrast maps called "data_*.nii.gz"::
 
-  `vlisa_onesample` -in data_*.nii.gz -out result.v
+  `vlisa_onesample`_ -in data_*.nii.gz -out result.v
   vnifti -in result.v -out result.nii
 
 
