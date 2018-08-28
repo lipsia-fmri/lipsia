@@ -9,13 +9,16 @@ Converter
 LISA statistical inference
 ``````````````````````````````````
 
-`vlisa0`_: generic LISA statistical inference
+`vlisa_generic`_: generic LISA statistical inference
 
-`vlisa1`_: onesample LISA statistical inference
+`vlisa_onesample`_: onesample LISA statistical inference
 
-`vlisa2`_: onesample LISA statistical inference
+`vlisa_twosample`_: twosample LISA statistical inference
 
-`vslisa`_: single subject LISA statistical inference
+`vlisa_precoloring`_: single subject LISA statistical inference using precoloring
+
+`vlisa_prewhitening`_: single subject LISA statistical inference using prewhitening
+
 
 
 Network tools
@@ -26,15 +29,19 @@ Network tools
 
 
 .. _vnifti: conv/vnifti.rst
+
 .. _vdicom: conv/vdicom.rst
 
-.. _vlisa0: stats/vlisa0.rst
+.. _vlisa_generic: stats/vlisa_generic.rst
 
-.. _vlisa1: stats/vlisa1.rst
+.. _vlisa_onesample: stats/vlisa_onesample.rst
 
-.. _vlisa2: stats/vlisa2.rst
+.. _vlisa_twosample: stats/vlisa_twosample.rst
 
-.. _vslisa: stats/vslisa.rst
+.. _vlisa_precoloring: stats/vlisa_precoloring.rst
+
+.. _vlisa_prewhitening: stats/vlisa_prewhitening.rst
+
 
 .. _vted: ted/vted.rst
 

@@ -152,57 +152,34 @@ int compare_function(const void *a,const void *b)
   else return 0;
 }
 
+
 /* get histogram range */
 void VGetHistRange(VImage src,double *hmin,double *hmax)
 {
-  /* count number of nonzero voxels */
-  float u=0,v=0,tiny=1.0e-8;
-  size_t i=0,n=0;
+  size_t i=0;
+  double zmin = VRepnMaxValue(VFloatRepn);
+  double zmax = VRepnMinValue(VFloatRepn);
+  double u=0;
+
   VFloat *pp=VImageData(src);
   for (i=0; i<VImageNPixels(src); i++) {
     u = (*pp++);
-    if (fabs(u) < tiny) continue;
-    n++;
+    if (u < zmin) zmin = u;
+    if (u > zmax) zmax = u;
   }
-  /* fprintf(stderr," number of nonzero voxels: %lu\n",n); */
+  fprintf(stderr," zmin,zmax: %f %f\n",zmin,zmax);
 
+  /* correct implausible ranges */
+  if (zmin < -20.0) zmin = -20.0;
+  if (zmax > 20.0) zmax = 20.0;
+  
+  if (zmin > -10.0) zmin = -10.0;
+  if (zmax < 10.0) zmax = 10.0;
 
-  /* get every other nonzero data point */
-  size_t nn = n/2;
-  float *data = (float *) VCalloc(nn,sizeof(float));
-  n=0;
-  pp=VImageData(src);
-  for (i=0; i<VImageNPixels(src); i+=2) {
-    u = (*pp++);
-    v = (*pp++);
-    if (fabs(u) < tiny || fabs(v) < tiny) continue;
-    if (n >= nn) break;
-    data[n] = u;
-    n++;
-  }
-  if (n < 10) VError(" not enough nonzero voxels: %lu",n);
-
-
-  /* get upper and lower quantiles */
-  size_t k0 = (size_t)(0.001 * (float)n);
-  if (k0 < 3) k0 = 3;
-  size_t k1 = (size_t)(0.999 * (float)n);
-  if (k1 < n-3) k1 = n-3;
-  if (k0 >= k1) VError(" not enough nonzero voxels: %lu",n);
-  qsort(data,n,sizeof(float),compare_function);
-  float u0 = data[k0];
-  float u1 = data[k1];
-  float eps = (fabs(u1-u0))*0.05;
-  VFree(data);
 
   /* output */
-  *hmin = (double)(u0-eps);
-  *hmax = (double)(u1+eps);
-
-
-  /* correct if implausible */
-  if ((*hmin) > -4.0) (*hmin) = -4.0;
-  if ((*hmax) < 4.0) (*hmax) = 4.0;
+  *hmin = zmin;
+  *hmax = zmax;
 }
 
 

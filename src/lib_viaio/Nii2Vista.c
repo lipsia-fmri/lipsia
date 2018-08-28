@@ -546,8 +546,9 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
   /* apply scaling if needed */
   float scl_slope = (float)hdr.scl_slope;
   float scl_inter = (float)hdr.scl_inter;
-  if (fabs(scl_slope-1.0) < 1.0e-6 && fabs(scl_inter) < 1.0e-6) goto skip;
-  if (fabs(scl_slope) > 0 || fabs(scl_inter) > 0) {
+  float tiny=1.0e-6;
+  if (fabs(scl_slope-1.0) < tiny && fabs(scl_inter) < tiny) goto skip;
+  if (fabs(scl_slope) > tiny || fabs(scl_inter) > tiny) {
     dst_repn = VFloatRepn;
     do_scaling = FALSE;  /* no automatic scaling */  
     fprintf(stderr," apply scaling, slope: %f, intercept= %f\n",hdr.scl_slope,hdr.scl_inter);
