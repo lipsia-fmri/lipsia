@@ -21,22 +21,22 @@ Find the full lipsia documentation here: `documentation`_.
 Statistical inference (LISA) in examples:
 ```````````````````````````````````````````````````
 
-*Onesample test at the 2nd level*
+*Onesample test at the 2nd level* (`vlisa_onesample`_)
 
 Example: the input is a set of contrast maps called "data_*.nii.gz"::
 
-  `vlisa_onesample`_ -in data_*.nii.gz -out result.v
+  vlisa_onesample -in data_*.nii.gz -out result.v
   vnifti -in result.v -out result.nii
 
 
-*Twosample test at the 2nd level* `vlisa_twosample`_: vlisa_twosample
+*Twosample test at the 2nd level* (`vlisa_twosample`_)
 Example: input are two sets of contrast maps called "data1_*.nii.gz" and "data2_*.nii.gz"::
 
   vlisa_twosample -in1 data1_*.nii.gz -in2 data2_*.nii.gz -out result.v
   vnifti -in result.v -out result.nii
 
 
-*Single subject test (1st level)* `vlisa_prewhitening`_: vlisa_prewhitening
+*Single subject test (1st level)* (`vlisa_prewhitening`_)
 Example: input are two runs acquired in the same session called "run1.nii.gz" and "run2.nii.gz".
 Preprocessing should include a correction for baseline drifts!::
 
