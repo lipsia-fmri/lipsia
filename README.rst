@@ -89,6 +89,6 @@ in the initial preprocessing.
 .. _documentation: docs/index_github.rst
 
 
-.. _vlisa_onesample: stats/vlisa_onesample.rst
-.. _vlisa_twosample: stats/vlisa_twosample.rst
-.. _vlisa_prewhitening: stats/vlisa_prewhitening.rst
+.. _vlisa_onesample: docs/stats/vlisa_onesample.rst
+.. _vlisa_twosample: docs/stats/vlisa_twosample.rst
+.. _vlisa_prewhitening: docs/stats/vlisa_prewhitening.rst
