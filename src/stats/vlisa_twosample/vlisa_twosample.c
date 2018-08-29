@@ -202,7 +202,7 @@ void TTest(VImage *src1,VImage *src2,int *permtable,VImage dest,int n1,int n2,in
 
 
 VDictEntry TSTDict[] = {
-  { "ttest", 0, 0,0,0,0 },
+  { "pooled", 0, 0,0,0,0 },
   { "paired", 1, 0,0,0,0 },
   { "welch", 2, 0,0,0,0  },
   { NULL, 0,0,0,0,0 }
@@ -220,7 +220,7 @@ int main (int argc, char *argv[])
   static VFloat   rvar = 2.0;
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
-  static VShort   numperm = 2000;
+  static VShort   numperm = 5000;
   static VLong    seed = 99402622;
   static VBoolean centering = FALSE;
   static VBoolean cleanup = TRUE;

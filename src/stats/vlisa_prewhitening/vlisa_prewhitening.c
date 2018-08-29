@@ -141,14 +141,14 @@ int main (int argc, char *argv[])
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
   static VBoolean globalmean = FALSE;
-  static VShort   numperm = 2000;
+  static VShort   numperm = 5000;
   static VLong    seed = 99402622;
   static VBoolean cleanup = TRUE;
   static VShort   nproc = 0;
   static VOptionDescRec options[] = {
     {"in", VStringRepn, 0, & in_files, VRequiredOpt, NULL,"Input files" },
     {"design", VStringRepn, 0, & des_files, VRequiredOpt, NULL,"Design files" },
-    {"covariates", VStringRepn,  1, & cova_filename, VOptionalOpt, NULL,"Additional covariates (optional)" },
+    {"nuisance", VStringRepn,  1, & cova_filename, VOptionalOpt, NULL,"Nuisance covariates (optional)" },
     {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
     {"contrast", VFloatRepn, 0, (VPointer) &contrast, VRequiredOpt, NULL, "Contrast vector"},
     {"order", VShortRepn, 1, &numlags, VOptionalOpt, NULL,"Order of AR model" },
@@ -226,9 +226,11 @@ int main (int argc, char *argv[])
   gsl_matrix *ctmp2=NULL;
   gsl_matrix *covariates=NULL;
   int cdim = 1;
+  int nuisance_dim=0;
   if (strlen(cova_filename) > 1) {
     ctmp1 = VReadCovariates(cova_filename,TRUE);
     if (ctmp1->size1 != Data->size2) VError(" num timesteps in covariate file not consistent with data");
+    nuisance_dim = ctmp1->size2;
   }
   if (globalmean) {
     if (ctmp1 != NULL) cdim = ctmp1->size2+1;
@@ -237,6 +239,7 @@ int main (int argc, char *argv[])
   }
   if (ctmp1 != NULL && ctmp2 == NULL) covariates = ctmp1;
   if (ctmp2 != NULL) covariates = ctmp2;
+
 
 
   /* design files with task labels */
@@ -260,7 +263,7 @@ int main (int argc, char *argv[])
 
 
   /* read contrast vector */
-  gsl_vector *cont = gsl_vector_alloc(contrast.number+1);
+  gsl_vector *cont = gsl_vector_alloc(contrast.number + nuisance_dim + 1);
   gsl_vector_set_zero(cont);
   for (i=0; i < contrast.number; i++) {
     double u = ((VFloat *)contrast.vector)[i];

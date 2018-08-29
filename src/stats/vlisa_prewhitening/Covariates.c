@@ -50,7 +50,7 @@ gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize)
     nrows++;
   }
   rewind(fp);
-  nrows--;
+  /* nrows--; */
   fprintf(stderr," covariates,  nrows: %d, ncols: %d\n",nrows,ncols);
 
 

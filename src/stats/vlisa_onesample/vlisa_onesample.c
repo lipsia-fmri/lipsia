@@ -114,7 +114,7 @@ int main (int argc, char *argv[])
   static VFloat   rvar = 2.0;
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
-  static VShort   numperm = 2000;
+  static VShort   numperm = 5000;
   static VLong    seed = 99402622;
   static VBoolean centering = FALSE;
   static VBoolean cleanup = TRUE;
