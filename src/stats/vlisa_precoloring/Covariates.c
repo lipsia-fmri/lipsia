@@ -1,8 +1,7 @@
 /*
-** construct a design file from an ASCII file
-** no hemodynamic modelling
+** read nuisance covariates file into a matrix
 **
-** G.Lohmann, Dec 2006
+** G.Lohmann, MPI-KYB, 2018
 */
 
 #include <viaio/Vlib.h>
@@ -19,52 +18,55 @@
 
 
 extern int VStringToken (char *,char *,int,int);
+extern int line_empty(char *buf,int len);
+extern int CheckBuffer(char *buf,int len);
+extern int VistaFormat(char *buf,int len);
+extern int test_ascii(int val);
 
-#define LEN  10000   /* max number of characters per line in file */
-#define NCOV   200   /* max number of additional covariates     */
-#define M       50
 
 gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize)
 {
-  FILE *fp=NULL;
-  char buf[LEN],token[80];
-  fp = fopen(cfile,"r");
+  float x=0;
+  int i=0,j=0,nrows=0,ncols=0,len=10000,tlen=80;
+  char *buf = (char *)VCalloc(len,sizeof(char));
+  char *token = (char *)VCalloc(tlen,sizeof(char));
+
+  FILE *fp = fopen(cfile,"r");
   if (fp == NULL) VError(" err opening covariates file %s",cfile);
+  
 
   /* get matrix dimensions */
-  float x=0;
-  int i=0,j=0,nrows=0,ncols=0;
   while (!feof(fp)) {
-    for (j=0; j<LEN; j++) buf[j] = '\0';
-    fgets(buf,LEN,fp);
-    if (buf[0] == '#' || buf[0] == '%') continue;
-    if (strlen(buf) < 1) continue;
+
+    for (j=0; j<len; j++) buf[j] = '\0';
+    if (fgets(buf,len,fp) == NULL) break;
+    if (VistaFormat(buf,len) > 1) VError(" File %s must be a text file",cfile);
+    if (CheckBuffer(buf,len) < 1) continue;
+    if (! test_ascii((int)buf[0])) VError(" File %s: line %d begins with an illegal character (%c)",cfile,nrows,buf[0]);
 
     j = 0;
-    while (VStringToken(buf,token,j,M)) {
+    while (VStringToken(buf,token,j,tlen)) {
       sscanf(token,"%f",&x);
-      if (j >= NCOV) VError(" too many additional covariates (%d), max is %d",j,NCOV-1);
       j++;
     }
     if (j > ncols) ncols = j;
     nrows++;
   }
   rewind(fp);
-  nrows--;
-  fprintf(stderr," covariates,  nrows: %d, ncols: %d\n",nrows,ncols);
+  fprintf(stderr," Nuisance covariates:  %d x %d\n",nrows,ncols);
+  if (ncols < 1) VError(" Nuisance covariates: no columns in file %s",cfile);
 
 
   /* read into matrix */
   gsl_matrix *dest = gsl_matrix_calloc(nrows,ncols);
   i=0;
   while (!feof(fp)) {
-    for (j=0; j<LEN; j++) buf[j] = '\0';
-    fgets(buf,LEN,fp);
-    if (buf[0] == '#' || buf[0] == '%') continue;
-    if (strlen(buf) < 1) continue;
+    for (j=0; j<len; j++) buf[j] = '\0';
+    if (fgets(buf,len,fp) == NULL) break;
+    if (CheckBuffer(buf,len) < 1) continue;
 
     j = 0;
-    while (VStringToken(buf,token,j,M)) {
+    while (VStringToken(buf,token,j,tlen)) {
       if (j >= ncols) break;
       sscanf(token,"%f",&x);
       gsl_matrix_set(dest,i,j,(double)x);
@@ -77,7 +79,7 @@ gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize)
 
 
   /* normalize */
-  double u=0,sum1=0,sum2=0,nx=0,mean=0,sigma=0,tiny=1.0e-8;
+  double u=0,sum1=0,sum2=0,nx=0,mean=0,sigma=0,tiny=1.0e-6;
   for (i=0; i<dest->size2; i++) {
     sum1 = sum2 = nx = 0;
     for (j=0; j<dest->size1; j++) {
@@ -88,7 +90,7 @@ gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize)
     }
     mean = sum1/nx;
     sigma = sqrt((sum2 - nx * mean * mean) / (nx - 1.0));
-    if (sigma < tiny) VError(" i=%d, sigma= %f",i,sigma);
+    if (sigma < tiny) VError(" Nuisance covariates:  column %d is constant",i);
 
     for (j=0; j<dest->size1; j++) {
       u = gsl_matrix_get(dest,j,i);

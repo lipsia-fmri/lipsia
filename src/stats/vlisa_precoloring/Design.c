@@ -60,7 +60,7 @@ int CheckBuffer(char *buf,int len)
 {
   int j;
   if(strlen(buf) < 1) return 0;
-  if (buf[0] == '%' || buf[0] == '#' || buf[0] == '/') return 0;
+  if (buf[0] == '%' || buf[0] == '#' || buf[0] == '/') return 0;  /* comment */
   for (j=0; j<len; j++) {
     if (buf[j] == '\v') buf[j] = ' '; /* remove tabs */
     if (buf[j] == '\t') buf[j] = ' ';

@@ -2,7 +2,7 @@
 ** single subject lisa algorithm
 ** prewhitening
 **
-** G.Lohmann, Aug 2018
+** G.Lohmann, MPI-KYB, 2018
 */
 #include "viaio/Vlib.h"
 #include "viaio/file.h"
@@ -105,7 +105,6 @@ int **genperm(gsl_rng *rx,int *numtrials,int sumtrials,int dlists,int numperm)
       gsl_ran_shuffle (rx, perm[k]->data,numtrials[k],sizeof(size_t));
       for (j=0; j<numtrials[k]; j++) {
 	permtable[i][j+jj] = perm[k]->data[j] + jj;
-	/* fprintf(stderr," %5d:  %3d  %3d,  jj=%d\n",i,j+jj,permtable[i][j+jj],jj); */
       }
       jj += numtrials[k];
     }
@@ -141,14 +140,14 @@ int main (int argc, char *argv[])
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
   static VBoolean globalmean = FALSE;
-  static VShort   numperm = 2000;
+  static VShort   numperm = 5000;
   static VLong    seed = 99402622;
   static VBoolean cleanup = TRUE;
   static VShort   nproc = 0;
   static VOptionDescRec options[] = {
     {"in", VStringRepn, 0, & in_files, VRequiredOpt, NULL,"Input files" },
     {"design", VStringRepn, 0, & des_files, VRequiredOpt, NULL,"Design files" },
-    {"covariates", VStringRepn,  1, & cova_filename, VOptionalOpt, NULL,"Additional covariates (optional)" },
+    {"nuisance", VStringRepn,  1, & cova_filename, VOptionalOpt, NULL,"Nuisance covariates (optional)" },
     {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
     {"contrast", VFloatRepn, 0, (VPointer) &contrast, VRequiredOpt, NULL, "Contrast vector"},
     {"order", VShortRepn, 1, &numlags, VOptionalOpt, NULL,"Order of AR model" },
@@ -226,9 +225,11 @@ int main (int argc, char *argv[])
   gsl_matrix *ctmp2=NULL;
   gsl_matrix *covariates=NULL;
   int cdim = 1;
+  int nuisance_dim=0;
   if (strlen(cova_filename) > 1) {
     ctmp1 = VReadCovariates(cova_filename,TRUE);
     if (ctmp1->size1 != Data->size2) VError(" num timesteps in covariate file not consistent with data");
+    nuisance_dim = ctmp1->size2;
   }
   if (globalmean) {
     if (ctmp1 != NULL) cdim = ctmp1->size2+1;
@@ -237,6 +238,7 @@ int main (int argc, char *argv[])
   }
   if (ctmp1 != NULL && ctmp2 == NULL) covariates = ctmp1;
   if (ctmp2 != NULL) covariates = ctmp2;
+
 
 
   /* design files with task labels */
@@ -260,7 +262,7 @@ int main (int argc, char *argv[])
 
 
   /* read contrast vector */
-  gsl_vector *cont = gsl_vector_alloc(contrast.number+1);
+  gsl_vector *cont = gsl_vector_alloc(contrast.number + nuisance_dim + 1);
   gsl_vector_set_zero(cont);
   for (i=0; i < contrast.number; i++) {
     double u = ((VFloat *)contrast.vector)[i];
@@ -337,7 +339,6 @@ int main (int argc, char *argv[])
   /* ini histograms */
   double hmin=0,hmax=0;
   VGetHistRange(dst1,&hmin,&hmax);
-  fprintf(stderr," hist range: [%.4f,%.4f]\n",hmin,hmax);
   size_t nbins = 20000;
   gsl_histogram *hist0 = gsl_histogram_alloc (nbins);
   gsl_histogram_set_ranges_uniform (hist0,hmin,hmax);

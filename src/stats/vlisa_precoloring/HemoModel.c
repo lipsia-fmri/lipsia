@@ -1,7 +1,7 @@
 /*
-** prepare single subject analysis for vlisa
+** hemodynamic modelling for single-subject LISA
 **
-** G.Lohmann, Dec 2016
+** G.Lohmann, MPI-KYB,  2018
 */
 #include <viaio/Vlib.h>
 #include <viaio/VImage.h>
@@ -29,7 +29,7 @@
 #define NTRIALS 10000   /* max number of trials */
 
 
-/* standard parameter values for gamma function,Glover 99 */
+/* standard parameter values for gamma function, Glover 99 */
 double a1 = 6;
 double b1 = 0.9;
 double a2 = 12;
@@ -50,7 +50,7 @@ void printmat(gsl_matrix *R,char *str)
   fprintf(stderr," %s: \n",str);
   for (i=0; i<R->size1; i++) {
     for (j=0; j<R->size2; j++) {
-      fprintf(stderr," %8.4f",gsl_matrix_get(R,i,j));
+      fprintf(stderr," %9.6f",gsl_matrix_get(R,i,j));
     }
     fprintf(stderr,"\n");
   }
@@ -230,6 +230,7 @@ void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,in
   int i,j,k;
   double t,t0,t1,h;
 
+
   for(i = 0; i < nevents; i++) {
     double xmin = VRepnMaxValue(VFloatRepn);
     for(j = 0; j < ntrials; j++) {
@@ -242,6 +243,7 @@ void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,in
   /* get kernels */
   t1 = 30.0;    /* kernel duration = 30 secs */
   int kernelsize = t1 / tr;
+  if (tr < 0.05) VWarning(" implausible TR (%f seconds)",tr);
 
 
   double *kernel1=NULL,*kernel2=NULL;
@@ -296,6 +298,7 @@ void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,in
       h  = trial[j].height;
       int k0 = (int) (t0/tr + 0.5);
       int k1 = (int) (t1/tr + 0.5);
+
       for (k=k0; k<=k1; k++) {
 	if (k < 0 || k >= X->size1) continue;
 	x[k] = h;
@@ -339,7 +342,6 @@ void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,in
       col++;
     }
   }
-
 
 
   /* cleanup */

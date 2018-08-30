@@ -107,7 +107,7 @@ int main (int argc, char *argv[])
   int numperm  = VAttrListNumImages(listperm);
   VImage *zmap = VAttrListGetImages(listperm,numperm);
   CheckImageTypes(zmap1,zmap,numperm);
-  fprintf(stderr," number of permutation images: %d\n",(int)numperm);
+  fprintf(stderr," Number of permutation images: %d\n",(int)numperm);
 
 
   /* estimate null variance to adjust radiometric parameter, use first 30 permutations */
@@ -125,7 +125,6 @@ int main (int argc, char *argv[])
     }
     double meanvar = varsum/nx;
     stddev = sqrt(meanvar);
-    fprintf(stderr," null variance:  %f\n",stddev);
   }
 
 
@@ -141,13 +140,13 @@ int main (int argc, char *argv[])
 
   /* ini histograms */
   VGetHistRange(dst1,&hmin,&hmax);
-  fprintf(stderr," Histogram range:  [%.3f, %.3f]\n",hmin,hmax);
-  size_t nbins = 10000;
+  size_t nbins = 20000;
   gsl_histogram *hist0 = gsl_histogram_alloc (nbins);
   gsl_histogram_set_ranges_uniform (hist0,hmin,hmax);
   gsl_histogram *histz = gsl_histogram_alloc (nbins);
   gsl_histogram_set_ranges_uniform (histz,hmin,hmax);
   HistoUpdate(dst1,histz);
+
 
   /* omp-stuff */
 #ifdef _OPENMP

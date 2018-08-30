@@ -1,7 +1,8 @@
 /*
-** GLM (general linear modeling)
+** LISA single subject statistical inference using 1st level GLM (general linear modeling).
+** The prewhitening approach is adapted from Worsley et al (2002), Neuroimage 15(1).
 **
-** G.Lohmann
+** G.Lohmann, MPI-KYB, 2018
 */
 #include <viaio/Vlib.h>
 #include <viaio/VImage.h>

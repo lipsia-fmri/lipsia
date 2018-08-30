@@ -1,7 +1,7 @@
 /*
-** prepare single subject analysis for vlisa
+** hemodynamic modelling for single-subject LISA
 **
-** G.Lohmann, Dec 2016
+** G.Lohmann, MPI-KYB,  2018
 */
 #include <viaio/Vlib.h>
 #include <viaio/VImage.h>
@@ -29,7 +29,7 @@
 #define NTRIALS 10000   /* max number of trials */
 
 
-/* standard parameter values for gamma function,Glover 99 */
+/* standard parameter values for gamma function, Glover 99 */
 double a1 = 6;
 double b1 = 0.9;
 double a2 = 12;

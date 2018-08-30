@@ -137,46 +137,36 @@ void VImageCount(VImage src)
     u = (float)(*pp++);
     if (u > 0) npos++;
   }
-  fprintf(stderr," positive voxels:  %lu\n",npos);
 }
 
 
-/* needed for qsort */
-int compare_function(const void *a,const void *b) 
-{
-  float *x = (float *) a;
-  float *y = (float *) b;
-  float d = ((*x) - (*y));
-  if (d > 0) return 1;
-  else if (d < 0) return -1;
-  else return 0;
-}
-
-
-/* get histogram range */
+/* check histogram range, image is normalized so [-10,10] should be okay */
 void VGetHistRange(VImage src,double *hmin,double *hmax)
 {
   size_t i=0;
-  double zmin = VRepnMaxValue(VFloatRepn);
-  double zmax = VRepnMinValue(VFloatRepn);
-  double u=0;
+  double u=0,x=0,y=0;
+  double zmin = -10.0;
+  double zmax = 10.0;
 
   VFloat *pp=VImageData(src);
+  size_t npix=0,npos=0,nneg=0;
   for (i=0; i<VImageNPixels(src); i++) {
     u = (*pp++);
-    if (u < zmin) zmin = u;
-    if (u > zmax) zmax = u;
+    if (u < zmin) nneg++;
+    if (u > zmax) npos++;
+    if (fabs(u) > 0) npix++;
   }
-  fprintf(stderr," zmin,zmax: %f %f\n",zmin,zmax);
+  if (npix < 1) VError(" image has no non-zero pixels");
 
-  /* correct implausible ranges */
-  if (zmin < -20.0) zmin = -20.0;
-  if (zmax > 20.0) zmax = 20.0;
-  
-  if (zmin > -10.0) zmin = -10.0;
-  if (zmax < 10.0) zmax = 10.0;
-
-
+  if (npos > 0 || nneg > 0) {
+    x = (double)npos/(double)npix;
+    y = (double)nneg/(double)npix;
+    if (x > 0.01 || y > 0.01) {
+      zmin = -20.0;
+      zmax = 20.0;
+    }
+  }
+ 
   /* output */
   *hmin = zmin;
   *hmax = zmax;

@@ -1,7 +1,7 @@
 /*
-** GLM (general linear modelling) using pre-coloring
+** Read input data into array
 **
-** G.Lohmann
+** G.Lohmann, MPI-KYB, 2018
 */
 #include <viaio/Vlib.h>
 #include <viaio/VImage.h>
@@ -18,9 +18,6 @@
 #include <gsl/gsl_blas.h>
 
 #define TINY 1.0e-8
-
-extern float kth_smallest(float *a, size_t n, size_t k);
-#define Median(a,n) kth_smallest(a,n,(((n)&1)?((n)/2):(((n)/2)-1)))
 
 
 /*
@@ -244,7 +241,7 @@ VImage VoxelMap(VAttrList list)
       }
     }
   }
-  fprintf(stderr," number of voxels: %lu\n",nvox);
+  if (nvox < 1) VError(" No non-zero voxels in input image");
 
 
   /* voxel addresses */
