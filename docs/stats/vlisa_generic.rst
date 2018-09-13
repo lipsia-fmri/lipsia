@@ -22,6 +22,19 @@ The resulting image shows (1-FDR) so that larger values indicate higher signific
 
 
 
+Note that this program also accepts input images in Nifti format ("*.nii" or "*.nii.gz").
+In this case, the permutations file is a 4D image in which each volume represents a permutation.
+The output is in vista format.
+To convert the output to the Nifti format, use the following command:
+
+
+::
+
+
+  vnifti -in result.v -out result.nii
+
+
+
 
 Parameters of 'vlisa_generic':
 ```````````````````````````````````

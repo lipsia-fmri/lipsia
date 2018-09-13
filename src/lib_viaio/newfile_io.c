@@ -126,6 +126,13 @@ VAttrList VReadAttrList(VString filename,VLong tr,VBoolean attrtype,VBoolean do_
 {
   VAttrList list = NULL;
 
+
+  /* check if file exists */
+  struct stat st;
+  if (stat(filename, &st) != 0) {
+    VError(" Error opening %s,  %s",filename,strerror(errno));
+  }
+
   /* get format type */
   int type = xgetformat(filename);
   if (type != 0 && type != 1) VError( "illegal format type %d",type);

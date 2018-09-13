@@ -143,7 +143,9 @@ VAttrList VReadAttrListZ(FILE *in_file,VString in_filename,
   gzFile gz_file;
 
   struct stat st;
-  stat(in_filename, &st);
+  if (stat(in_filename, &st) != 0) {
+    VError(" Error opening %s,  %s",in_filename,strerror(errno));
+  }
   size_t buflen = st.st_size;
 
   int format_type = getformat(in_filename);

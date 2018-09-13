@@ -22,6 +22,19 @@ the pairs match.
 
 
 
+Note that this program also accepts input images in Nifti format ("*.nii" or "*.nii.gz"), 
+but the output is always in vista format.
+To convert the output to the Nifti format, use the following command:
+
+
+::
+
+
+  vnifti -in result.v -out result.nii
+
+
+
+
 Parameters of 'vlisa_twosample':
 ```````````````````````````````````
 

@@ -233,12 +233,6 @@ void VReportValidParamOptions (
 #endif
 );
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* V_option_h */
-
 
 /*
 ** needed for handling gzipped vista- and nifti data
@@ -246,3 +240,12 @@ void VReportValidParamOptions (
 */
 extern void VParseFilterCmdX (int,VOptionDescRec opts[],int,char **,VString *,FILE **);
 extern void VParseFilterCmdZ (int, VOptionDescRec opts[],int,char **,FILE **,FILE **,VString *);
+
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* V_option_h */
+

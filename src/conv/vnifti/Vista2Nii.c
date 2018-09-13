@@ -140,38 +140,52 @@ int GetDataType(VRepnKind repn)
   return datatype;
 }
 
-void Vista2Nii3D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
-{  
-  VAttrListPosn posn;
-  VImage src=NULL;
-  size_t ncols   = (size_t) D[1];
-  size_t nrows   = (size_t) D[2];
-  size_t nslices = (size_t) D[3];
-  fprintf(stderr," image dims: %ld %ld %ld\n",ncols,nrows,nslices);
+void Vista2Nii3D(VAttrList list,nifti_1_header *hdr,FILE *fp)
+{
+  VImage src = VReadImage(list);
+  if (src == NULL) VError(" no input image found");
+  size_t ncols = VImageNColumns(src);
+  size_t nrows = VImageNRows(src);
+  size_t nslices = VImageNBands(src);
 
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src);
-    break;
-  }
-  if (src == NULL) VError(" no image found");
 
   /* data type */
   VRepnKind repn = VPixelRepn(src);
   int datatype = GetDataType(repn);
   
 
-  /* header infos */
+  /* get voxel size */
+  VAttrList geolist = VGetGeoInfo(list);
+  double *pixdim = (double *)VCalloc(8,sizeof(double));
+  if (geolist != NULL) pixdim = VGetGeoPixdim(geolist,pixdim);
+  VString str=NULL;
+  VFloat resx=1.0,resy=1.0,resz=1.0;
+  if (VGetAttr (VImageAttrList (src), "voxel", NULL,
+		VStringRepn, (VPointer) & str) == VAttrFound) {
+    sscanf(str,"%f %f %f",&resx,&resy,&resz);
+    pixdim[1] = resx;
+    pixdim[2] = resy;
+    pixdim[3] = resz;
+  }
+
+
+  /* write header infos */
+  hdr->pixdim[1] = pixdim[1];
+  hdr->pixdim[2] = pixdim[2];
+  hdr->pixdim[3] = pixdim[3];
+  hdr->pixdim[4] = pixdim[4];
+  /* hdr->xyzt_units = SPACE_TIME_TO_XYZT(NIFTI_UNITS_MM,NIFTI_UNITS_MSEC); */
+
   hdr->dim[0] = 3;
-  hdr->dim[1] = D[1];
-  hdr->dim[2] = D[2];
-  hdr->dim[3] = D[3];
+  hdr->dim[1] = VImageNColumns(src);
+  hdr->dim[2] = VImageNRows(src);
+  hdr->dim[3] = VImageNBands(src);
   hdr->dim[4] = 1;
   hdr->dim[5] = 0;
   hdr->dim[6] = 0;
   hdr->dim[7] = 0;
-  hdr->datatype  = datatype;
-  hdr->bitpix    = VPixelPrecision(src);
+  hdr->datatype = datatype;
+  hdr->bitpix  = VPixelPrecision(src);
 
 
   /* write header */
@@ -188,22 +202,33 @@ void Vista2Nii3D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
 }
 
 
-void Vista2Nii4D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
-{
-  size_t ncols   = (size_t) D[1];
-  size_t nrows   = (size_t) D[2];
-  size_t nslices = (size_t) D[3];
-  size_t nt      = (size_t) D[4];
-  fprintf(stderr," image dims: %ld %ld %ld, nt= %ld\n",ncols,nrows,nslices,nt);
+void Vista2Nii4D(VAttrList list,nifti_1_header *hdr,FILE *fp)
+{  
+  int nrows=0,ncols=0,nt=0;
+  int nslices = VAttrListNumImages(list);
+  VImage *src = VAttrListGetImages(list,nslices);
+  VImageDimensions(src,nslices,&nt,&nrows,&ncols);
 
-  VAttrListPosn posn;
-  VImage *src = (VImage *) VCalloc(nslices,sizeof(VImage));
-  size_t i = 0;
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src[i]);
-    i++;
-  }    
+
+  /* read repetition time, voxel size */
+  VAttrList geolist = VGetGeoInfo(list);
+  double *pixdim = (double *)VCalloc(8,sizeof(double));
+  if (geolist != NULL) pixdim = VGetGeoPixdim(geolist,pixdim);
+  VString str=NULL;
+  VFloat resx=1.0,resy=1.0,resz=1.0,tr=1.0;
+  if (VGetAttr (VImageAttrList (src[0]), "repetition_time", NULL,
+		VFloatRepn, (VPointer) & tr) == VAttrFound) {
+    pixdim[4] = tr;
+  }
+  if (VGetAttr (VImageAttrList (src[0]), "voxel", NULL,
+		VStringRepn, (VPointer) & str) == VAttrFound) {
+    sscanf(str,"%f %f %f",&resx,&resy,&resz);
+    pixdim[1] = resx;
+    pixdim[2] = resy;
+    pixdim[3] = resz;
+  }
+  fprintf(stderr," image dims: %d x %d x %d,  nt: %d\n",ncols,nrows,nslices,nt);
+  fprintf(stderr," voxel resolution: %.4f %.4f %.4f,  TR= %.4f secs\n",resx,resy,resz,tr/1000.0);
 
 
   /* data type */
@@ -214,27 +239,30 @@ void Vista2Nii4D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
   /* image dims */
   size_t bytesize = 8;
   hdr->dim[0] = 4;
-  hdr->dim[1] = D[1];
-  hdr->dim[2] = D[2];
-  hdr->dim[3] = D[3];
-  hdr->dim[4] = D[4];
+  hdr->dim[1] = ncols;
+  hdr->dim[2] = nrows;
+  hdr->dim[3] = nslices;
+  hdr->dim[4] = nt;
   hdr->dim[5] = 0;
   hdr->dim[6] = 0;
   hdr->dim[7] = 0;
   hdr->datatype = datatype;
   hdr->bitpix   = VPixelPrecision(src[0]);
 
-  hdr->xyzt_units = SPACE_TIME_TO_XYZT(NIFTI_UNITS_MM,NIFTI_UNITS_MSEC);
-
+  hdr->pixdim[1] = pixdim[1];
+  hdr->pixdim[2] = pixdim[2];
+  hdr->pixdim[3] = pixdim[3];
+  hdr->pixdim[4] = pixdim[4];
+  /*   hdr->xyzt_units = SPACE_TIME_TO_XYZT(NIFTI_UNITS_MM,NIFTI_UNITS_MSEC); */
 
 
   /* write header */
   VWriteNiftiHeader(fp,hdr);
 
   size_t nsize  = hdr->bitpix/bytesize;
-  size_t nrnc = nrows*ncols;
-  size_t npix = nrnc*nslices;
-  size_t ndata = nt * npix;
+  size_t nrnc = (size_t)nrows*(size_t)ncols;
+  size_t npix = nrnc*(size_t)nslices;
+  size_t ndata = (size_t)nt * npix;
 
   /* write to disk */
   VWriteData(src,nslices,nrows,ncols,nt,datatype,ndata,nsize,fp);
@@ -244,22 +272,18 @@ void Vista2Nii4D(VAttrList list,float *D,nifti_1_header *hdr,FILE *fp)
 
 void Vista_to_Nifti1(VAttrList list,VString filename)
 {
+  VBundle bundle=NULL;
   VImage sform=NULL;
   size_t j;
   nifti_1_header hdr;
 
 
-  VBundle bundle;
+  /* get geoinfo */
   VAttrList geolist = VGetGeoInfo(list);
   if (geolist == NULL) VError(" no geoinfo found");
 
 
-  /* dim */
-  if (VGetAttr (geolist, "dim", NULL,VBundleRepn, (VPointer) & bundle) != VAttrFound)
-    VError("dim not found");
-  float *D = bundle->data;
-  long nt = D[4];
-
+  /* quaternion */
   VShort qform_code = 0;
   VShort sform_code = 0;
   VGetAttr (geolist, "qform_code", NULL,VShortRepn, (VPointer) & qform_code);
@@ -317,6 +341,7 @@ void Vista_to_Nifti1(VAttrList list,VString filename)
   hdr.scl_slope = 0.0;
   hdr.xyzt_units = NIFTI_UNITS_MM | NIFTI_UNITS_MSEC;
 
+
   /* slicetimes */
   VShort sbuf=0;
   VFloat fbuf=0;
@@ -341,9 +366,11 @@ void Vista_to_Nifti1(VAttrList list,VString filename)
   FILE *fp = fopen(filename,"w");
   if (fp == NULL) VError("Error opening file %s",filename);
 
-  /* write image data */
-  if (nt < 2) Vista2Nii3D(list,D,&hdr,fp);
-  else Vista2Nii4D(list,D,&hdr,fp);
+
+  /* write image data */  
+  int nimages = VAttrListNumImages(list);
+  if (nimages < 2) Vista2Nii3D(list,&hdr,fp);
+  else Vista2Nii4D(list,&hdr,fp);
 
   /* close */
   fclose(fp);

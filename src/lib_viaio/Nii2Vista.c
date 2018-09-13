@@ -1,5 +1,5 @@
 /*
-** read nifti-1 to vista format
+** read nifti-1 or nifti-2 to vista format
 **
 ** G.Lohmann, MPI-KYB, 2016
 */
@@ -17,7 +17,7 @@
 
 #include <gsl/gsl_math.h>
 
-#include <nifti/nifti1.h>
+#include <nifti/nifti2.h>
 #include <nifti/nifti1_io.h>
 
 #define MIN_HEADER_SIZE 348
@@ -36,8 +36,28 @@ extern FILE *VReadInputFile (char *filename,VBoolean nofail);
 extern int  CheckGzip(char *filename);
 
 extern void VByteSwapNiftiHeader(nifti_1_header *hdr);
+extern void VByteSwapNifti2Header(nifti_2_header *hdr);
 extern void VByteSwapData(char *data,size_t ndata,size_t nsize);
 extern float strtof(const char *str, char **endptr);
+
+
+int NiftiVersion(char *databuffer,int *swap)
+{
+  int *k = (int *)(&databuffer[0]);
+  int type = *k;
+  *swap = 0;
+  if (type == 348) return 1;
+  else if (type == 540) return 2;
+  else {
+    nifti_swap_4bytes(1,k);
+    type = *k;
+    *swap = 1;
+    if (type == 348) return 1;
+    else if (type == 540) return 2;
+    else return 0;
+  }
+  return 0;
+}
 
 
 /* read repetition time from description field instead of pixdim  */
@@ -365,9 +385,8 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 
 
 /* copy nifti header infos to geolist in vista header */
-double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
+double *VGetNiftiHeader(VAttrList geolist,nifti_2_header hdr,VLong tr)
 {
-  /* if (hdr.sizeof_hdr != 348) VError(" incorrect header size %lu",hdr.sizeof_hdr); */
 
   /* units in lipsia: mm and sec */
   char xyzt = hdr.xyzt_units;
@@ -375,6 +394,7 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
   int timeunits  = XYZT_TO_TIME(xyzt);
   double xscale  = 1.0;
   double tscale  = 1.0;
+
   if (spaceunits == NIFTI_UNITS_MICRON) xscale=1000.0;
   if (timeunits == NIFTI_UNITS_SEC) tscale=1000.0;
 
@@ -484,18 +504,63 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
 
 VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean do_scaling,VBoolean *ok)
 {
-
   /* read header */
-  nifti_1_header hdr;
-  memcpy(&hdr,databuffer,MIN_HEADER_SIZE);
-  if ((strncmp(hdr.magic,"ni1\0",4) != 0) && (strncmp(hdr.magic,"n+1\0",4) != 0))
-    VError(" not a nifti-1 file, magic number is %s",hdr.magic);
+  nifti_1_header hdr1;
+  nifti_2_header hdr;
+  int i=0,swap=0;
+  size_t header_size=0;
 
+  int nifti_version = NiftiVersion(databuffer,&swap);
+  if (nifti_version < 1) VError(" unknown nifti version");
+  fprintf(stderr," nifti version: %d\n",nifti_version);
 
-  int swap = NIFTI_NEEDS_SWAP(hdr);
-  if (swap == 1) {
-    VByteSwapNiftiHeader(&hdr);
+  
+  if (nifti_version == 1) {  /* nifti-1 */
+    header_size = 348;
+    memcpy(&hdr1,databuffer,header_size);
+    swap = NIFTI_NEEDS_SWAP(hdr1);
+    if (swap == 1) VByteSwapNiftiHeader(&hdr1);
+    
+    hdr.datatype = hdr1.datatype;
+    for (i=0; i<8; i++) hdr.dim[i]=hdr1.dim[i];
+    for (i=0; i<8; i++) hdr.pixdim[i]=hdr1.pixdim[i];
+    hdr.bitpix=hdr1.bitpix;
+    hdr.vox_offset=hdr1.vox_offset;
+    hdr.intent_p1 = hdr1.intent_p1;
+    hdr.intent_p2 = hdr1.intent_p2;
+    hdr.intent_p3 = hdr1.intent_p3;
+    hdr.scl_slope = hdr1.scl_slope;
+    hdr.scl_inter = hdr1.scl_inter;
+    hdr.slice_duration = hdr1.slice_duration;
+    hdr.slice_start = hdr1.slice_start;
+    hdr.slice_end = hdr1.slice_end;
+    for (i=0; i<80; i++) hdr.descrip[i] = hdr1.descrip[i];
+    hdr.qform_code = hdr1.qform_code;
+    hdr.sform_code = hdr1.sform_code;
+    hdr.quatern_b = hdr1.quatern_b;
+    hdr.quatern_c = hdr1.quatern_c;
+    hdr.quatern_d = hdr1.quatern_d;
+    hdr.qoffset_x = hdr1.qoffset_x;
+    hdr.qoffset_y = hdr1.qoffset_y;
+    hdr.qoffset_z = hdr1.qoffset_z;
+    for (i=0; i<4; i++) hdr.srow_x[i]=hdr1.srow_x[i];
+    for (i=0; i<4; i++) hdr.srow_y[i]=hdr1.srow_y[i];
+    for (i=0; i<4; i++) hdr.srow_z[i]=hdr1.srow_z[i];
+    hdr.xyzt_units = hdr1.xyzt_units;
+    hdr.dim_info = hdr1.dim_info;
   }
+  else if (nifti_version == 2) {  /* nifti-2 */    
+    header_size = 540;
+    memcpy(&hdr,databuffer,header_size);
+    if (swap) {
+      VByteSwapNifti2Header(&hdr);
+    }
+  }
+  else {
+    VError(" not a nifti file");
+  }
+
+
 
   /* get data type */
   VRepnKind dst_repn = DT_UNKNOWN;
@@ -543,23 +608,22 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
     VError(" unknown data type %d",datatype);
   }
 
-  /* apply scaling if needed */
-  float scl_slope = (float)hdr.scl_slope;
-  float scl_inter = (float)hdr.scl_inter;
-  float tiny=1.0e-6;
-  if (fabs(scl_slope-1.0) < tiny && fabs(scl_inter) < tiny) goto skip;
-  if (fabs(scl_slope) > tiny || fabs(scl_inter) > tiny) {
+  /* get scaling parameters */
+  double scl_slope = (double)hdr.scl_slope;
+  double scl_inter = (double)hdr.scl_inter;
+  double tiny=1.0e-6;
+  if (fabs(scl_slope) < tiny && fabs(scl_inter) < tiny) {
+    scl_slope = 1.0;
+    scl_inter = 0;
+  }
+  else if (fabs(scl_slope-1.0) < tiny && fabs(scl_inter) < tiny) {
+    scl_slope = 1.0;
+    scl_inter = 0;
+  }
+  else {
     dst_repn = VFloatRepn;
     do_scaling = FALSE;  /* no automatic scaling */  
-    fprintf(stderr," apply scaling, slope: %f, intercept= %f\n",hdr.scl_slope,hdr.scl_inter);
   }
- skip: ;
-  /*
-  dst_repn = VShortRepn;
-  scl_slope = 1.0;
-  scl_inter = 0;
-  */
-
 
 
   /* number of values stored at each time point */
@@ -600,6 +664,7 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
   if (tcode == NIFTI_UNITS_MSEC) factor = 1.0;
   if (tcode == NIFTI_UNITS_SEC) factor = 1000.0;
 
+
   if (nt > 1)  {
     if (tr == 0) tr = (short)(factor*hdr.pixdim[4]);
 
@@ -610,7 +675,7 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
       fprintf(stderr," reading TR from description field, TR= %ld ms\n",tr);
     }
     /* fprintf(stderr," nt=%ld,  TR= %ld milliseconds\n",nt,tr); */
-    if (tr < 50) VError(" implausible TR (%d ms), use 'vnifti' for data conversion to specify TR on the command line",tr);
+    if (tr < 0.1) VWarning(" implausible TR (%d ms), use 'vnifti' for data conversion to specify TR on the command line",tr);
   }
 
   

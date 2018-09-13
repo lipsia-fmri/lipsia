@@ -145,7 +145,6 @@ void VCheckImage(VImage src)
   VAppendAttr(out_list,"image",NULL,VImageRepn,src);
   FILE *out_file = fopen("test.v","w");
   VWriteFile (out_file, out_list);
-  exit(0);    
 }
 
 

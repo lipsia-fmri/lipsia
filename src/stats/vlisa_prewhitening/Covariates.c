@@ -53,7 +53,6 @@ gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize)
     nrows++;
   }
   rewind(fp);
-
   fprintf(stderr," Nuisance covariates:  %d x %d\n",nrows,ncols);
   if (ncols < 1) VError(" Nuisance covariates: no columns in file %s",cfile);
 

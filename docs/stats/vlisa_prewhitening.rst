@@ -46,6 +46,11 @@ voxels (brain mask). Voxels whose values in the first volume are below this thre
 further analysis. If no value is given, then a heuristic is used to set this threshold automatically.
 
 
+**Caution:**
+The preprocessing pipeline must include a correction for baseline drifts.
+
+
+
 Examples:
 
 ::
@@ -61,10 +66,16 @@ Examples:
 
 
 
+Note that this program also accepts input images in Nifti format ("run_*.nii" or "run_*.nii.gz"), 
+but the output is always in vista format.
+To convert the output to the Nifti format, use the following command:
 
 
-**Caution:**
-The preprocessing pipeline must include a correction for baseline drifts.
+::
+
+
+  vnifti -in result.v -out result.nii
+
 
 
 
