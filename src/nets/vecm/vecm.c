@@ -32,6 +32,32 @@
 #include <omp.h>
 #endif /*_OPENMP*/
 
+
+void NormalizeData(gsl_matrix_float *mat)
+{
+  size_t i,j;
+  double s1,s2,mean,sd,u,nx;
+  nx = (double)mat->size2;
+
+  for (i=0; i<mat->size1; i++) {
+    s1=s2=0;
+    for (j=0; j<mat->size2; j++) {
+      u = (double)gsl_matrix_float_get(mat,i,j);
+      s1 += u;
+      s2 += u*u;
+    }
+    mean = s1/nx;
+    sd = sqrt((s2 - nx * mean * mean) / (nx - 1.0));
+    for (j=0; j<mat->size2; j++) {
+      u = (double)gsl_matrix_float_get(mat,i,j);
+      u = (u-mean)/sd;
+      gsl_matrix_float_set(mat,i,j,(float)u);
+    }
+  }
+}
+
+
+
 /* re-implementation of cblas_sspmv,  cblas_sspmv causes problems */
 void my_sspmv(float *A,float *x,float *y,int n)
 {
@@ -55,32 +81,6 @@ void my_sspmv(float *A,float *x,float *y,int n)
   }
 }
 
-
-double Correlation(const float * arr1,const float * arr2,int n)
-{
-  int i;
-  double sx,sy,sxx,syy,sxy,rx;
-  double tiny=1.0e-4;
-
-  sxx = syy = sxy = sx = sy = 0;
-  for (i=0; i<n; i++) {
-    const double u = (double)arr1[i];
-    const double v = (double)arr2[i];
-    sx  += u;
-    sy  += v;
-    sxx += u*u;
-    syy += v*v;
-    sxy += u*v;
-  }
-  const double nx= n;
-  const double u = nx*sxx - sx*sx;
-  const double v = nx*syy - sy*sy;
-  rx = 0;
-  if (u*v > tiny)
-    rx = (nx*sxy - sx*sy)/sqrt(u*v);
-
-  return rx;
-}
 
 void EigenvectorCentrality(float *A,float *ev,int n)
 {
@@ -117,6 +117,20 @@ void EigenvectorCentrality(float *A,float *ev,int n)
 }
 
 
+double Correlation(const float *arr1,const float *arr2,int n)
+{
+  int i;
+  double sum=0;
+  for (i=0; i<n; i++) {
+    const double u = (double)arr1[i];
+    const double v = (double)arr2[i];
+    sum += u*v;
+  }
+  double rx = sum/(double)n;
+  return rx;
+}
+
+
 VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float *ev, int n)
 {
   VImage dest=NULL;
@@ -128,9 +142,9 @@ VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float
   VSetAttr(VImageAttrList(dest),"modality",NULL,VStringRepn,"conimg");
 
   for (i=0; i<n; i++) {
-    b = VPixel(map,0,0,i,VFloat);
-    r = VPixel(map,0,1,i,VFloat);
-    c = VPixel(map,0,2,i,VFloat);
+    b = VPixel(map,0,0,i,VInteger);
+    r = VPixel(map,0,1,i,VInteger);
+    c = VPixel(map,0,2,i,VInteger);
     if (b < 0 || r < 0 || c < 0) VError("  WriteOutput: illegal address %d %d %d",b,r,c);
     VPixel(dest,b,r,c,VFloat) = ev[i];
   }
@@ -142,41 +156,23 @@ VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float
 VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type)
 {
   VAttrList out_list=NULL;
-  VAttrListPosn posn;
-  VImage src[NSLICES],map=NULL;
   VImage dest=NULL;
-  int b,r,c,ntimesteps,nrows,ncols,nslices,nt,last;
-  size_t i,j,n,m;
+  size_t i,j,m;
   gsl_matrix_float *mat=NULL;
   float *A=NULL,*ev=NULL;
   float tiny=1.0e-6;
 
-  /*
-  ** get image dimensions
-  */
-  i = ntimesteps = nrows = ncols = 0;
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src[i]);
-    if (VImageNBands(src[i]) > ntimesteps) ntimesteps = VImageNBands(src[i]);
-    if (VImageNRows(src[i])  > nrows)  nrows = VImageNRows(src[i]);
-    if (VImageNColumns(src[i]) > ncols) ncols = VImageNColumns(src[i]);
-    i++;
-    if (i >= NSLICES) VError(" too many slices");
-  }
-  nslices = i;
 
-  if (VImageNBands(mask) != nslices) 
-    VError(" number of slices inconsistent: %d, mask: %d",nslices,VImageNBands(mask));
-  if (VImageNRows(mask) != nrows) 
-    VError(" number of rows inconsistent: %d, mask: %d",nrows,VImageNRows(mask));
-  if (VImageNColumns(mask) != ncols) 
-    VError(" number of columns inconsistent: %d, mask: %d",ncols,VImageNColumns(mask));
+  /* read image dims */
+  int nrows=0,ncols=0,ntimesteps=0,nt=0;
+  int nslices = VAttrListNumImages(list);
+  VImage *src = VAttrListGetImages(list,nslices);
+  VImageDimensions(src,nslices,&ntimesteps,&nrows,&ncols);
 
 
   /* get time steps to include */
   if (length < 1) length = ntimesteps-1;
-  last = first + length;
+  int last = first + length;
   if (last >= ntimesteps) last = ntimesteps-1;
   if (first < 0) first = 0;
 
@@ -187,29 +183,27 @@ VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type
 
 
   /* count number of voxels */
-  n = 0;
+  size_t nvox = 0;
+  int b,r,c;
   for (b=0; b<nslices; b++) {
     if (VImageNRows(src[b]) < 2) continue;
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
 	if (VGetPixel(mask,b,r,c) < 0.5) continue;
-	n++;
+	nvox++;
       }
     }
   }
-  fprintf(stderr," nvoxels: %ld\n",(long)n);
+  fprintf(stderr," nvoxels: %ld\n",(long)nvox);
 
 
-
-  /*
-  ** voxel addresses
-  */
-  map = VCreateImage(1,5,n,VFloatRepn);
+  /*  voxel addresses */
+  VImage map = VCreateImage(1,5,nvox,VIntegerRepn);
   if (map == NULL) VError(" error allocating addr map");
   VFillImage(map,VAllBands,0);
-  VPixel(map,0,3,0,VFloat) = nslices;
-  VPixel(map,0,3,1,VFloat) = nrows;
-  VPixel(map,0,3,2,VFloat) = ncols;
+  VPixel(map,0,3,0,VInteger) = nslices;
+  VPixel(map,0,3,1,VInteger) = nrows;
+  VPixel(map,0,3,2,VInteger) = ncols;
 
   i = 0;
   for (b=0; b<nslices; b++) {
@@ -217,10 +211,9 @@ VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
 	if (VGetPixel(mask,b,r,c) < 0.5) continue;
-
-	VPixel(map,0,0,i,VFloat) = b;
-	VPixel(map,0,1,i,VFloat) = r;
-	VPixel(map,0,2,i,VFloat) = c;
+	VPixel(map,0,0,i,VInteger) = b;
+	VPixel(map,0,1,i,VInteger) = r;
+	VPixel(map,0,2,i,VInteger) = c;
 	i++;
       }
     }
@@ -229,13 +222,14 @@ VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type
 
   /*
   ** avoid casting to float, copy data to matrix
+  ** and normalize 
   */
-  mat = gsl_matrix_float_calloc(n,nt);
-  for (i=0; i<n; i++) {
+  mat = gsl_matrix_float_calloc(nvox,nt);
+  for (i=0; i<nvox; i++) {
 
-    b = VPixel(map,0,0,i,VFloat);
-    r = VPixel(map,0,1,i,VFloat);
-    c = VPixel(map,0,2,i,VFloat);
+    b = VPixel(map,0,0,i,VInteger);
+    r = VPixel(map,0,1,i,VInteger);
+    c = VPixel(map,0,2,i,VInteger);
 
     float *ptr = gsl_matrix_float_ptr(mat,i,0);
     int k;
@@ -248,12 +242,15 @@ VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type
     }
   }
 
+  /* normalize data matrix */
+  NormalizeData(mat);
+
 
   /*
   ** compute similarity matrix
   */
-  m = (n*(n+1))/2;
-  fprintf(stderr," matrix computation, n= %ld...\n",(long)n);
+  m = (nvox*(nvox+1))/2;
+  fprintf(stderr," matrix computation, n= %ld...\n",(long)nvox);
   A = (float *) calloc(m,sizeof(float));
   if (!A) VError(" err allocating correlation matrix");
   memset(A,0,m*sizeof(float));
@@ -261,7 +258,7 @@ VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type
 
 
 #pragma omp parallel for shared(progress) private(j) schedule(guided) firstprivate(mat,A)
-  for (i=0; i<n; i++) {
+  for (i=0; i<nvox; i++) {
     if (i%100 == 0) fprintf(stderr," %d00\r",(int)(++progress));
 
     const float *arr1 = gsl_matrix_float_const_ptr(mat,i,0);
@@ -306,9 +303,9 @@ VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type
   /*
   ** eigenvector centrality
   */
-  ev = (float *) VCalloc(n,sizeof(float));
-  EigenvectorCentrality(A,ev,n);
-  dest = WriteOutput(src[0],map,nslices,nrows,ncols,ev,n);
+  ev = (float *) VCalloc(nvox,sizeof(float));
+  EigenvectorCentrality(A,ev,nvox);
+  dest = WriteOutput(src[0],map,nslices,nrows,ncols,ev,nvox);
   VSetAttr(VImageAttrList(dest),"name",NULL,VStringRepn,"ECM");
 
   out_list = VCreateAttrList();

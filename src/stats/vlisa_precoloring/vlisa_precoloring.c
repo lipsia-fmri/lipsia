@@ -199,15 +199,24 @@ int main (int argc, char *argv[])
   /* read functional image data */
   int nlists = in_files.number;
   if (nlists < 1) VError(" no input");
-  int dlists = des_files.number;
-  if (dlists != nlists) VError(" number of input images and design files do not match: %d %d",nlists,dlists);
 
   VAttrList *list = (VAttrList *) VCalloc(nlists,sizeof(VAttrList));
   for (i=0; i<nlists; i++) {
     in_filename = ((VString *) in_files.vector)[i];
     fprintf(stderr," %3d:  %s\n",i,in_filename);
     list[i] = VReadAttrList(in_filename,0L,TRUE,FALSE);
-    if (geolist == NULL) geolist = VGetGeoInfo(list[i]);
+    if (geolist == NULL) {
+      geolist = VGetGeoInfo(list[i]);
+      double *DGeo = VGetGeoDim(geolist,NULL);
+      if (fabs(DGeo[0]-4.0) > 0.01) VError(" Input files must be 4D (not 3D)");
+    }
+  }
+
+
+  /* get number og design files */
+  int dlists = des_files.number;
+  if (dlists != nlists) {
+    VError(" number of input functional files (%d) and design files (%d) do not match",nlists,dlists);
   }
 
 
@@ -285,7 +294,7 @@ int main (int argc, char *argv[])
   gsl_matrix *X = VCreateDesign(ntimesteps,nevents,(int)hemomodel,covariates);
   gsl_matrix *XInv = gsl_matrix_calloc(X->size2,X->size1);
   if (X->size2 != cont->size)
-    VError(" dimension of contrast vector does not match design matrix %ld %ld",X->size2,cont->size);
+    VError(" dimension of contrast vector (%ld) does not match design matrix (%ld)",cont->size-1,X->size2);
 
 
 
