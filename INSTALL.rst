@@ -7,11 +7,12 @@ How to install LIPSIA
 * gsl dev
 * boost dev
 * zlib dev
+* BLAS (e.g. openblas)
 
 Ubuntu:
  ::
 
-    sudo apt-get install build-essential libfftw3-dev libgsl0-dev libboost-dev zlib1g-dev
+    sudo apt-get install build-essential libfftw3-dev libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev
 
 
 OSX:

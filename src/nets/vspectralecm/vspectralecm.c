@@ -198,12 +198,11 @@ VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float
   dest = VCreateImage(nslices,nrows,ncols,VFloatRepn);
   VFillImage(dest,VAllBands,0);
   VCopyImageAttrs (src, dest);
-  VSetAttr(VImageAttrList(dest),"modality",NULL,VStringRepn,"conimg");
 
   for (i=0; i<n; i++) {
-    b = VPixel(map,0,0,i,VFloat);
-    r = VPixel(map,0,1,i,VFloat);
-    c = VPixel(map,0,2,i,VFloat);
+    b = VPixel(map,0,0,i,VInteger);
+    r = VPixel(map,0,1,i,VInteger);
+    c = VPixel(map,0,2,i,VInteger);
     VPixel(dest,b,r,c,VFloat) = ev[i];
   }
   return dest;
@@ -237,6 +236,13 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
   VImageDimensions(src,nslices,&nt,&nrows,&ncols);
   size_t ntimesteps = nt;
 
+  if (VImageNRows(mask) != nrows) 
+    VError(" inconsistent image dims, mask has %d rows, image has %d rows",VImageNRows(mask),nrows);
+  if (VImageNColumns(mask) != ncols) 
+    VError(" inconsistent image dims, mask has %d columns, image has %d columns",VImageNColumns(mask),ncols);
+  if (VImageNBands(mask) != nslices) 
+    VError(" inconsistent image dims, mask has %d slices, image has %d slices",VImageNBands(mask),nslices);
+
 
   /* get time steps to include */
   if (length < 1) length = ntimesteps-2;
@@ -260,7 +266,7 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
 
   k0   = GetFFtIndex((int)n,tr,wavelength); 
   freq = 1.0/wavelength;
-  fprintf(stderr,"# TR= %g secs,  wavelength= %g secs,  freq= %.3f Hz,  k0= %d\n",
+  fprintf(stderr," TR= %g secs,  wavelength= %g secs,  freq= %.3f Hz,  k0= %d\n",
 	  tr,wavelength,freq,k0);
   if (k0 < 1 || k0 >= n/2) VError(" illegal freq, index must be in [1,%d]\n",n/2);
 
@@ -379,7 +385,7 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
 
   ii = 0;
   for (i=0; i<nvox; i++) {
-    if (i%100 == 0) fprintf(stderr,"i= %7ld\r",(long)i);
+    if (i%100 == 0) fprintf(stderr," %7ld  of  %ld\r",(long)i,(long)nvox);
     
     x = xmap[i];
 

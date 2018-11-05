@@ -169,6 +169,13 @@ VAttrList VECM(VAttrList list,VImage mask,VShort first,VShort length,VShort type
   VImage *src = VAttrListGetImages(list,nslices);
   VImageDimensions(src,nslices,&ntimesteps,&nrows,&ncols);
 
+  if (VImageNRows(mask) != nrows) 
+    VError(" inconsistent image dims, mask has %d rows, image has %d rows",VImageNRows(mask),nrows);
+  if (VImageNColumns(mask) != ncols) 
+    VError(" inconsistent image dims, mask has %d columns, image has %d columns",VImageNColumns(mask),ncols);
+  if (VImageNBands(mask) != nslices) 
+    VError(" inconsistent image dims, mask has %d slices, image has %d slices",VImageNBands(mask),nslices);
+
 
   /* get time steps to include */
   if (length < 1) length = ntimesteps-1;
