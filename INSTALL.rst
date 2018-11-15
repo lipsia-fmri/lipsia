@@ -1,5 +1,14 @@
 How to install LIPSIA
 ===========================
+
+
+There are two alternatives for installing lipsia. The first possibility is to compile and build everything from scratch on your local machine, which requires the manual installation of several libraries (as described below). The second option is to install lipsia using docker, which may be a easier in some cases, especially for non-linux systems.
+
+
+
+Install LIPSIA from scratch
+===============================
+
 1) Install the necessary compilers and libraries
 `````````````````````````````````````````````````````
 * gcc, g++
@@ -15,8 +24,13 @@ Ubuntu:
     sudo apt-get install build-essential libfftw3-dev libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev
 
 
-OSX:
+Mac OSX:
  ::
+     
+     #open a terminal: Applications/Utilities/Terminal
+ 	
+     #install command line tools
+     xcode-select --install
 
      #install homebrew package manager
      ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -63,3 +77,27 @@ The following changes need to be performed to your local bash profile (for ubunt
 
     PATH=<lipsia_dir>/bin:$PATH
     export LD_LIBRARY_PATH=<lipsa_dir>/lib:$LD_LIBRARY_PATH
+
+
+
+Install LIPSIA using Docker
+===============================
+
+The first step is to install docker on your local machine, see: https://docs.docker.com/install/
+The second step is to build the docker image as follows:
+
+ ::
+
+   docker build -t lipsia .
+
+After the installation, you can run any lipsia program by prepending *docker run lipsia*, e.g.
+
+ ::
+
+   docker run lipsia vecm
+
+
+
+
+
+
