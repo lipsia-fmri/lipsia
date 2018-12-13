@@ -8,7 +8,7 @@
 !*.c
 !*.cpp
 !*.h
-
+!*.py
 
 !publish_selection.sh
 !publish_config.txt
@@ -33,3 +33,5 @@
 /docs/_build/*/
 
 /ext*
+
+!/src/pyvista/README.md

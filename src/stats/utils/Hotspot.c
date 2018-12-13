@@ -120,7 +120,7 @@ double VImageVar(VImage src)
     s2 += u*u;
     nx++;
   }
-  if (nx < 3.0) VError(" nx: %f\n",nx);
+  if (nx < 3.0) VError(" number of nonzero voxels: %g\n",nx);
   double mean = s1/nx;
   double var = (s2 - nx * mean * mean) / (nx - 1.0);
   return var;

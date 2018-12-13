@@ -49,11 +49,10 @@ extern void FDR(VImage src,VImage dest,gsl_histogram *nullhist,gsl_histogram *re
 extern double ttest1(double *data1,int n);
 extern void ImageStats(VImage src,double *,double *,double *hmin,double *hmax);
 extern Trial *ReadDesign(VStringConst designfile,int *numtrials,int *nevents);
-extern gsl_matrix *VCreateDesign(int ntimesteps,int nevents,int deriv,gsl_matrix *);
-extern void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,int deriv,gsl_matrix *X,gsl_matrix *);
+extern gsl_matrix *VCreateDesign(int ntimesteps,int nevents,int,VBoolean,gsl_matrix *);
+extern void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,int,VBoolean,gsl_matrix *,gsl_matrix *);
 extern Trial *CopyTrials(Trial *trial,int numtrials);
 extern void VGLM(gsl_matrix *Data,gsl_matrix *X,gsl_matrix *XInv,gsl_vector *con,VImage map,VImage zmap);
-extern void PlotDesign(gsl_matrix *X,double tr,VString filename);
 extern Trial *ConcatenateTrials(Trial **trial,int *numtrials,float *run_duration,int dlists,int sumtrials);
 
 extern double VImageVar(VImage src);
@@ -72,6 +71,7 @@ extern void VApplyMinvalNlists(VAttrList *list,int nlists,float minval);
 extern void VRowNormalize(gsl_matrix *Data);
 extern void CheckTrialLabels(Trial *trial,int numtrials);
 extern void HistoUpdate(VImage,gsl_histogram *);
+extern void PlotDesign(gsl_matrix *X,double tr,VString filename);
 
 
 void XCheckImage(VImage src,char *filename)
@@ -133,8 +133,10 @@ int main (int argc, char *argv[])
   static VArgVector des_files;
   static VString  cova_filename="";
   static VString  out_filename="";
+  static VString  plot_filename="";
   static VFloat   minval = MINVAL;
   static VShort   hemomodel = 0;
+  static VBoolean firstcol = TRUE;
   static VArgVector contrast;
   static VFloat   alpha = 0.05;
   static VShort   radius = 2;
@@ -142,6 +144,7 @@ int main (int argc, char *argv[])
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
   static VBoolean cleanup = TRUE;
+  static VBoolean normcova = TRUE;
   static VBoolean verbose = FALSE;
   static VBoolean globalmean = FALSE;
   static VShort   numperm = 5000;
@@ -154,10 +157,13 @@ int main (int argc, char *argv[])
     {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
     {"contrast", VFloatRepn, 0, (VPointer) &contrast, VRequiredOpt, NULL, "Contrast vector"},
     {"hemo", VShortRepn, 1, (VPointer) &hemomodel, VOptionalOpt, HemoDict,"Hemodynamic model" },
+    {"col1", VBooleanRepn, 1, (VPointer) &firstcol, VOptionalOpt, NULL,"Whether to add a constant first column" },
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
     {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},
-    {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},
     {"minval",VFloatRepn,1,(VPointer) &minval,VOptionalOpt,NULL,"Signal threshold"},
+    {"norm_nuisance",VBooleanRepn,1,(VPointer) &normcova,VOptionalOpt,NULL,"Whether to normalize nuisance regressors"},
+    {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},
+    {"plotdesign", VStringRepn, 1, & plot_filename, VOptionalOpt, NULL,"Filename for plotting design matrix X" },
     {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Bilateral parameter (radius in voxels)"},
     {"rvar",VFloatRepn,1,(VPointer) &rvar,VOptionalOpt,NULL,"Bilateral parameter (radiometric)"},
     {"svar",VFloatRepn,1,(VPointer) &svar,VOptionalOpt,NULL,"Bilateral parameter (spatial)"},
@@ -183,7 +189,6 @@ int main (int argc, char *argv[])
     VReportBadArgs (argc, argv);
     exit (EXIT_FAILURE);
   }
-
 
   /* omp-stuff */
 #ifdef _OPENMP
@@ -239,6 +244,7 @@ int main (int argc, char *argv[])
   int ncols   = VPixel(map,0,3,2,VShort);
   int ntimesteps = Data->size2;
 
+ 
 
   /* additional regressors, no task labels, not included in permutations */
   gsl_matrix *ctmp1=NULL;
@@ -247,7 +253,7 @@ int main (int argc, char *argv[])
   int cdim = 1;
   int nuisance_dim=0;
   if (strlen(cova_filename) > 1) {
-    ctmp1 = VReadCovariates(cova_filename,TRUE);
+    ctmp1 = VReadCovariates(cova_filename,normcova);
     if (ctmp1->size1 != Data->size2) VError(" num timesteps in covariate file not consistent with data");
     nuisance_dim = ctmp1->size2;
   }
@@ -271,32 +277,32 @@ int main (int argc, char *argv[])
     int kk=0,jj=0;
     trial[i] = ReadDesign(in_filename,&kk,&jj);
     numtrials[i] = kk;
-    if (nevents == 0) nevents = jj;
-    if (nevents != jj) VError(" inconsistent number of event types in design %d",i);
+    if (jj > nevents) nevents = jj;
     sumtrials += numtrials[i];
   }
-  fprintf(stderr," Number of trials: %d, number of event types: %d\n",sumtrials,nevents-1);
+  fprintf(stderr," Number of trials: %d, number of event types: %d\n",sumtrials,nevents);
   Trial *alltrials = ConcatenateTrials(trial,numtrials,run_duration,nlists,sumtrials);
   CheckTrialLabels(alltrials,sumtrials);
 
 
-  /* read contrast vector */
-  gsl_vector *cont = gsl_vector_alloc(contrast.number + nuisance_dim + 1);
+  /* read contrast vector */ 
+  gsl_vector *cont = gsl_vector_alloc(contrast.number + nuisance_dim);
   gsl_vector_set_zero(cont);
   for (i=0; i < contrast.number; i++) {
     double u = ((VFloat *)contrast.vector)[i];
-    gsl_vector_set(cont,i+1,u);
+    gsl_vector_set(cont,i,u);
   }
 
 
-
   /* alloc initial design matrix X */
-  gsl_matrix *X = VCreateDesign(ntimesteps,nevents,(int)hemomodel,covariates);
+  gsl_matrix *X = VCreateDesign(ntimesteps,nevents,(int)hemomodel,firstcol,covariates);
+  fprintf(stderr," Design file dimensions: %lu x %lu\n",X->size1,X->size2);
+ 
+  
   gsl_matrix *XInv = gsl_matrix_calloc(X->size2,X->size1);
-  if (X->size2 != cont->size)
+  if (X->size2 != cont->size) {
     VError(" dimension of contrast vector (%ld) does not match design matrix (%ld)",cont->size-1,X->size2);
-
-
+  }
 
   /* ini random permutations */
   gsl_rng_env_setup();
@@ -323,9 +329,9 @@ int main (int argc, char *argv[])
 	int j0 = permtable[nperm][j];
 	permtrials[j].id = alltrials[j0].id;
       }
-      gsl_matrix *X = VCreateDesign(ntimesteps,nevents,(int)hemomodel,covariates);
+      gsl_matrix *X = VCreateDesign(ntimesteps,nevents,(int)hemomodel,firstcol,covariates);
       gsl_matrix *XInv = gsl_matrix_calloc(X->size2,X->size1);
-      VHemoModel(permtrials,sumtrials,nevents,ntimesteps,tr,(int)hemomodel,X,covariates);
+      VHemoModel(permtrials,sumtrials,nevents,ntimesteps,tr,(int)hemomodel,firstcol,X,covariates);
       VGLM(Data,X,XInv,cont,map,zmap);
       varsum += VImageVar(zmap);
       nx++;
@@ -338,13 +344,14 @@ int main (int argc, char *argv[])
     stddev = (float)(sqrt(meanvar));  /* update stddev */
     VDestroyImage(zmap);
   }
-
+  
 
   /* no permutation */
   VImage zmap1 = VCreateImage(nslices,nrows,ncols,VFloatRepn);
   VCopyImageAttrs (map,zmap1);
   VImage dst1 = VCreateImageLike (zmap1);
-  VHemoModel(alltrials,sumtrials,nevents,ntimesteps,tr,(int)hemomodel,X,covariates);
+  VHemoModel(alltrials,sumtrials,nevents,ntimesteps,tr,(int)hemomodel,firstcol,X,covariates);
+  if (strlen(plot_filename) > 0) PlotDesign(X,tr,plot_filename);
   VGLM(Data,X,XInv,cont,map,zmap1);
 
 
@@ -382,16 +389,14 @@ int main (int argc, char *argv[])
     }
 
     /* hemodynamic model */
-    gsl_matrix *X = VCreateDesign(ntimesteps,nevents,(int)hemomodel,covariates);
+    gsl_matrix *X = VCreateDesign(ntimesteps,nevents,(int)hemomodel,firstcol,covariates);
     gsl_matrix *XInv = gsl_matrix_calloc(X->size2,X->size1);
-    VHemoModel(permtrials,sumtrials,nevents,ntimesteps,tr,(int)hemomodel,X,covariates);
+    VHemoModel(permtrials,sumtrials,nevents,ntimesteps,tr,(int)hemomodel,firstcol,X,covariates);
 
 
     /* GLM */
     VImage zmap = VCreateImageLike(zmap1);
     VGLM(Data,X,XInv,cont,map,zmap);
-
-
     VZScale(zmap,mode,stddev);
     gsl_matrix_free(X);
     gsl_matrix_free(XInv);
@@ -415,7 +420,6 @@ int main (int argc, char *argv[])
   VImage fdrimage = VCopyImage (dst1,NULL,VAllBands);
   if (numperm > 0) {
     FDR(dst1,fdrimage,hist0,histz,(double)alpha);
-
     if (cleanup && alpha < 1.0) {
       VIsolatedVoxels(fdrimage,(float)(1.0-alpha));
     }
@@ -441,6 +445,8 @@ int main (int argc, char *argv[])
   fp = VOpenOutputFile (out_filename, TRUE);
   if (! VWriteFile (fp, out_list)) exit (1);
   fclose(fp);
+
+
   fprintf (stderr, "\n%s: done.\n", argv[0]);
   exit(0);
 }

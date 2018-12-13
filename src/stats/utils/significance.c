@@ -12,8 +12,9 @@
 int compare_function(const void *a,const void *b) {
 float *x = (float *) a;
 float *y = (float *) b;
-if (*x < *y) return -1;
-else if (*x > *y) return 1; return 0;
+ if ((*x) < (*y)) return -1;
+ else if ((*x) > (*y)) return 1;
+ else return 0;
 }
 
 /* returns P (X >= T) given empirical distribution */

@@ -512,7 +512,7 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean d
 
   int nifti_version = NiftiVersion(databuffer,&swap);
   if (nifti_version < 1) VError(" unknown nifti version");
-  fprintf(stderr," nifti version: %d\n",nifti_version);
+  /* fprintf(stderr," nifti version: %d\n",nifti_version); */
 
   
   if (nifti_version == 1) {  /* nifti-1 */

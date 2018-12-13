@@ -84,7 +84,7 @@ extern VImage VConvolveBand(VImage,VImage,VImage);
 extern VImage VLeeImage(VImage,VImage,VLong,VDouble,VLong,VLong);
 extern VImage VSmoothImage3d(VImage,VImage,VLong,VLong);
 extern VImage VFilterGauss2d(VImage,VImage,double);
-extern VImage VFilterGauss3d(VImage,VImage,double);
+extern VImage VFilterGauss3d(VImage,VImage,double *);
 extern VImage VFilterBox3d(VImage,VImage,int);
 extern VImage VMedianImage3d (VImage,VImage,int,VBoolean);
 extern VImage VMedianImage2d (VImage,VImage,int,VBoolean);

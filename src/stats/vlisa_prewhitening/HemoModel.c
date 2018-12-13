@@ -28,7 +28,6 @@
 #define LEN     10000   /* buffer length        */
 #define NTRIALS 10000   /* max number of trials */
 
-
 /* standard parameter values for gamma function, Glover 99 */
 double a1 = 6;
 double b1 = 0.9;
@@ -57,6 +56,19 @@ void printmat(gsl_matrix *R,char *str)
   fprintf(stderr,"\n");
 }
 
+void tprintmat(gsl_matrix *R,char *str)
+{
+  int i,j;
+  fprintf(stderr," %s: \n",str);
+  for (i=0; i<R->size2; i++) {
+    for (j=0; j<R->size1; j++) {
+      fprintf(stderr," %9.6f",gsl_matrix_get(R,j,i));
+    }
+    fprintf(stderr,"\n");
+  }
+  fprintf(stderr,"\n");
+}
+
 void printvec(gsl_vector *x,char *str)
 {
   int i;
@@ -72,13 +84,16 @@ void printvec(gsl_vector *x,char *str)
 void PlotDesign(gsl_matrix *X,double tr,VString filename)
 {
   int i,j;
+  double u=0;
+
   FILE *fp = fopen(filename,"w");
   if (fp == NULL) VError("err opening plot file");
   double t = 0;
   for (i=0; i<X->size1; i++) {
-    fprintf(fp," %f",t);
+    fprintf(fp," %8.2f",t);
     for (j=0; j<X->size2; j++) {
-      fprintf(fp," %f",gsl_matrix_get(X,i,j));
+      u = gsl_matrix_get(X,i,j);
+      fprintf(fp," %10.6f",u);
     }
     t += tr;
     fprintf(fp,"\n");
@@ -88,11 +103,12 @@ void PlotDesign(gsl_matrix *X,double tr,VString filename)
 
 
 /* create design X */
-gsl_matrix *VCreateDesign(int ntimesteps,int nevents,int hemomodel,gsl_matrix *covariates)
+gsl_matrix *VCreateDesign(int ntimesteps,int nevents,int hemomodel,VBoolean firstcol,gsl_matrix *covariates)
 {
   int dim = nevents;
-  if (hemomodel == 1) dim = (nevents-1)*2+1;
-  if (hemomodel == 2) dim = (nevents-1)*3+1;
+  if (hemomodel == 1) dim = nevents*2;
+  if (hemomodel == 2) dim = nevents*3;
+  if (firstcol == TRUE) dim++;
   if (covariates != NULL) dim += covariates->size2;  /* nuisance covariates without task labels */
 
   gsl_matrix *X = gsl_matrix_calloc(ntimesteps,dim);
@@ -207,7 +223,6 @@ void XConvolve(double *src,double *dst,double *kernel,int nt,int kernelsize)
   double sum=0;
 
   for (i=0; i<nt; i++) {
-
     sum = 0;
     k=0;
     for (j=i; j<i+kernelsize; j++) {
@@ -222,14 +237,21 @@ void XConvolve(double *src,double *dst,double *kernel,int nt,int kernelsize)
 }
 
 
-
-/* hemodynamic modelling */
-void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,int hemomodel,
+/* hemodynamic modelling at high temporal resolution */
+void VHemoModel(Trial *trial,int ntrials,int nevents,int nt,double xtr,int hemomodel,VBoolean firstcol,
 		gsl_matrix *X,gsl_matrix *covariates)
 {
-  int i,j,k;
+  int i,j,jj,k;
   double t,t0,t1,h;
 
+  
+  /* set temporal resolution to 0.5 sec, reduce discretization artefacts */
+  double hfactor = floor(xtr/0.5);
+  if (hfactor < 1.0) hfactor = 1.0;
+
+  double tr = xtr/hfactor;
+  int jfactor = (int)hfactor;
+  int ntimesteps = jfactor*nt;
 
   for(i = 0; i < nevents; i++) {
     double xmin = VRepnMaxValue(VFloatRepn);
@@ -243,9 +265,10 @@ void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,in
   /* get kernels */
   t1 = 30.0;    /* kernel duration = 30 secs */
   int kernelsize = t1 / tr;
-  if (tr < 0.05) VWarning(" implausible TR (%f seconds)",tr);
+  if (tr < 0.01) VWarning(" implausible TR (%f seconds)",tr);
 
-
+  /* fprintf(stderr," hf= %f,  tr= %f  %f, kernelsize: %d\n",hfactor,xtr,tr,kernelsize); */
+  
   double *kernel1=NULL,*kernel2=NULL;
   double *bkernel  = (double *)VCalloc(kernelsize,sizeof(double));
   double *kernel0  = (double *)VCalloc(kernelsize,sizeof(double));
@@ -255,7 +278,6 @@ void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,in
   if (hemomodel == 2) {
     kernel2 = (double *)VCalloc(kernelsize,sizeof(double));
   }
-
 
   i = 0;
   for (t = 0; t < t1; t += tr) {
@@ -271,42 +293,45 @@ void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,in
     i++;
   }
 
-
-
+  
   /* tmp storage */
   double *x = (double *) VCalloc(ntimesteps,sizeof(double));
   double *y = (double *) VCalloc(ntimesteps,sizeof(double));
 
 
   /* constant in column 0 */
-  gsl_matrix_set_zero(X);
-  for (j=0; j<ntimesteps; j++) gsl_matrix_set(X,j,0,1.0);
-
-
-  /* for each trial,event, do... */
-  int col=1;
-  for(i = 1; i < nevents; i++) {
+  int col=0;
+  if (firstcol == TRUE) {
+    gsl_matrix_set_zero(X);
+    for (j=0; j<nt; j++) gsl_matrix_set(X,j,0,1.0);
+    col=1;
+  }
+  
+  
+  /* for each trial,event, do... */  
+  for (i = 0; i < nevents; i++) {
     for (k=0; k<ntimesteps; k++) x[k] = y[k] = 0;
 
     /* read design info */
     int trialcount = 0;
     for (j = 0; j < ntrials; j++) {
-      if(trial[j].id != i) continue;
+      if(trial[j].id != i+1) continue;
       trialcount++;
       t0 = trial[j].onset;
       t1 = trial[j].onset + trial[j].duration;
       h  = trial[j].height;
       int k0 = (int) (t0/tr + 0.5);
       int k1 = (int) (t1/tr + 0.5);
-
+      
+      int klen=0;
       for (k=k0; k<=k1; k++) {
-	if (k < 0 || k >= X->size1) continue;
+	if (k < 0 || k >= ntimesteps) continue;
 	x[k] = h;
+	klen++;
       }
       if(trialcount < 1)
 	VError(" no trials in event %d, please re-number event-ids,  ntrials= %d", i + 1,ntrials);
     }
-
 
     /* convolve */
     if (hemomodel == 3)  {       /* block design, gaussian kernel */
@@ -315,35 +340,45 @@ void VHemoModel(Trial *trial,int ntrials,int nevents,int ntimesteps,double tr,in
     else {                       /* gamma function kernel */
       XConvolve(x,y,kernel0,ntimesteps,kernelsize);
     }
+
     for (j=0; j<X->size1; j++) {
-      gsl_matrix_set(X,j,col,y[j]);
+      jj = j*jfactor;
+      if (jj >= ntimesteps) continue;
+      gsl_matrix_set(X,j,col,y[jj]/hfactor);
     }
     col++;
 
     if (hemomodel == 1 || hemomodel == 2) {   /* gamma function kernel, first derivative */
       XConvolve(x,y,kernel1,ntimesteps,kernelsize);
-      for (j=0; j<X->size1; j++) gsl_matrix_set(X,j,col,y[j]);
+      for (j=0; j<X->size1; j++) {
+	jj = j*jfactor;
+	if (jj >= ntimesteps) continue;
+	gsl_matrix_set(X,j,col,y[jj]/hfactor);
+      }
       col++;
     }
     if (hemomodel == 2) {   /* gamma function kernel, second derivative */
       XConvolve(x,y,kernel2,ntimesteps,kernelsize);
-      for (j=0; j<X->size1; j++) gsl_matrix_set(X,j,col,y[j]);
+      for (j=0; j<X->size1; j++) {
+	jj = j*jfactor;
+	if (jj >= ntimesteps) continue;
+	gsl_matrix_set(X,j,col,y[jj]/hfactor);
+      }
       col++;
     }
   }
-
-
+  
   /* add further covariates that have no task labels, will not be permuted */
   if (covariates != NULL) {
     for (i=0; i<covariates->size2; i++) {
       for (j=0; j<covariates->size1; j++) {
+	if (col >= X->size2) VError(" VHemoModel, column= %d  %d\n",col,(int)X->size2);
 	gsl_matrix_set(X,j,col,gsl_matrix_get(covariates,j,i));
       }
       col++;
     }
   }
-
-
+  
   /* cleanup */
   VFree(x);
   VFree(y);

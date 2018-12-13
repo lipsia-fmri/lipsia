@@ -16,6 +16,7 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
+#include <gsl/gsl_math.h>
 
 #define TINY 1.0e-8
 
@@ -152,6 +153,7 @@ gsl_matrix *VReadImageData(VAttrList *list,int nlists)
     for (row=0; row<nrows; row++) {
       for (col=0; col<ncols; col++) {
 	u = VGetPixel(src[0][slice],0,row,col);
+	if (gsl_isnan(u) || gsl_isinf(u)) continue;
 	if (fabs(u) < TINY) continue;
 	nvox++;
       }
@@ -162,6 +164,7 @@ gsl_matrix *VReadImageData(VAttrList *list,int nlists)
   gsl_matrix *Data = gsl_matrix_calloc(nvox,ntimesteps);
   if (!Data) VError(" error allocating Data");
 
+  
   /* fill map and data */
   for (k=0; k<nlists; k++) {
 
@@ -173,6 +176,7 @@ gsl_matrix *VReadImageData(VAttrList *list,int nlists)
       for (row=0; row<nrows; row++) {
 	for (col=0; col<ncols; col++) {
 	  u = VGetPixel(src[0][slice],0,row,col);
+	  if (gsl_isnan(u) || gsl_isinf(u)) continue;
 	  if (fabs(u) < TINY) continue;
 
 	  s1=s2=nx=0;
@@ -202,7 +206,7 @@ gsl_matrix *VReadImageData(VAttrList *list,int nlists)
       }
     }
   }
-  VFree(nt); 
+  VFree(nt);
   return Data;
 }
 

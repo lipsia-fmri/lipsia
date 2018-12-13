@@ -17,18 +17,20 @@ Install LIPSIA from scratch
 * boost dev
 * zlib dev
 * BLAS (e.g. openblas)
+* python: numpy, matplotlib
 
 Ubuntu:
  ::
 
-    sudo apt-get install build-essential libfftw3-dev libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev
+    sudo apt-get install build-essential libfftw3-dev libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev python-tk
+    sudo pip install numpy matplotlib
 
 
 Mac OSX:
  ::
-     
+
      #open a terminal: Applications/Utilities/Terminal
- 	
+
      #install command line tools
      xcode-select --install
 
@@ -71,7 +73,7 @@ All executables can be found in <lipsia_dir>/bin.
 `````````````````````````
  ::
 
-The following changes need to be performed to your local bash profile (for ubuntu ~/.bashrc, for OSX ~/.bash_profile) Furthermore, the library path needs to be set. Add the following two lines to 
+The following changes need to be performed to your local bash profile (for ubuntu ~/.bashrc, for OSX ~/.bash_profile) Furthermore, the library path needs to be set. Add the following two lines to
 
  ::
 
@@ -95,9 +97,3 @@ After the installation, you can run any lipsia program by prepending *docker run
  ::
 
    docker run lipsia vecm
-
-
-
-
-
-

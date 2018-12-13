@@ -24,26 +24,31 @@ The labels are integers starting from 1, and represent the label (event type) of
 For example, if there are three different event types, then their labels should be one of 1,2,3.
 For a detailed description see  `designformat`_.
 
-
-The program 'vlisa_prewhitening' automatically adds a column of constant values '1' to account for offsets.
-It is hidden from view and need not be specified in the design file.
-
-The user must supply a contrast vector whose dimension matches that of the design files
-(excluding the hidden constant column).
+The user must supply a contrast vector whose dimension matches that of the design files.
 
 Hemodynamic modelling is specified using the parameter '-hemo'.
 Possible values are "gamma_0" (canonical function), "gamma_1" (canonical function plus its first derivative),
 "gamma_2" (canonical function plus its first and second derivatives), or "gauss" (Gaussian function).
 
+The option '-col1' determines whether the hemodynamic modelling procedure should add a 
+a first (leftmost) column of the design file containing the constant value '1'.
+This column represents a global offset. If set to 'true' (default)
+then the contrast vector must contain an additional first entry which is usually set to '0'.
+
 A txt-file containing additional nuisance covariates (e.g. motion parameters) may be added as a separate file.
 It must have one line per time volume and one column per covariate.
 The covariates are not subjected to any form of hemodynamic modelling,
-and are exempt from random permutations. These covariates are normalized (subtraction of mean).
+and are exempt from random permutations. By default, these covariates are normalized (subtraction of mean, standard deviation 1).
+Normalization can be turned off using the option '-norm_nuisance false'.
 These nuisance covariates need not be specified in the contrast vector.
+Nuisance files from several runs must be concatenated into one single file. The number of lines in this file must match
+the total number of volumes of all runs.
 
-The optional parameter '-minval' can be used to specify a threshold that separates brain from non-brain
-voxels (brain mask). Voxels whose values in the first volume are below this threshold are discarded from
-further analysis. If no value is given, then a heuristic is used to set this threshold automatically.
+Optionally, the design file can be obtained as a txt-file using the option '-plot'.
+The txt-file that will be output using this option contains one column for each regressor.
+The task regressors are convolved with a hemodynamic model, the nuisance covariates are normalized.
+The file can be visualized using various plotting tools (e.g. vdesignplot or gnuplot).
+
 
 
 **Caution:**
@@ -55,18 +60,23 @@ Examples:
 
 ::
 
-   vlisa_prewhitening -in run_*.v -design des_*.txt -contrast 1 -1
-	   -hemo gamma_0 -out result.v
+   vlisa_prewhitening -in run_*.v -design des_*.txt -contrast 0 1 -1 -out result.v -plotdesign X.txt
+   vdesignplot -in X.txt
 
+
+Sometimes, it may be useful to obtain an output image that is not FDR-thresholded at a pre-defined alpha level.
+This can be achieved by setting the alpha-parameter to 1, i.e. '-alpha 1.0'.
+The resulting image can later be thresholded using the program "vlisa_applythreshold". Example:
 
 ::
 
-   vlisa_prewhitening -in run_*.v -design des_*.txt -contrast 1 0 -1 0
-     -hemo gamma_1 -out result.v
+   vlisa_prewhitening -in run_*.v -design des_*.txt -contrast 0 1 -1 -out result.v -alpha 1.0
+   vlisa_applythreshold -in result.v -out thresholded.v -threshold 0.05
+
+::
 
 
-
-Note that this program also accepts input images in Nifti format ("run_*.nii" or "run_*.nii.gz"), 
+Note that 'vlisa_prewhitening' also accepts input images in Nifti format ("run_*.nii" or "run_*.nii.gz"),
 but the output is always in vista format.
 To convert the output to the Nifti format, use the following command:
 
@@ -89,12 +99,15 @@ Parameters of 'vlisa_prewhitening':
     -design   Design files.
     -nuisance   Nuisance covariates (optional).
     -contrast   Contrast vector.
+    -plotdesign    Filename for plotting design matrix X (optional).
     -order   Order of AR model. Default: 1
     -hemo    Hemodynamic model [ gamma_0 | gamma_1 | gamma_2 | gauss ]. Default: gamma_0
+    -col1    Whether to add a constant first column. Default: true
     -alpha   FDR significance level. Default: 0.05
     -perm    Number of permutations. Default: 5000
     -minval  Signal threshold.
     -seed    Seed for random number generation. Default: 99402622
+    -norm_nuisance  Whether to normalize nuisance regressors. Default: true
     -radius  Bilateral parameter (radius in voxels). Default: 2
     -rvar    Bilateral parameter (radiometric). Default: 2.0
     -svar    Bilateral parameter (spatial). Default: 2

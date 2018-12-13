@@ -1,11 +1,13 @@
-
-LDLIBS += -lgsl -lgslcblas -lvia3.0 -lviaio3.0 -lm -fopenmp -lz
-
+LDLIBS = -lgsl -lgslcblas -latlas -lvia3.0 -lviaio3.0 -lm -fopenmp -lz
+#CFLAGS  = -g
 CFLAGS  += -fopenmp
 
-PROG = vecm
 
-${PROG}:
+PROG = vecm
+SRC = vecm.c ECM_IO.c MatrixECM.c MatrixProjection.c Irreducible.c
+OBJ=$(SRC:.c=.o)
+
+${PROG}: ${OBJ}
 
 clean:
-	-rm -f ${PROG} *.o *~
+	-rm -f *.o *~ ${PROG}

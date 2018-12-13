@@ -117,7 +117,6 @@ Trial *ReadDesign(VString designfile,int *numtrials,int *nevents)
     i++;
     if (id > (*nevents)) (*nevents) = id;
   }
-  (*nevents) = (*nevents) + 1;
   fclose(fp);
   return trial;
 }
