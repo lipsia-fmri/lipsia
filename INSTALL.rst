@@ -96,4 +96,6 @@ After the installation, you can run any lipsia program by prepending *docker run
 
  ::
 
-   docker run lipsia vecm
+   docker run -v ${dir}:${dir} lipsia vecm -in ${dir}/fmri.v -mask ${dir}/mask.v -out ${dir}/ecm.v
+
+where $dir is the path to the local directory, which is needed by docker. (e.g. dir=/home/user/).
