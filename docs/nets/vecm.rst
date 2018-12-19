@@ -64,7 +64,8 @@ References
 
 .. [2010_Lohmann] Lohmann, G. et al (2010), Eigenvector centrality mapping for analyzing connectivity patterns in fMRI data of the human brain. PLoS ONE 5(4): e10232. doi:10.1371/journal.pone.0010232. `(link) <https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0010232>`_
 
-.. [2018b_Lohmann] Lohmann, G. et al (2018), Eigenvector centrality mapping for high-resolution fMRI data of the human brain. bioRxiv  `(link) <https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0010232>`_
+.. [2018b_Lohmann] Lohmann, G. et al (2018), Eigenvector centrality mapping for ultrahigh resolution fMRI data of the human brain.
+		   bioRxiv  `(link) <https://www.biorxiv.org/content/early/2018/12/13/494732>`_
 
 
 

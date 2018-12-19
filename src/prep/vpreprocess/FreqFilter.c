@@ -29,11 +29,58 @@
 #include <viaio/Vlib.h>
 #include <viaio/mu.h>
 #include <viaio/option.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
 #include <fftw3.h>
+
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_errno.h>
+
+extern gsl_matrix *DataMap(VImage *src,VImage mask,size_t nvox,int);
+
+gsl_matrix *DataMap(VImage *src,VImage mask,size_t nvox,int tail)
+{
+  int j,b,r,c;
+  int nrows=0,ncols=0,nt0=0;
+  double tiny=1.0e-6;
+
+  int nslices = VImageNBands(mask);
+  VImageDimensions(src,nslices,&nt0,&nrows,&ncols);
+
+  int nt = nt0 + 2*tail;
+  gsl_matrix *A = gsl_matrix_calloc(nvox,nt);
+
+  
+  size_t n=0;
+  for (b=0; b<nslices; b++) {
+    for (r=0; r<nrows; r++) {
+      for (c=0; c<ncols; c++) {
+
+	double u = VGetPixel(src[b],0,r,c);
+	if (fabs(u) < tiny) continue;
+
+	for (j=0; j<tail; j++) {
+	  u = (double)VGetPixel(src[b],tail-j,r,c); 
+	  gsl_matrix_set(A,n,j,u);
+	}
+	for (j=tail; j<nt-tail; j++) {
+	  u = (double)VGetPixel(src[b],j-tail,r,c);
+	  gsl_matrix_set(A,n,j,u);
+	}
+	for (j=nt-tail; j<nt; j++) {
+	  u = (double)VGetPixel(src[b],2*nt-3*tail-2-j,r,c); 
+	  gsl_matrix_set(A,n,j,u);
+	}
+	n++;
+      }
+    }
+  }
+  return A;
+}
 
 
 void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat sharp)
@@ -42,11 +89,11 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
   double *in=NULL;
   fftw_complex *out;
   fftw_plan p1,p2;
-  int i,j,nc,b,r,c,tail=0;
+  int i,j,nc,b,r,c;
   float freq=0,alpha=0;
   double *highp=NULL, *lowp=NULL;
   double x_high, x_low, x;
-  double tiny=1.0e-6;
+  double u=0,v=0,tiny=1.0e-6;
 
 
   /* dialog messages */
@@ -82,7 +129,7 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
 
   /* alloc memory */
   double nx = (double)nt;
-  tail = 50;
+  int tail = 50;
   if (nt<tail) tail=nt-2;
   nt  += 2 * tail;
   nc  = (nt / 2) + 1;
@@ -109,25 +156,38 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
       lowp[i]  = 1.0 / (1.0 +  exp( ((double)i - alpha/low)*sharp )   );
     }
   }
-  
 
+  /* create ROI mask */
+  VImage mask = VCreateImage(nslices,nrows,ncols,VBitRepn);
+  VFillImage(mask,VAllBands,0);
+  size_t nvox=0;
   for (b=0; b<nslices; b++) {
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-
 	double u = VGetPixel(src[b],0,r,c);
 	if (fabs(u) < tiny) continue;
+	VPixel(mask,b,r,c,VBit) = 1;
+	nvox++;
+      }
+    }
+  }
 
-	for (j=0; j<tail; j++) {
-	  in[j] = (double)VGetPixel(src[b],tail-j,r,c); 
-	}
-	for (j=tail; j<nt-tail; j++) {
-	  in[j] = (double)VGetPixel(src[b],j-tail,r,c); 
-	}
-	for (j=nt-tail; j<nt; j++) {
-	  in[j] = (double)VGetPixel(src[b],2*nt-3*tail-2-j,r,c); 
-	}
+  /* map to double values */
+  gsl_matrix *A = DataMap(src,mask,nvox,tail);
+  double zmax = gsl_matrix_max(A);
+  double zmin = gsl_matrix_min(A);
 
+
+  /* main process */
+  size_t n=0;
+  for (b=0; b<nslices; b++) {
+    for (r=0; r<nrows; r++) {
+      for (c=0; c<ncols; c++) {
+	
+	if (VPixel(mask,b,r,c,VBit) == 0) continue;
+	for (i=0; i<nt; i++) {
+	  in[i] = gsl_matrix_get(A,n,i);
+	}
 
 	/*  fft */
 	fftw_execute(p1);
@@ -162,17 +222,58 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
 	      out[i][0] = out[i][1] = 0;
 	  }
 	}
-
 	  
 	/* inverse fft */
 	fftw_execute(p2);
-	for (i=0; i<nt; i++) in[i] /= nx;
-
-	for (j=tail; j<nt-tail; j++) {
-	  VSetPixel(src[b],j-tail,r,c,in[j]);
+	for (i=0; i<nt; i++) {
+	  gsl_matrix_set(A,n,i,in[i]/nx);
 	}
+	n++;
       }
     }
   }
+
+  
+  /* rescale */
+  VRepnKind repn = VPixelRepn(src[0]);
+  double smax = VPixelMaxValue(src[0]);
+  double smin = VPixelMinValue(src[0]);
+
+  double ymax = 32000;
+  if (repn == VFloatRepn || repn == VDoubleRepn) ymax = 1000.0;
+  
+  for (b=0; b<nslices; b++) {
+    VFillImage(src[b],VAllBands,0);
+  }
+  zmax = gsl_matrix_max(A);
+  zmin = gsl_matrix_min(A);
+
+
+  /* write output */
+  n=0;
+  for (b=0; b<nslices; b++) {
+    for (r=0; r<nrows; r++) {
+      for (c=0; c<ncols; c++) {
+	if (VPixel(mask,b,r,c,VBit) == 0) continue;
+	
+	/* map to output image */
+	for (j=tail; j<nt-tail; j++) {
+	  u = gsl_matrix_get(A,n,j);
+	  if (fabs(u) > 0.0001) u = (u-zmin)/(zmax-zmin);
+	  else u = 0;
+	  if (u > 1.0) u = 1.0;
+	  if (u < 0) u = 0;
+	  
+	  v = u*ymax;
+	  if (v > smax) v = smax;
+	  if (v < smin) v = smin;
+	  VSetPixel(src[b],j-tail,r,c,v);
+	}
+	n++;
+      }
+    }
+  }
+  VDestroyImage(mask);
+  gsl_matrix_free(A);
 }
 
