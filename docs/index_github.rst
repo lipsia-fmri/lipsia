@@ -11,6 +11,8 @@ LISA statistical inference
 
 `vlisa_generic`_: generic LISA statistical inference
 
+`vlisa_2ndlevel`_: second level (group level) inference with LISA
+
 `vlisa_onesample`_: onesample LISA statistical inference
 
 `vlisa_twosample`_: twosample LISA statistical inference
@@ -33,6 +35,8 @@ Network tools
 .. _vdicom: conv/vdicom.rst
 
 .. _vlisa_generic: stats/vlisa_generic.rst
+
+.. _vlisa_2ndlevel: stats/vlisa_2ndlevel.rst
 
 .. _vlisa_onesample: stats/vlisa_onesample.rst
 

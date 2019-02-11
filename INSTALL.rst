@@ -2,12 +2,12 @@ How to install LIPSIA
 ===========================
 
 
-There are two alternatives for installing lipsia. The first possibility is to compile and build everything from scratch on your local machine, which requires the manual installation of several libraries (as described below). The second option is to install lipsia using docker, which may be a easier in some cases, especially for non-linux systems.
+There are two alternatives for installing lipsia. The first possibility is to compile and build everything from scratch on your local machine, which requires the manual installation of several libraries (as described below). The second option is to install a virtual version of lipsia using docker. This is the preferable option for operatings systems outside the linux/unix world and delivers the same performance as the native build.
 
 
 
-Install LIPSIA from scratch
-===============================
+Install LIPSIA from source (Linux only)
+========================================
 
 1) Install the necessary compilers and libraries
 `````````````````````````````````````````````````````
@@ -25,33 +25,13 @@ Ubuntu:
     sudo apt-get install build-essential libfftw3-dev libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev python-tk
     sudo pip install numpy matplotlib
 
-
-Mac OSX:
+2) Clone the git repository:
  ::
-
-     #open a terminal: Applications/Utilities/Terminal
-
-     #install command line tools
-     xcode-select --install
-
-     #install homebrew package manager
-     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-
-     #install GCC
-     brew tap homebrew/versions
-     brew install [flags] gcc48
-
-     #install gsl
-     brew install gsl
-
-     #install fftw
-     brew install fftw
-
-     Furthermore, make sure the last line in the file "lipsia-setup.sh" should be:
-     export CC="/usr/local/bin/gcc-4.8"
+	
+    git clone https://github.com/lipsia-fmri/lipsia.git
 
 
-2) Execute the script "lipsia-setup.sh" (in a shell)
+3) Execute the script "lipsia-setup.sh" (in a shell)
 ``````````````````````````````````````````````````````
  ::
 
@@ -59,7 +39,7 @@ Mac OSX:
    source ./lipsia-setup.sh
 
 
-3) Compile lipsia
+4) Compile lipsia
 `````````````````````````
  ::
 
@@ -69,7 +49,7 @@ where <lipsia_dir> is the directory of the lipsia repository.
 All executables can be found in <lipsia_dir>/bin.
 
 
-4) Change bash profile
+5) Change bash profile
 `````````````````````````
  ::
 
@@ -85,12 +65,25 @@ The following changes need to be performed to your local bash profile (for ubunt
 Install LIPSIA using Docker
 ===============================
 
-The first step is to install docker on your local machine, see: https://docs.docker.com/install/
-The second step is to build the docker image as follows:
+1) Install docker on your local machine
+`````````````````````````````````````````````````````
+
+Please follow the instructions: https://docs.docker.com/install/
+
+
+2) Clone the git repository:
+ ::
+	
+    git clone https://github.com/lipsia-fmri/lipsia.git
+
+
+3) Build the Dockerfile
+`````````````````````````````````````````````````````
 
  ::
-
+   cd <lipsia_dir>
    docker build -t lipsia .
+
 
 After the installation, you can run any lipsia program by prepending *docker run lipsia*, e.g.
 
@@ -98,4 +91,4 @@ After the installation, you can run any lipsia program by prepending *docker run
 
    docker run -v ${dir}:${dir} lipsia vecm -in ${dir}/fmri.v -mask ${dir}/mask.v -out ${dir}/ecm.v
 
-where $dir is the path to the local directory, which is needed by docker. (e.g. dir=/home/user/).
+where $dir is the path to the local directory containing your data file, e.g. ${dir}/fmri.v must exist as a file on your local system. 

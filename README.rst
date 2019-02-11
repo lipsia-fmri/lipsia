@@ -10,7 +10,7 @@ Below, a brief description follows. For further details see `documentation`_.
 
 Installation
 ```````````````````````
-Lipsia currently supports Linux and MacOS. Follow the instructions here: `install`_.
+Lipsia currently supports Linux and all other operating systems via Docker. Follow the instructions here: `install`_.
 
 
 Documentation
