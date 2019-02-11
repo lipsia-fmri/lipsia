@@ -121,7 +121,12 @@ void VFreqFilter(VAttrList list,VFloat high,VFloat low,VBoolean stop,VFloat shar
   for (i=0; i<8; i++) D[i] = 1.0;
   VAttrList geolist = VGetGeoInfo(list);
   if (geolist != NULL) D = VGetGeoPixdim(geolist,D);
-  double tr = D[4];  
+  double tr = D[4];
+
+  VFloat xtr=-1;
+  if (VGetAttr(VImageAttrList(src[0]),"repetition_time",NULL,VFloatRepn,&xtr) == VAttrFound) {
+    tr = (double)xtr;
+  }  
   if (tr > 100) tr /= 1000.0;  /* convert to seconds */
   if (tr < 0.01) VError("FreqFilter: implausible TR (%f seconds)",tr);
   fprintf(stderr," image dimensions: %d x %d x %d,  nt= %d,  TR= %.3f secs\n",nslices,nrows,ncols,nt,tr);  
