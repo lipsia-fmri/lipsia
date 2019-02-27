@@ -12,7 +12,7 @@ The design file is a txt-file that follows standard conventions for 2nd-level an
 It may for instance be generated using the tool `GLM <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/GLM>`_ of the FSL software package,
 alternatively the design textfile can also be written manually.
 The number of rows in the design file must match the number of input images.
-For a detailed description see :doc:`designformat <designformat>`.
+For a detailed description see :doc:`designformat_higher <designformat_higher>`.
 
 It is important to make sure that the order in which the input images are
 specified on the command line matches the order of the rows in the design file.

@@ -22,7 +22,7 @@ The design file is a txt-file containing one row per trial. Each row must have f
 The format of each row is: label, onset in seconds, duration in seconds, amplitude.
 The labels are integers starting from 1, and represent the label (event type) of that trial.
 For example, if there are three different event types, then their labels should be one of 1,2,3.
-For a detailed description see  `designformat`_.
+For a detailed description see  `designformat_first`_.
 
 The user must supply a contrast vector whose dimension matches that of the design files.
 
