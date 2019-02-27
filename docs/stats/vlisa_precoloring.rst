@@ -122,9 +122,6 @@ Parameters of 'vlisa_precoloring':
 
 
 
-.. index:: lisa_precoloring
-
-
 
 References
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -136,4 +133,9 @@ References
 
 
 
-.. _designformat: designformat.rst
+.. _designformat_first: designformat_first.rst
+
+
+
+.. index:: lisa_precoloring
+

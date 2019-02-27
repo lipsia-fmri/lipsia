@@ -19,10 +19,6 @@ functional data and cover the desired portions of the brain (or the entire brain
 In particular, the mask must have the same spatial resolution, the same image matrix size and
 the same orientation as the functional data.
 
-Note that the number of voxels in the mask determines the computational burden.
-The exact number of voxels in the mask can be obtained
-by the program :doc:`volumeinfo <../via/volumeinfo>`.
-
 
 Example:
 ``````````

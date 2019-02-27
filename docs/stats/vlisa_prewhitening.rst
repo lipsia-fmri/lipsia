@@ -118,10 +118,6 @@ Parameters of 'vlisa_prewhitening':
 
 
 
-
-.. index:: lisa_prewhitening
-
-
 References
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -130,4 +126,8 @@ References
 
 
 
-.. _designformat: designformat.rst
+.. _designformat_first: designformat_first.rst
+
+
+
+.. index:: lisa_prewhitening
