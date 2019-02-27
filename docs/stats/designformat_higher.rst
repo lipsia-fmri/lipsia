@@ -16,22 +16,12 @@ with the number of input files to 'vlisa_2ndlevel'.
 Note that convenience programs exist that can be used instead of the more complicated way of
 specifying high-level statistics via 'vlisa_2ndlevel'. These programs are:
 
- - :doc:`vlisa_onesample <vlisa_onesample>`
- - :doc:`vlisa_twosample <vlisa_twosample>`
+ - `vlisa_onesample`_
+ - `vlisa_twosample`_
 
 
 However, higher-level design files are needed in more complex situations.
 Below, some simple design files are listed for tutorial purposes.
-
-:ref:`One-sample test`
-
-:ref:`Two-sample test`
-
-:ref:`Two-sample test with nuisance covariates`
-
-:ref:`Paired test`
-
-:ref:`ANOVA (interactions and main effects, repeated measures)`
 
 
 
@@ -56,7 +46,7 @@ One-sample test
 This example design can be used to perform a one-sample test for 8 scans.
 Each row in this file corresponds to one scan.
 The contrast vector in this case is '1' (to test for > 0) or '-1' (to test for < 0).
-For such simple scenarios, an easier way to do a one-sample test is to use  :doc:`vlisa_onesample <vlisa_onesample>`.
+For such simple scenarios, an easier way to do a one-sample test is to use `vlisa_onesample`_.
 
 
 
@@ -110,7 +100,7 @@ for comparing two groups of 8 subjects each (e.g. patients vs. healthy controls)
        control 7
        control 8
 
-For such simple scenarios, an easier way to the same test is to use  :doc:`vlisa_twosample <vlisa_twosample>`.
+For such simple scenarios, an easier way to the same test is to use  `vlisa_twosample`_.
 
 
 
@@ -274,6 +264,22 @@ Furthermore, as we don't want to constrain the permutations within one subject (
        morning patient 4
        afternoon patient 4
 
+
+
+.. _designformat_first: designformat_first.rst
+
+.. _designformat_higher: designformat_higher.rst
+
+
+.. _vlisa_2ndlevel: vlisa_2ndlevel.rst
+
+.. _vlisa_onesample: vlisa_onesample.rst
+
+.. _vlisa_twosample: vlisa_twosample.rst
+
+.. _vlisa_precoloring: vlisa_precoloring.rst
+
+.. _vlisa_prewhitening: vlisa_prewhitening.rst
 
 
 .. index:: design files

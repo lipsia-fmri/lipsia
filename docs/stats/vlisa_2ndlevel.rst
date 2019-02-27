@@ -12,7 +12,7 @@ The design file is a txt-file that follows standard conventions for 2nd-level an
 It may for instance be generated using the tool `GLM <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/GLM>`_ of the FSL software package,
 alternatively the design textfile can also be written manually.
 The number of rows in the design file must match the number of input images.
-For a detailed description see :doc:`designformat_higher <designformat_higher>`.
+For a detailed description see `designformat_higher`_.
 
 It is important to make sure that the order in which the input images are
 specified on the command line matches the order of the rows in the design file.
@@ -67,6 +67,11 @@ Parameters of 'vlisa_2ndlevel':
     -filteriterations   Bilateral parameter (number of iterations). Default: 2
     -cleanup  Whether to delete isolated voxels. Default: true
     -j        Number of processors to use, '0' to use all. Default: 0
+
+
+
+.. _designformat_higher: designformat_higher.rst
+
 
 
 .. index:: lisa_2ndlevel

@@ -2,7 +2,7 @@ First level design files
 ============================
 First level design files describe the experimental setup within one session in a simple txt format.
 They specify onset times and duration of the various experimental events.
-They can be used as input into single-subject LISA (**vlisa_prewhitening**).
+They can be used as input into single-subject LISA (`vlisa_precoloring`_ , `vlisa_prewhitening`_)
 
 The design specification of first level designs must be given as a text file in the following format.
 Each line of the file corresponds to one trial. Each line must have 4 entries:
@@ -42,5 +42,12 @@ This is essentially the same design as in example 1. However, event 2
 has an additional *parametric* component which is specified as event '3'.
 Note that the event therefore occurs twice, once without and once with
 the additional parameter.
+
+
+.. _vlisa_precoloring: vlisa_precoloring.rst
+
+.. _vlisa_prewhitening: vlisa_prewhitening.rst
+
+
 
 .. index:: design files
