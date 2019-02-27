@@ -9,9 +9,10 @@ The output is a map thresholded such that FDR < alpha for every voxel. The defau
 The resulting image shows (1-FDR) so that larger values indicate higher significance.
 
 The design file is a txt-file that follows standard conventions for 2nd-level analyses.
-It may for instance be generated using the tool "Glm" of the FSL software package.
+It may for instance be generated using the tool `GLM <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/GLM>`_ of the FSL software package,
+alternatively the design textfile can also be written manually.
 The number of rows in the design file must match the number of input images.
-For a detailed description see  `designformat`_.
+For a detailed description see :doc:`designformat <designformat>`.
 
 It is important to make sure that the order in which the input images are
 specified on the command line matches the order of the rows in the design file.
@@ -22,8 +23,12 @@ Each input image is represented by one row of this file and contains
 an integer ID (>=1) that represents the group to which the image belongs.
 Images within the same group are assumed to be exchangeable.
 This file corresponds to the file ".grp" of FSL-Glm.
-If no group file is specified then it is assumed that no exchangeability constraints
-exist.
+If no group file is specified then it is assumed that no exchangeability constraints exist.
+
+Optionally, nuisance regressors can be supplied in a separate txt-file using the option '-nuisance'.
+Each column in this file corresponds to one regressor. The number of rows must match the number of input images (scans).
+The nuisance regressors are exempt from random permutations, and they are not included in the contrast vector.
+By default, the mean of each regressor is subtracted ('-demean true').
 
 The parameter '-contrast' is used to specify the contrast vector.
 The length of the contrast vector must match the number of columns of the design file.
@@ -35,8 +40,8 @@ Example:
 
 ::
 
-   vlisa_2ndlevel -in images_*.nii.gz -out result.v -design design.mat 
-        -grp design.grp -contrast 1 0 0 0
+   vlisa_2ndlevel -in images_*.nii.gz -out result.v -design design.mat
+        -grp design.grp -contrast 1 0 0 0 -nuisance regressors.txt
 
 
 
@@ -49,8 +54,10 @@ Parameters of 'vlisa_2ndlevel':
     -in      Input files.
     -out     Output file.
     -design  Design file.
-    -grp     Group Ids needed for exchangeability.
+    -grp     Group Ids needed for exchangeability (optional).
     -contrast  Contrast vector.
+    -nuisance  Nuisance regressors (optional).
+    -demean  Whether to subtract mean in nuisance regressors. Default: true
     -alpha   FDR significance level. Default: 0.05
     -perm    Number of permutations. Default: 5000
     -seed    Seed for random number generation. Default: 99402622
@@ -70,7 +77,3 @@ References
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 .. [2018_Lohmann] Lohmann G., Stelzer J., Lacosse E., Kumar V.J., Mueller K., Kuehn E., Grodd W., Scheffler K. (2018). LISA improves statistical analysis for fMRI. Nature Communications 9:4014. `(link) <https://www.nature.com/articles/s41467-018-06304-z>`_
-
-
-
-.. _designformat: designformat.rst

@@ -37,11 +37,11 @@ then the contrast vector must contain an additional first entry which is usually
 A txt-file containing additional covariates (e.g. motion parameters) may be added as a separate file.
 It must have one line per time volume and one column per covariate.
 The covariates are not subjected to any form of hemodynamic modelling,
-and are exempt from random permutations. By default, these covariates are normalized to mean 0, standard deviation 1.
-Normalization can be turned off using the option '-norm_nuisance false'.
-These nuisance covariates need not be specified in the contrast vector.
+and are exempt from random permutations. 
+The nuisance regressors are not included in the contrast vector.
 Nuisance files from several runs must be concatenated into one single file. The number of lines in this file must match
 the total number of volumes of all runs.
+By default, the mean of each regressor is subtracted ('-demean true').
 
 The optional parameter '-minval' can be used to specify a threshold that separates brain from non-brain
 voxels (brain mask). Voxels whose values in the first volume are below this threshold are discarded from
@@ -101,14 +101,14 @@ Parameters of 'vlisa_precoloring':
     -in      Input file(s).
     -out     Output file.
     -design   Design files.
-    -nuisance   Nuisance covariates (optional).
     -contrast   Contrast vector.
+    -nuisance   Nuisance regressors (optional).
+    -demean  Whether to subtract mean in nuisance regressors. Default: true
     -hemo    Hemodynamic model [ gamma_0 | gamma_1 | gamma_2 | gauss ]. Default: gamma_0
     -col1    Whether to add a constant first column. Default: true
     -alpha   FDR significance level. Default: 0.05
     -perm    Number of permutations. Default: 5000
     -minval  Signal threshold.
-    -norm_nuisance  Whether to normalize nuisance regressors. Default: true
     -seed    Seed for random number generation. Default: 99402622
     -plotdesign    Filename for plotting design matrix X (optional).
     -radius  Bilateral parameter (radius in voxels). Default: 2

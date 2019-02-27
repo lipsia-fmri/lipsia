@@ -144,7 +144,7 @@ int main (int argc, char *argv[])
   static VFloat   svar = 2.0;
   static VShort   numiter = 2;
   static VBoolean cleanup = TRUE;
-  static VBoolean normcova = TRUE;
+  static VBoolean demean = TRUE;
   static VBoolean verbose = FALSE;
   static VBoolean globalmean = FALSE;
   static VShort   numperm = 5000;
@@ -152,16 +152,16 @@ int main (int argc, char *argv[])
   static VShort   nproc = 0;
   static VOptionDescRec options[] = {
     {"in", VStringRepn, 0, & in_files, VRequiredOpt, NULL,"Input files" },
-    {"design", VStringRepn, 0, & des_files, VRequiredOpt, NULL,"Design files (1st level)" },
-    {"nuisance", VStringRepn,  1, & cova_filename, VOptionalOpt, NULL,"Nuisance covariates (optional)" },
     {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
+    {"design", VStringRepn, 0, & des_files, VRequiredOpt, NULL,"Design files (1st level)" },
     {"contrast", VFloatRepn, 0, (VPointer) &contrast, VRequiredOpt, NULL, "Contrast vector"},
+    {"nuisance", VStringRepn,  1, & cova_filename, VOptionalOpt, NULL,"Nuisance regressors" },
+    {"demean",VBooleanRepn,1,(VPointer) &demean,VOptionalOpt,NULL,"Whether to subtract mean in nuisance regressors"},
     {"hemo", VShortRepn, 1, (VPointer) &hemomodel, VOptionalOpt, HemoDict,"Hemodynamic model" },
     {"col1", VBooleanRepn, 1, (VPointer) &firstcol, VOptionalOpt, NULL,"Whether to add a constant first column" },
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
     {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},
     {"minval",VFloatRepn,1,(VPointer) &minval,VOptionalOpt,NULL,"Signal threshold"},
-    {"norm_nuisance",VBooleanRepn,1,(VPointer) &normcova,VOptionalOpt,NULL,"Whether to normalize nuisance regressors"},
     {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},
     {"plotdesign", VStringRepn, 1, & plot_filename, VOptionalOpt, NULL,"Filename for plotting design matrix X" },
     {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Bilateral parameter (radius in voxels)"},
@@ -253,7 +253,7 @@ int main (int argc, char *argv[])
   int cdim = 1;
   int nuisance_dim=0;
   if (strlen(cova_filename) > 1) {
-    ctmp1 = VReadCovariates(cova_filename,normcova);
+    ctmp1 = VReadCovariates(cova_filename,demean);
     if (ctmp1->size1 != Data->size2) VError(" num timesteps in covariate file not consistent with data");
     nuisance_dim = ctmp1->size2;
   }

@@ -90,7 +90,7 @@ gsl_matrix *VReadCovariates(VString cfile,VBoolean demean)
     }
     mean = sum1/nx;
     sigma = sqrt((sum2 - nx * mean * mean) / (nx - 1.0));
-    if (sigma < tiny) VError(" Nuisance covariates:  column %d is constant",i);
+    if (sigma < tiny) VError(" Nuisance regressors:  column %d is constant",i);
 
     for (j=0; j<dest->size1; j++) {
       u = gsl_matrix_get(dest,j,i);

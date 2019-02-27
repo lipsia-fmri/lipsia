@@ -47,13 +47,13 @@ extern void   VZScale(VImage src,float mode,float stddev);
 extern float  VGetMode(VImage src);
 
 extern void XReadExchange(VString filename,int *exchange,int n);
-extern void GLM2(VImage *src,gsl_matrix *X,gsl_vector *contrast,int *permtable,int *signtable,int signswitch,VImage dest);
+extern void GLM2(VImage *src,gsl_matrix *X,gsl_vector *contrast,int *,int *permtable,int *signtable,int signswitch,VImage dest);
 extern gsl_matrix *XRead2ndLevel(VString);
 extern gsl_matrix *PseudoInv(gsl_matrix *A,gsl_matrix *B);
-extern int SignSwitch (gsl_matrix *X,gsl_vector *contrast);
+extern int SignSwitch (gsl_matrix *X,gsl_vector *contrast,int *);
 extern void genperm(long seed,int *exchange,int,int **,int **,int,int,gsl_vector *);
 extern void HistoUpdate(VImage,gsl_histogram *);
-
+extern gsl_matrix *VReadCovariates(VString,VBoolean);
 
 
 
@@ -63,6 +63,7 @@ int main (int argc, char *argv[])
   static VString  out_filename="";  
   static VString  design_filename="";
   static VString  exchange_filename="";
+  static VString  nuisance_filename="";
   static VArgVector cont;
   static VFloat   alpha = 0.05; 
   static VShort   radius = 2;
@@ -72,14 +73,17 @@ int main (int argc, char *argv[])
   static VShort   numperm = 5000;
   static VLong    seed = 99402622;
   static VBoolean centering = FALSE;
+  static VBoolean demean  = TRUE;
   static VBoolean cleanup = TRUE;
   static VShort   nproc = 0;
   static VOptionDescRec options[] = {
     {"in", VStringRepn, 0, & in_files1, VRequiredOpt, NULL,"Input files" },
     {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },   
     {"design",VStringRepn,1,(VPointer) &design_filename,VRequiredOpt,NULL,"Design file (2nd level)"}, 
-    {"grp", VStringRepn, 1, & exchange_filename, VOptionalOpt, NULL,"Group Ids needed for exchangeability" },     
+    {"grp", VStringRepn, 1, & exchange_filename, VOptionalOpt, NULL,"Group Ids needed for exchangeability" },
     {"contrast", VFloatRepn, 0, (VPointer) &cont, VRequiredOpt, NULL, "contrast vector"},
+    {"nuisance", VStringRepn, 1, & nuisance_filename, VOptionalOpt, NULL,"Nuisance regressors" },
+    {"demean",VBooleanRepn,1,(VPointer) &demean,VOptionalOpt,NULL,"Whether to subtract mean in nuisance regressors"},
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
     {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},    
     {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},
@@ -94,7 +98,8 @@ int main (int argc, char *argv[])
   VString in_filename;
   VAttrList list1=NULL,out_list=NULL,geolist=NULL;
   VImage *src1;
-  int i,nimages,npix=0;
+  int i,j,nimages,npix=0;
+  double u=0;
   char *prg_name=GetLipsiaName("vlisa_2ndlevel");
   fprintf (stderr, "%s\n", prg_name);
 
@@ -138,15 +143,74 @@ int main (int argc, char *argv[])
   }
 
 
+  /* get nuisance file */
+  gsl_matrix *XN = NULL;
+  if (strlen(nuisance_filename) > 1) {
+    XN = VReadCovariates(nuisance_filename,demean);
+    fprintf(stderr," nuisance covariates dimensions:  %d x %d\n",(int)XN->size1,(int)XN->size2);
+    if (XN->size1 != nimages) 
+      VError(" number of input images (%d) does not match number of rows in nuisance covariates file (%d)",nimages,(int)XN->size1);
+  }
 
+
+  
   /* get design file and its inverse */
-  gsl_matrix *X = XRead2ndLevel(design_filename);
-  fprintf(stderr," design file dimensions:  %d x %d\n",(int)X->size1,(int)X->size2);
-  if (X->size1 == 1) VError(" Please use 'vlisa_onesample' for onesample tests");
-  if (X->size1 != nimages) 
-    VError(" number of input images (%d) does not match number of rows in design file (%d)",nimages,(int)X->size1);
+  gsl_matrix *X0 = XRead2ndLevel(design_filename);
+  fprintf(stderr," design file dimensions:  %d x %d\n",(int)X0->size1,(int)X0->size2);
+  if (X0->size2 == 1) VError(" Please use 'vlisa_onesample' for onesample tests");
+  if (X0->size1 != nimages) 
+    VError(" number of input images (%d) does not match number of rows in design file (%d)",nimages,(int)X0->size1);
 
 
+  /* read contrast vector */
+  if (cont.number != X0->size2) 
+    VError(" Dimension of contrast vector (%d) does not match number of columns in design file (%d)",cont.number,X0->size2);
+  gsl_vector *contrast0 = gsl_vector_alloc(cont.number);
+  for (i=0; i < cont.number; i++) {
+    double u = ((VFloat *)cont.vector)[i];
+    gsl_vector_set(contrast0, i, u);
+  }
+
+
+  /* concatenate design matrix and nuisance covariates */
+  gsl_matrix *X = NULL;
+  gsl_vector *contrast = NULL;
+  int *permflag = NULL;
+
+  /* include nuisance covariates, if present */
+  if (XN != NULL) {
+    permflag = (int *) VCalloc(XN->size2 + X0->size2,sizeof(int));
+    for (j=0; j<XN->size2 + X0->size2; j++) permflag[j] = 0;
+    for (j=0; j<X0->size2; j++) permflag[j] = 1;
+    
+    X = gsl_matrix_calloc(X0->size1, X0->size2 + XN->size2);
+    for (i=0; i<X->size1; i++) {
+      for (j=0; j<X0->size2; j++) {
+	u = gsl_matrix_get(X0,i,j);
+	gsl_matrix_set(X,i,j,u);	
+      }
+      for (j=0; j<XN->size2; j++) {
+	u = gsl_matrix_get(XN,i,j);
+	gsl_matrix_set(X,i,j+X0->size2,u);
+      }
+    }
+    contrast = gsl_vector_calloc(cont.number + XN->size2);
+    gsl_vector_set_zero(contrast);
+    for (j=0; j<contrast0->size; j++) gsl_vector_set(contrast,j,contrast0->data[j]);
+  }
+
+  /* no nuisance covariates */
+  else {
+    permflag = (int *) VCalloc(X0->size2,sizeof(int));
+    for (j=0; j<X0->size2; j++) permflag[j] = 1;
+    X = gsl_matrix_calloc(X0->size1,X0->size2);
+    gsl_matrix_memcpy(X,X0);
+    contrast = gsl_vector_calloc(cont.number);
+    gsl_vector_memcpy(contrast,contrast0);
+  }
+
+ 
+  
   /* read exchangeability information */
   int *exchange = (int *) VCalloc(X->size1,sizeof(int));
   for (i=0; i<X->size1; i++) exchange[i] = 1;  /* no restrictions w.r.t. exchangeability */
@@ -155,19 +219,8 @@ int main (int argc, char *argv[])
   }
 
 
-
-  /* read contrast vector */
-  if (cont.number != X->size2) 
-    VError(" Dimension of contrast vector (%d) does not match number of columns in design file (%d)",cont.number,X->size2);
-  gsl_vector *contrast = gsl_vector_alloc(cont.number);
-  for (i=0; i < cont.number; i++) {
-    double u = ((VFloat *)cont.vector)[i];
-    gsl_vector_set(contrast, i, u);
-  }
-
-
   /* ini random permutations and sign switching */
-  int signswitch = SignSwitch(X,contrast);
+  int signswitch = SignSwitch(X,contrast,permflag);
   int nperm=0;
   int **permtable = (int **) VCalloc(numperm,sizeof(int *));
   int **signtable = (int **) VCalloc(numperm,sizeof(int *));
@@ -186,7 +239,7 @@ int main (int argc, char *argv[])
 #pragma omp parallel for shared(src1,permtable) schedule(dynamic)
     for (nperm = 0; nperm < tstperm; nperm++) {
       VImage zmap = VCreateImageLike(src1[0]);
-      GLM2(src1,X,contrast,permtable[nperm],signtable[nperm],signswitch,zmap);
+      GLM2(src1,X,contrast,permflag,permtable[nperm],signtable[nperm],signswitch,zmap);
 #pragma omp critical 
       {
 	varsum += VImageVar(zmap);
@@ -207,7 +260,7 @@ int main (int argc, char *argv[])
   for (i=0; i<nimages; i++) nosigntable[i] = 1;
   VImage dst1  = VCreateImageLike (src1[0]);
   VImage zmap1 = VCreateImageLike(src1[0]);
-  GLM2(src1,X,contrast,nopermtable,nosigntable,signswitch,zmap1);
+  GLM2(src1,X,contrast,permflag,nopermtable,nosigntable,signswitch,zmap1);
 
 
   if (numperm == 0) {
@@ -238,7 +291,7 @@ int main (int argc, char *argv[])
 
     VImage zmap = VCreateImageLike(src1[0]);
     VImage dst  = VCreateImageLike (zmap);      
-    GLM2(src1,X,contrast,permtable[nperm],signtable[nperm],signswitch,zmap);
+    GLM2(src1,X,contrast,permflag,permtable[nperm],signtable[nperm],signswitch,zmap);
     float mode=0;
     if (centering) mode = VGetMode(zmap);
     VZScale(zmap,mode,stddev);

@@ -24,7 +24,7 @@ extern int VistaFormat(char *buf,int len);
 extern int test_ascii(int val);
 
 
-gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize)
+gsl_matrix *VReadCovariates(VString cfile,VBoolean demean)
 {
   float x=0;
   int i=0,j=0,nrows=0,ncols=0,len=10000,tlen=80;
@@ -75,10 +75,10 @@ gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize)
     i++;
     if (i >= nrows) break;
   }
-  if (!normalize) return dest;
+  if (!demean) return dest;
 
 
-  /* normalize */
+  /* subtract mean */
   double u=0,sum1=0,sum2=0,nx=0,mean=0,sigma=0,tiny=1.0e-6;
   for (i=0; i<dest->size2; i++) {
     sum1 = sum2 = nx = 0;
@@ -94,7 +94,7 @@ gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize)
 
     for (j=0; j<dest->size1; j++) {
       u = gsl_matrix_get(dest,j,i);
-      u = (u-mean)/sigma;
+      u = (u-mean);
       gsl_matrix_set(dest,j,i,u);
     }
   }

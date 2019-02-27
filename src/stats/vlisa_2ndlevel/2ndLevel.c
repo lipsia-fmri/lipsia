@@ -24,7 +24,6 @@
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 #define SQR(x) ((x)*(x))
 
-extern void SubtractMean(gsl_matrix *X);
 extern gsl_matrix *PseudoInv(gsl_matrix *A,gsl_matrix *B);
 extern gsl_matrix *XRead2ndLevel(VString);
 extern double t2z(double t,double df);
@@ -84,7 +83,7 @@ double DoF(gsl_matrix *X,gsl_matrix *XInv,double *xtrace)
 /*
 ** general linear regression, 2nd level
 */
-void GLM2(VImage *src,gsl_matrix *X,gsl_vector *contrast,int *permtable,int *signtable,int signswitch,VImage dest)
+void GLM2(VImage *src,gsl_matrix *X,gsl_vector *contrast,int *permflag,int *permtable,int *signtable,int signswitch,VImage dest)
 {
   int i,j,ip,b,r,c;
   double t=0,z=0,sum=0,tsigma=0,d=0,err=0,var=0,u=0,tiny=1.0e-6;
@@ -113,7 +112,7 @@ void GLM2(VImage *src,gsl_matrix *X,gsl_vector *contrast,int *permtable,int *sig
     for (i=0; i<X->size1; i++) {
       ip = permtable[i];
       for (j=0; j<X->size2; j++) {
-	if (fabs(contrast->data[j]) > 0) {  /* only permute columns with nonzero contrast */
+	if (permflag[j] > 0) {  /* do not permute columns containing nuisance covariates */
 	  u = gsl_matrix_get(X,i,j);
 	  gsl_matrix_set(XP,ip,j,u);
 	}

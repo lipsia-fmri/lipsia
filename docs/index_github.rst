@@ -1,9 +1,18 @@
 
-Converter
+File format converters
 ```````````````````````
 `vnifti`_: convert nifti to to vista (lipsia file format) and vice versa
 
 `vdicom`_: convert dicom to vista
+
+
+
+Design file formats
+```````````````````````
+`designformat_first`_: first level design files
+
+`designformat_higher`_: higher level design files
+
 
 
 LISA statistical inference
@@ -28,6 +37,8 @@ Network tools
 `vted`_: Task-based edge density algorithm TED
 
 `vecm`_: Eigenvector centrality mapping (ECM)
+
+`vccm`_: Connectivity concordance mapping (CCM)
 
 
 .. _vnifti: conv/vnifti.rst
@@ -56,3 +67,10 @@ Network tools
 .. _vhubness: ted/vhubness.rst
 
 .. _vecm: nets/vecm.rst
+
+.. _vccm: nets/vccm.rst
+
+
+.. _designformat_first: stats/designformat_first.rst
+
+.. _designformat_higher: stats/designformat_higher.rst

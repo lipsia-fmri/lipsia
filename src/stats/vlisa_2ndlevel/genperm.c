@@ -51,11 +51,8 @@ void genperm(long seed,int *exchange,int signswitch,
   /* sign switching only */
   if (signswitch >= 0) {
     for (i=0; i<numperm; i++) {  
-      for (j=0; j<nimages; j++) {
-	
-	if (fabs(contrast->data[j]) > 0) {  /* only switch columns with nonzero contrast */
-	  if (gsl_ran_bernoulli (rx,(double)0.5) == 1) signtable[i][j] = -1;
-	}
+      for (j=0; j<nimages; j++) {	
+	if (gsl_ran_bernoulli (rx,(double)0.5) == 1) signtable[i][j] = -1;
       }
     }
     return;  /* stop here, no permutations */
@@ -101,15 +98,15 @@ void genperm(long seed,int *exchange,int signswitch,
 
 
 
-/* for zero variance replace permutations with sign switching (only if contrast is '1') */
-int SignSwitch (gsl_matrix *X,gsl_vector *contrast)
+/* for zero variance replace permutations with sign switching (only for non-nuisance columns) */
+int SignSwitch (gsl_matrix *X,gsl_vector *contrast,int *permflag)
 {
   int i,j;
   double s1=0,s2=0,nx=0,u=0,mean=0,var=0,tiny=1.0e-6;
 
   int signswitch = -1;
   for (j=0; j<X->size2; j++) {
-    if (fabs(contrast->data[j]) < tiny) continue;
+    if (permflag[j] == 0) continue;
     s1 = s2 = nx = 0;
     for (i=0; i<X->size1; i++) { 
       u = gsl_matrix_get(X,i,j);
@@ -124,31 +121,4 @@ int SignSwitch (gsl_matrix *X,gsl_vector *contrast)
     if (var < tiny) signswitch = j;
   }
   return signswitch;
-}
-
-
-
-/* de-mean design matrix */
-void SubtractMean(gsl_matrix *X)
-{
-  int i,j;
-  double s1=0,s2=0,nx=0,u=0,mean=0,var=0,tiny=1.0e-6;
-
-  for (j=0; j<X->size2; j++) {
-    s1 = s2 = nx = 0;
-    for (i=0; i<X->size1; i++) { 
-      u = gsl_matrix_get(X,i,j);
-      s1 += u;
-      s2 += u*u;
-      nx++;
-    }
-    mean = s1/nx;
-    var = (s2 - nx * mean * mean) / (nx - 1.0);
-    if (var < tiny) continue;  /* no de-meaning for zero variance columns */
-
-    for (i=0; i<X->size1; i++) { 
-      u = gsl_matrix_get(X,i,j);
-      gsl_matrix_set(X,i,j,u-mean);
-    }
-  }
 }

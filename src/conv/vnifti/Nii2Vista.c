@@ -1,5 +1,7 @@
 /*
-** read nifti-1 to vista format
+** read nifti-1 or nifti-2 to vista format
+**
+** G.Lohmann, MPI-KYB, 2016
 */
 #include <viaio/Vlib.h>
 #include <viaio/VImage.h>
@@ -11,10 +13,11 @@
 #include <string.h>
 #include <strings.h>
 #include <math.h>
+#include <ctype.h>
 
 #include <gsl/gsl_math.h>
 
-#include <nifti/nifti1.h>
+#include <nifti/nifti2.h>
 #include <nifti/nifti1_io.h>
 
 #define MIN_HEADER_SIZE 348
@@ -23,6 +26,9 @@
 #define TINY 1.0e-10
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
+extern int isinff(float x);
+extern int isnanf(float x);
+
 extern char *VReadGzippedData(char *filename,size_t *len);
 extern char *VReadUnzippedData(char *filename,VBoolean nofail,size_t *size);
 extern char *VReadDataContainer(char *filename,VBoolean nofail,size_t *size);
@@ -30,15 +36,71 @@ extern FILE *VReadInputFile (char *filename,VBoolean nofail);
 extern int  CheckGzip(char *filename);
 
 extern void VByteSwapNiftiHeader(nifti_1_header *hdr);
+extern void VByteSwapNifti2Header(nifti_2_header *hdr);
 extern void VByteSwapData(char *data,size_t ndata,size_t nsize);
+extern float strtof(const char *str, char **endptr);
+
+
+int NiftiVersion(char *databuffer,int *swap)
+{
+  int *k = (int *)(&databuffer[0]);
+  int type = *k;
+  *swap = 0;
+  if (type == 348) return 1;
+  else if (type == 540) return 2;
+  else {
+    nifti_swap_4bytes(1,k);
+    type = *k;
+    *swap = 1;
+    if (type == 348) return 1;
+    else if (type == 540) return 2;
+    else return 0;
+  }
+  return 0;
+}
+
+
+/* read repetition time from description field instead of pixdim  */
+float TRfromString(const char *str)
+{
+  float f_tr   = -1;    /* return value on failure */
+  float factor = 1000;  /* expect seconds as default */
+  char* c_tr;
+
+  if( ( c_tr = strstr( str, "TR=" ) ) || ( c_tr = strstr( str, "TR =" ) ) ) {
+      while( *c_tr++ != '=' )
+    ;
+
+      while( *c_tr && isspace( *c_tr ) )
+	c_tr++;
+
+      f_tr = strtof( c_tr, &c_tr );
+      
+      if( f_tr > 0.0 ) {   
+	while( *c_tr && isspace( *c_tr ) )
+	  c_tr++;
+	
+	if( strncasecmp( c_tr, "ms", 2 ) == 0 )
+	  factor = 1;
+      }
+  }
+  return f_tr * factor;
+}
+
 
 
 /* set dimension in geo info */
-void VSetGeo3d4d(VAttrList geolist,int dimtype)
+void VUpdateGeoinfo(VAttrList geolist,int dimtype,VLong tr)
 {
   double *D = VGetGeoDim(geolist,NULL);
   D[0] = (double)dimtype;
   VSetGeoDim(geolist,D);
+
+  double *E = VGetGeoPixdim(geolist,NULL);
+  if (tr > 0) {
+    E[4] = (double)tr;
+    VSetGeoPixdim(geolist,E);
+  }
 } 
 
 
@@ -52,7 +114,6 @@ void VSetGeo3d4d(VAttrList geolist,int dimtype)
 VImage VIniImage (int nbands, int nrows, int ncolumns, VRepnKind pixel_repn, char *databuffer)
 {
   size_t row_size = ncolumns * VRepnSize (pixel_repn);
-  size_t data_size = nbands * nrows * row_size;
   size_t row_index_size = nbands * nrows * sizeof (char *);
   size_t band_index_size = nbands * sizeof (char **);
   size_t pixel_size=0;
@@ -101,13 +162,13 @@ VImage VIniImage (int nbands, int nrows, int ncolumns, VRepnKind pixel_repn, cha
 #define xgetval(data,index,Datatype) \
 { \
   Datatype *k = (Datatype *)(&data[index]); \
-  u = (double)(*k); \
+  u = (float)(*k); \
 }
 
 
-double VGetValue(char *data,size_t index,int datatype)
+float VGetValue(char *data,size_t index,int datatype)
 {
-  double u=0;
+  float u=0;
   switch(datatype) {
   case DT_BINARY:
     xgetval(data,index,VBit);
@@ -145,20 +206,40 @@ double VGetValue(char *data,size_t index,int datatype)
   default:
     VError(" unknown datatype %d",datatype);
   }
+  if (isinff(u) || isnanf(u)) u = 0;
   return u;
 }
 
 
+void VCleanData(VImage src)
+{
+  int b,r,c;
+  double u=0;
+  for (b=0; b<VImageNBands(src); b++) {
+    for (r=0; r<VImageNRows(src); r++) {
+      for (c=0; c<VImageNColumns(src); c++) {
+	u = VGetPixel(src,b,r,c);
+	if (gsl_isinf(u) || gsl_isnan(u)) {
+	  u = 0;
+	  VSetPixel(src,b,r,c,u);
+	}
+      }
+    }
+  }
+}
+
+
 /* get image statistics for re-scaling parameters */
-void VDataStats(char *data,size_t ndata,size_t nsize,int datatype,double *xmin,double *xmax)
+void VDataStats(char *data,size_t ndata,size_t nsize,int datatype,float *xmin,float *xmax)
 {
   size_t i,n;
-  double zmin = VRepnMaxValue(VDoubleRepn);
-  double zmax = VRepnMinValue(VDoubleRepn);
+  float u=0;
+  float zmin = VRepnMaxValue(VFloatRepn);
+  float zmax = VRepnMinValue(VFloatRepn);
 
   n=0;
   for (i=0; i<ndata; i+= nsize) {
-    double u = VGetValue(data,i,datatype);
+    u = VGetValue(data,i,datatype);
     if (fabs(u) < TINY) continue;
     if (u < zmin) zmin = u;
     if (u > zmax) zmax = u;
@@ -174,72 +255,129 @@ void VDataStats(char *data,size_t ndata,size_t nsize,int datatype,double *xmin,d
 
 /* list of 3D images */
 void Nii2Vista3DList(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncols,size_t nt,
-		     VRepnKind pixel_repn,VString voxelstr,VShort tr,VAttrList out_list)
+		     VRepnKind dst_repn,int datatype,float scl_slope,float scl_inter,
+		     VString voxelstr,VLong tr,VAttrList out_list)
 {
+  int slice,row,col;
+  float u=0;
   size_t i;
-  size_t npix = nrows*ncols*nslices;
+  size_t add=0;      
+  size_t nrnc = nrows*ncols;
+  size_t npix = nrnc*nslices;
+  size_t ndata = nt * npix * nsize;  
+
+
+  if (nsize == 1) add=4;
+  if (nsize == 2) add=2;
+  if (nsize == 4) add=1;
 
   VImage *dst = (VImage *) VCalloc(nt,sizeof(VImage));
-  VAppendAttr(out_list,"nimages",NULL,VLongRepn,(VLong) nt);
+  if (nt > 1) VAppendAttr(out_list,"nimages",NULL,VLongRepn,(VLong) nt);
 
   for (i=0; i<nt; i++) {
-    const size_t index = i*npix*nsize;
-    dst[i] = VIniImage(nslices,nrows,ncols,pixel_repn,&data[index]);
-    VSetAttr(VImageAttrList(dst[i]),"voxel",NULL,VStringRepn,voxelstr);
-    if (tr > 0) VSetAttr(VImageAttrList(dst[i]),"repetition_time",NULL,VShortRepn,tr);
-    VAppendAttr(out_list,"image",NULL,VImageRepn,dst[i]);
+
+    /* rescale if needed */
+    if (fabs(scl_slope) > 0 || fabs(scl_inter) > 0) {
+
+      VImage tmp = VCreateImage(nslices,nrows,ncols,dst_repn);
+      VSetAttr(VImageAttrList(tmp),"voxel",NULL,VStringRepn,voxelstr);
+      if (tr > 0) VSetAttr(VImageAttrList(tmp),"repetition_time",NULL,VLongRepn,(VLong)tr);
+      for (slice=0; slice<nslices; slice++) {
+	for (row=0; row<nrows; row++) {
+	  for (col=0; col<ncols; col++) {
+	    const size_t src_index = (col + row*ncols + slice*nrnc + i*npix)*nsize;
+	    if (src_index >= ndata || src_index < 0) continue;
+	    u = VGetValue(data,src_index,datatype);
+	    u = scl_slope*u + scl_inter;
+	    VSetPixel(tmp,slice,row,col,(double)u);	    
+	  }
+	}
+      }
+      VAppendAttr(out_list,"image",NULL,VImageRepn,tmp);
+    }
+
+    /* otherwise just copy */
+    else {
+      const size_t index = (i*npix-add)*nsize;
+      dst[i] = VIniImage(nslices,nrows,ncols,dst_repn,&data[index]);
+      VSetAttr(VImageAttrList(dst[i]),"voxel",NULL,VStringRepn,voxelstr);
+      if (tr > 0) VSetAttr(VImageAttrList(dst[i]),"repetition_time",NULL,VLongRepn,(VLong)tr);
+      VAppendAttr(out_list,"image",NULL,VImageRepn,dst[i]);
+      VCleanData(dst[i]);
+    }
   }
 }
 
 
 
+
 /* 4D time series data */
 void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncols,size_t nt,
-		 int datatype,double xmin,double xmax,
-		 VString voxelstr,double *slicetime,VShort tr,VAttrList out_list)
+		 VRepnKind dst_repn,int datatype,VBoolean do_scaling,float scl_slope,float scl_inter,
+		 VString voxelstr,double *slicetime,VLong tr,VAttrList out_list)
 {
   size_t slice,row,col,ti;
   size_t nrnc = nrows*ncols;
   size_t npix = nrnc*nslices;
+  size_t ndata = nt * npix * nsize;
+  size_t add=0;
+  float u=0;
 
-  double umin = 0;
-  double umax = VRepnMaxValue(VShortRepn);
+  /* rescale to 16bit integer if needed */
+  float xmin=0,xmax=0,umin=0,umax=0;
+  if (do_scaling && dst_repn != VShortRepn) {
+    dst_repn = VShortRepn;
+    VDataStats(data,ndata,nsize,datatype,&xmin,&xmax);
+    fprintf(stderr," data range: [%f, %f]\n",xmin,xmax);
+    umin = 0;
+    umax = VRepnMaxValue(VShortRepn);
+  }
+
 
   VImage *dst = (VImage *) VCalloc(nslices,sizeof(VImage));
 
   for (slice=0; slice<nslices; slice++) {
-    dst[slice] = VCreateImage(nt,nrows,ncols,VShortRepn);
+    dst[slice] = VCreateImage(nt,nrows,ncols,dst_repn);
     if (!dst[slice]) VError(" err allocating image");
     VFillImage(dst[slice],VAllBands,0);
 
     VSetAttr(VImageAttrList(dst[slice]),"voxel",NULL,VStringRepn,voxelstr);
-    if (tr > 0) VSetAttr(VImageAttrList(dst[slice]),"repetition_time",NULL,VShortRepn,tr);
+    if (tr > 0) VSetAttr(VImageAttrList(dst[slice]),"repetition_time",NULL,VLongRepn,(VLong)tr);
     if (slicetime != NULL)
       VSetAttr(VImageAttrList(dst[slice]),"slice_time",NULL,VShortRepn,(VShort)slicetime[slice]);
 
     for (ti=0; ti<nt; ti++) {
       for (row=0; row<nrows; row++) {
 	for (col=0; col<ncols; col++) {
-	  const size_t index = (col + row*ncols + slice*nrnc + ti*npix + 1)*nsize;
-	  /*
-	  const size_t src_index = (col + row*ncols + i*nrnc + j*npix)*nsize;
-	  const size_t dst_index = (col + row*ncols + j*nrnc)*nsize;
-	  for (k=0; k<nsize; k++) {
-	    pp[dst_index+k] = data[src_index+k];
+	  const size_t src_index = (col + row*ncols + slice*nrnc + ti*npix + add)*nsize;
+	  if (src_index >= ndata || src_index < 0) continue;
+
+	  if (!do_scaling) {
+	    u = VGetValue(data,src_index,datatype);
+	    if (fabs(scl_slope) > 0 || fabs(scl_inter) > 0) {
+	      u = scl_slope*u + scl_inter;
+	    }
+	    if (VPixelRepn(dst[slice]) == VShortRepn) {
+	      VPixel(dst[slice],ti,row,col,VShort) = u;
+	    }
+	    else if (VPixelRepn(dst[slice]) == VFloatRepn) {
+	      VPixel(dst[slice],ti,row,col,VFloat) = u;
+	    }
+	    else {
+	      VSetPixel(dst[slice],ti,row,col,(double)u);
+	    }
 	  }
-	  */
-	  
-	  double u = VGetValue(data,index,datatype);
-	  if (fabs(u) > TINY) {
-	    u = umax * (u-xmin)/(xmax-xmin);
+	  else {
+	    u = VGetValue(data,src_index,datatype);
+	    u = umax * (u-xmin)/(xmax-xmin);	    
+	    if (u < umin) u = umin;
+	    if (u > umax) u = umax;
+	    VPixel(dst[slice],ti,row,col,VShort) = (VShort)u;
 	  }
-	  if (u < umin) u = umin;
-	  if (u > umax) u = umax;
-	  VPixel(dst[slice],ti,row,col,VShort) = (VShort)u;
-	  
 	}
       }
     }
+    VCleanData(dst[slice]);
     VAppendAttr(out_list,"image",NULL,VImageRepn,dst[slice]);
   }
 }
@@ -247,7 +385,7 @@ void Nii2Vista4D(char *data,size_t nsize,size_t nslices,size_t nrows,size_t ncol
 
 
 /* copy nifti header infos to geolist in vista header */
-double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
+double *VGetNiftiHeader(VAttrList geolist,nifti_2_header hdr,VLong tr)
 {
 
   /* units in lipsia: mm and sec */
@@ -256,10 +394,11 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
   int timeunits  = XYZT_TO_TIME(xyzt);
   double xscale  = 1.0;
   double tscale  = 1.0;
+
   if (spaceunits == NIFTI_UNITS_MICRON) xscale=1000.0;
   if (timeunits == NIFTI_UNITS_SEC) tscale=1000.0;
 
- 
+
   /* dim info */
   VSetAttr(geolist,"dim_info",NULL,VShortRepn,(VShort)hdr.dim_info);
 
@@ -275,34 +414,27 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
   for (i=5; i<8; i++) E[i] = 0;
 
 
-
   /* pixdim */  
   float *D = VCalloc(8,sizeof(float));
   for (i=0; i<8; i++) D[i] = hdr.pixdim[i];
   for (i=1; i<=3; i++) D[i] *= xscale; 
   D[4] *= tscale;
   if (tr > 0) D[4] = (double)tr;
+
+
+  /* override if TR info is in description field */
+  float xtr = TRfromString(hdr.descrip);
+  if (xtr > 0) {
+    D[4] = (double)(xtr*tscale);
+    fprintf(stderr," reading TR from description field, TR= %.4f ms\n",D[4]);
+  }
+  if (fabs(D[0]) < 0.0001) D[0] = 1.0;  /* if not specified, assume pixdim[0] = 1 */
+
+
   for (i=5; i<8; i++) D[i] = 0; 
   VAttrList dlist = VCreateAttrList();
   VBundle dbundle = VCreateBundle ("bundle",dlist,8*sizeof(float),(VPointer)D);
   VSetAttr(geolist,"pixdim",NULL,VBundleRepn,dbundle);
-
-
-
-  /* qform */
-  size_t dim=6;
-  float *Q = VCalloc(dim,sizeof(float));
-  VAttrList qlist = VCreateAttrList();
-  VBundle qbundle = VCreateBundle ("bundle",qlist,dim*sizeof(float),(VPointer)Q);
-  Q[0] = hdr.quatern_b;
-  Q[1] = hdr.quatern_c;
-  Q[2] = hdr.quatern_d;
-  Q[3] = hdr.qoffset_x;
-  Q[4] = hdr.qoffset_y;
-  Q[5] = hdr.qoffset_z;
-  VSetAttr(geolist,"qform_code",NULL,VShortRepn,(VShort)hdr.qform_code);
-  VSetAttr(geolist,"qform",NULL,VBundleRepn,qbundle);
-
 
 
   /* sform */
@@ -318,6 +450,24 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
   VSetAttr(geolist,"sform",NULL,VImageRepn,sform);
 
 
+  /* qform */
+  size_t dim=6;
+  float *Q = VCalloc(dim,sizeof(float));
+  VAttrList qlist = VCreateAttrList();
+  VBundle qbundle = VCreateBundle ("bundle",qlist,dim*sizeof(float),(VPointer)Q);
+  Q[0] = hdr.quatern_b;
+  Q[1] = hdr.quatern_c;
+  Q[2] = hdr.quatern_d;
+  Q[3] = hdr.qoffset_x;
+  Q[4] = hdr.qoffset_y;
+  Q[5] = hdr.qoffset_z;
+
+  VShort qform_code = hdr.qform_code;
+  if (hdr.sform_code==0 && qform_code==0) qform_code = 1;    /* if both codes are unspecified, assume scanner coord */
+  VSetAttr(geolist,"qform_code",NULL,VShortRepn,(VShort)qform_code);
+  VSetAttr(geolist,"qform",NULL,VBundleRepn,qbundle);
+
+  
   /* MRI encoding directions */
   int freq_dim=0,phase_dim=0,slice_dim=0;
   if (hdr.dim_info != 0) {
@@ -329,6 +479,8 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
     VSetAttr(geolist,"slice_dim",NULL,VShortRepn,(VShort)slice_dim);
   }
   if (slice_dim == 0) return NULL;
+
+
 
   /* slicetiming information */
   int slice_start = hdr.slice_start;
@@ -350,24 +502,70 @@ double *VGetNiftiHeader(VAttrList geolist,nifti_1_header hdr,VLong tr)
 
 
 
-VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype)
+VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype,VBoolean do_scaling,VBoolean *ok)
 {
-
   /* read header */
-  nifti_1_header hdr;
-  memcpy(&hdr,databuffer,MIN_HEADER_SIZE);
-  if ((strncmp(hdr.magic,"ni1\0",4) != 0) && (strncmp(hdr.magic,"n+1\0",4) != 0))
-    VError(" not a nifti-1 file, magic number is %s",hdr.magic);
+  nifti_1_header hdr1;
+  nifti_2_header hdr;
+  int i=0,swap=0;
+  size_t header_size=0;
 
+  int nifti_version = NiftiVersion(databuffer,&swap);
+  if (nifti_version < 1) VError(" unknown nifti version");
+  /* fprintf(stderr," nifti version: %d\n",nifti_version); */
 
-  int swap = NIFTI_NEEDS_SWAP(hdr);
-  if (swap == 1) {
-    VByteSwapNiftiHeader(&hdr);
+  
+  if (nifti_version == 1) {  /* nifti-1 */
+    header_size = 348;
+    memcpy(&hdr1,databuffer,header_size);
+    swap = NIFTI_NEEDS_SWAP(hdr1);
+    if (swap == 1) VByteSwapNiftiHeader(&hdr1);
+    
+    hdr.datatype = hdr1.datatype;
+    for (i=0; i<8; i++) hdr.dim[i]=hdr1.dim[i];
+    for (i=0; i<8; i++) hdr.pixdim[i]=hdr1.pixdim[i];
+    hdr.bitpix=hdr1.bitpix;
+    hdr.vox_offset=hdr1.vox_offset;
+    hdr.intent_p1 = hdr1.intent_p1;
+    hdr.intent_p2 = hdr1.intent_p2;
+    hdr.intent_p3 = hdr1.intent_p3;
+    hdr.scl_slope = hdr1.scl_slope;
+    hdr.scl_inter = hdr1.scl_inter;
+    hdr.slice_duration = hdr1.slice_duration;
+    hdr.slice_start = hdr1.slice_start;
+    hdr.slice_end = hdr1.slice_end;
+    for (i=0; i<80; i++) hdr.descrip[i] = hdr1.descrip[i];
+    hdr.qform_code = hdr1.qform_code;
+    hdr.sform_code = hdr1.sform_code;
+    hdr.quatern_b = hdr1.quatern_b;
+    hdr.quatern_c = hdr1.quatern_c;
+    hdr.quatern_d = hdr1.quatern_d;
+    hdr.qoffset_x = hdr1.qoffset_x;
+    hdr.qoffset_y = hdr1.qoffset_y;
+    hdr.qoffset_z = hdr1.qoffset_z;
+    for (i=0; i<4; i++) hdr.srow_x[i]=hdr1.srow_x[i];
+    for (i=0; i<4; i++) hdr.srow_y[i]=hdr1.srow_y[i];
+    for (i=0; i<4; i++) hdr.srow_z[i]=hdr1.srow_z[i];
+    hdr.xyzt_units = hdr1.xyzt_units;
+    hdr.dim_info = hdr1.dim_info;
+  }
+  else if (nifti_version == 2) {  /* nifti-2 */    
+    header_size = 540;
+    memcpy(&hdr,databuffer,header_size);
+    if (swap) {
+      VByteSwapNifti2Header(&hdr);
+    }
+  }
+  else {
+    VError(" not a nifti file");
   }
 
+
+
   /* get data type */
-  VRepnKind dst_repn;
+  VRepnKind dst_repn = DT_UNKNOWN;
   int datatype = (int)hdr.datatype;
+
 
   switch(datatype) {
   case DT_UNKNOWN:
@@ -410,13 +608,30 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype)
     VError(" unknown data type %d",datatype);
   }
 
+  /* get scaling parameters */
+  double scl_slope = (double)hdr.scl_slope;
+  double scl_inter = (double)hdr.scl_inter;
+  double tiny=1.0e-6;
+  if (fabs(scl_slope) < tiny && fabs(scl_inter) < tiny) {
+    scl_slope = 1.0;
+    scl_inter = 0;
+  }
+  else if (fabs(scl_slope-1.0) < tiny && fabs(scl_inter) < tiny) {
+    scl_slope = 1.0;
+    scl_inter = 0;
+  }
+  else {
+    dst_repn = VFloatRepn;
+    do_scaling = FALSE;  /* no automatic scaling */  
+  }
+
 
   /* number of values stored at each time point */
   if (hdr.dim[5] > 1) VError("data type not supported, dim[5]= %d\n",hdr.dim[5]);
 
 
   /* image size */
-  size_t dimtype = (size_t)hdr.dim[0];
+  /* size_t dimtype = (size_t)hdr.dim[0]; */
   size_t ncols   = (size_t)hdr.dim[1];
   size_t nrows   = (size_t)hdr.dim[2];
   size_t nslices = (size_t)hdr.dim[3];
@@ -429,9 +644,10 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype)
   size_t nsize   = hdr.bitpix/bytesize;
   size_t npixels = nslices * nrows * ncols;
   size_t ndata   = nt * npixels * nsize;
-  size_t hdrsize = MIN_HEADER_SIZE;
-  char *data = &databuffer[hdrsize];
-  
+  size_t vox_offset = (size_t)hdr.vox_offset;
+  size_t startdata = MIN_HEADER_SIZE;
+  if (vox_offset > 0) startdata = vox_offset;
+  char *data = &databuffer[startdata];
 
 
   /* byte swap image data, if needed */
@@ -439,27 +655,27 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype)
     VByteSwapData(data,ndata,nsize);
   }
 
-  /* functional data must be VShortRepn, rescale if needed */
-  double xmin=0,xmax=0;
-  if (nt > 1 || dimtype == 4) {
-    /* fprintf(stderr," scaling...\n"); */
-    size_t npixels = nslices * nrows * ncols;
-    size_t ndata   = nt * npixels * nsize;
-    VDataStats(data,ndata,nsize,datatype,&xmin,&xmax);
-    fprintf(stderr," data range: [%f, %f]\n",xmin,xmax);
-  }
-
 
   /* repetition time (may be wrong in some cases) */
   char xyzt = hdr.xyzt_units;
   int tcode = XYZT_TO_TIME(xyzt);
   float factor = 1.0;
+  float xtr=0;
   if (tcode == NIFTI_UNITS_MSEC) factor = 1.0;
   if (tcode == NIFTI_UNITS_SEC) factor = 1000.0;
+
+
   if (nt > 1)  {
     if (tr == 0) tr = (short)(factor*hdr.pixdim[4]);
-    fprintf(stderr," nt=%ld,  TR= %ld\n",nt,tr);
-    if (tr < 1) VWarning(" implausible TR (%d ms), use parameter '-tr' to set correct TR",tr);
+
+    /* override if TR info is in description field */
+    xtr = TRfromString(hdr.descrip);
+    if (xtr > 0) {
+      tr = (short) (xtr*factor);
+      fprintf(stderr," reading TR from description field, TR= %ld ms\n",tr);
+    }
+    /* fprintf(stderr," nt=%ld,  TR= %ld milliseconds\n",nt,tr); */
+    if (tr < 0.1) VWarning(" implausible TR (%d ms), use 'vnifti' for data conversion to specify TR on the command line",tr);
   }
 
   
@@ -468,30 +684,31 @@ VAttrList Nifti1_to_Vista(char *databuffer,VLong tr,VBoolean attrtype)
   char *voxelstr = (char *) VCalloc(blen,sizeof(char));
   memset(voxelstr,0,blen);
   sprintf(voxelstr,"%f %f %f",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
-  fprintf(stderr," voxel: %.4f %.4f %.4f\n",hdr.pixdim[1],hdr.pixdim[2],hdr.pixdim[3]);
 
 
   /* geometry information */
   VAttrList geolist = VCreateAttrList();
   double *slicetime = VGetNiftiHeader(geolist,hdr,tr);
-  
+
 
   /* read nii image into vista attrlist */
   VAttrList out_list = VCreateAttrList();
   VAppendAttr(out_list,"geoinfo",NULL,VAttrListRepn,geolist);
 
 
-  if (nt <= 1) {            /* output one 3D image */
-    Nii2Vista3DList(data,nsize,nslices,nrows,ncols,nt,dst_repn,voxelstr,(VShort)tr,out_list);
-    VSetGeo3d4d(geolist,(int) 3);
+  (*ok) = FALSE;
+  if (nt <= 1) {      /* output one 3D image */
+    Nii2Vista3DList(data,nsize,nslices,nrows,ncols,nt,dst_repn,datatype,scl_slope,scl_inter,voxelstr,tr,out_list);
+    VUpdateGeoinfo(geolist,(int)3,tr);
   }
-  else if (attrtype == FALSE) {  /* output list of 3D images */
-    Nii2Vista3DList(data,nsize,nslices,nrows,ncols,nt,dst_repn,voxelstr,(VShort)tr,out_list);
-    VSetGeo3d4d(geolist,(int) 3);
+  else if (attrtype == FALSE) {        /* output list of 3D images */
+    Nii2Vista3DList(data,nsize,nslices,nrows,ncols,nt,dst_repn,datatype,scl_slope,scl_inter,voxelstr,tr,out_list);
+    VUpdateGeoinfo(geolist,(int)3,tr);
   }
   else if (attrtype == TRUE && nt > 1) {   /* output one 4D image */
-    Nii2Vista4D(data,nsize,nslices,nrows,ncols,nt,datatype,xmin,xmax,voxelstr,slicetime,(VShort)tr,out_list);
-    VSetGeo3d4d(geolist,(int) 4);
+    Nii2Vista4D(data,nsize,nslices,nrows,ncols,nt,dst_repn,datatype,do_scaling,scl_slope,scl_inter,voxelstr,slicetime,tr,out_list);
+    VUpdateGeoinfo(geolist,(int)4,tr);
+    (*ok) = TRUE;
   }
 
   return out_list;
