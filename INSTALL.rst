@@ -25,7 +25,10 @@ Ubuntu:
     sudo apt-get install build-essential libfftw3-dev libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev python-tk
     sudo pip install numpy matplotlib
 
+
 2) Clone the git repository:
+`````````````````````````````````````````````````````
+
  ::
 	
     git clone https://github.com/lipsia-fmri/lipsia.git
