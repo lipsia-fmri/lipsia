@@ -49,6 +49,9 @@ extern "C" {
 #endif
 
 
+#define TINY 1.0e-6
+#define NO_MINVAL -1.0e+6
+
 
 /* function definition for writing history entry */
 extern char *GetLipsiaName(char *prgname);
@@ -552,14 +555,20 @@ extern VImage VReadImage(VAttrList list);
 extern int VAttrListNumImages(VAttrList list);
 extern VImage *VAttrListGetImages(VAttrList list,int n);
 extern void VImageDimensions(VImage *src,int nimages,int *bands,int *rows,int *cols);
+extern void VDimensions(VImage *src,int nimages,int *nslices,int *nrows,int *ncols,int *nvolumes);
+extern double VGetVoxel(VImage *src,int nimages,int b,int r,int c,int j);
+extern int VSetVoxel(VImage *src,int nvolumes,int b,int r,int c,int j,double value);
 
-/* automatic minval, July 2017 */
-extern float VGetMinval(VAttrList list);
-extern float VGetMinvalNlists(VAttrList *list,int nlists);
-extern void  VApplyMinval(VAttrList list,VFloat minval);
-extern void  VApplyMinvalNlists(VAttrList *list,int nlists,float minval);
-
-
+  
+/* automatic minval, July 2017, update May 2019 */
+extern int Foreground(double *data,size_t n,int norm);
+extern void VMaskMinval(VAttrList list,VImage mask,double minval);
+extern void VMinval(VAttrList list,VString mask_filename,double minval);
+extern void VMultMinval(VAttrList *list,int nlists,VString mask_filename,double minval);
+extern int VSetVoxel(VImage *src,int nvolumes,int b,int r,int c,int j,double value);
+extern double VGetVoxel(VImage *src,int nimages,int b,int r,int c,int j);
+extern VImage VReadImageFile(VString filename);
+  
 /* From Dictionary.c: */
 
 extern VDictEntry *VLookupDictKeyword (

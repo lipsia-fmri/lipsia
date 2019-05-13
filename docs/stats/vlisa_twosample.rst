@@ -16,9 +16,13 @@ The paired test ('-test paired') can be used if the samples are paired.
 If wildcards are used to specify the input files, it is important to make sure that
 the pairs match.
 
+Note that a region-of-interest mask is required. The mask should exclude non-brain voxels,
+and it may cover the entire brain. In the example below, the mask is in the file "braimmask.nii".
+
+
 ::
 
-   vlisa_twosample -in1 images1_*.v -in2 images2_*.v -out result.v -test welch
+   vlisa_twosample -in1 images1_*.v -in2 images2_*.v -mask brainmask.nii -out result.v -test welch
 
 
 
@@ -44,6 +48,7 @@ Parameters of 'vlisa_twosample':
     -out     Output file.
     -alpha   FDR significance level. Default: 0.05
     -perm    Number of permutations. Default: 5000
+    -mask    Region of interest mask.
     -test    Type of test to be performed [ pooled | paired | welch ]. Default: pooled
     -seed    Seed for random number generation. Default: 99402622
     -radius  Bilateral parameter (radius in voxels). Default: 2

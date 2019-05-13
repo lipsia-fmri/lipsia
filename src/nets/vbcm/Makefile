@@ -1,8 +1,7 @@
 
-LDLIBS = -lgsl -lcblas -latlas -lviaio3.0 -lvia3.0 -lm  -fopenmp -lz
+LDLIBS = -lgsl -lgslcblas -lviaio3.0 -lvia3.0 -lm  -fopenmp -lz
 #CFLAGS  = -g
 CFLAGS  += -fopenmp
-
 
 PROG = vbcm
 

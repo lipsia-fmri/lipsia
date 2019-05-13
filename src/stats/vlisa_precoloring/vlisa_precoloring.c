@@ -33,8 +33,6 @@
 #endif /*_OPENMP*/
 
 
-#define MINVAL 1.0e+8
-
 typedef struct TrialStruct {
   int   id;
   float onset;
@@ -67,7 +65,6 @@ extern gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize);
 extern VImage VoxelMap(VAttrList list);
 extern gsl_matrix *VReadImageData(VAttrList *list,int nlists);
 extern void VGetTimeInfos(VAttrList *list,int nlists,double *mtr,float *run_duration);
-extern void VApplyMinvalNlists(VAttrList *list,int nlists,float minval);
 extern void VRowNormalize(gsl_matrix *Data);
 extern void CheckTrialLabels(Trial *trial,int numtrials);
 extern void HistoUpdate(VImage,gsl_histogram *);
@@ -134,7 +131,7 @@ int main (int argc, char *argv[])
   static VString  cova_filename="";
   static VString  out_filename="";
   static VString  plot_filename="";
-  static VFloat   minval = MINVAL;
+  static VString  mask_filename="";
   static VShort   hemomodel = 0;
   static VBoolean firstcol = TRUE;
   static VArgVector contrast;
@@ -161,7 +158,6 @@ int main (int argc, char *argv[])
     {"col1", VBooleanRepn, 1, (VPointer) &firstcol, VOptionalOpt, NULL,"Whether to add a constant first column" },
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
     {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},
-    {"minval",VFloatRepn,1,(VPointer) &minval,VOptionalOpt,NULL,"Signal threshold"},
     {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},
     {"plotdesign", VStringRepn, 1, & plot_filename, VOptionalOpt, NULL,"Filename for plotting design matrix X" },
     {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Bilateral parameter (radius in voxels)"},
@@ -169,6 +165,7 @@ int main (int argc, char *argv[])
     {"svar",VFloatRepn,1,(VPointer) &svar,VOptionalOpt,NULL,"Bilateral parameter (spatial)"},
     {"filteriterations",VShortRepn,1,(VPointer) &numiter,VOptionalOpt,NULL,"Bilateral parameter (number of iterations)"},
     {"cleanup",VBooleanRepn,1,(VPointer) &cleanup,VOptionalOpt,NULL,"Whether to remove isloated voxels"},
+    {"mask", VStringRepn, 1, (VPointer) &mask_filename, VRequiredOpt, NULL, "Mask"},
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"number of processors to use, '0' to use all"},
   };
 
@@ -225,12 +222,8 @@ int main (int argc, char *argv[])
   }
 
 
-  /* if default minval parameter is set, then compute new minval threshold for brain mask */
-  if (fabs(minval - MINVAL) < 0.001) {
-    minval = VGetMinvalNlists(list,nlists);
-    fprintf(stderr," Brain mask,  minval: %f\n",minval);
-  }
-  VApplyMinvalNlists(list,nlists,minval);
+  /* apply brain mask or threshold */
+  VMultMinval(list,nlists,mask_filename,0.0);
 
 
   /* read data and voxel map */

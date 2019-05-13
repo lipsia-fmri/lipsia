@@ -49,6 +49,9 @@ The txt-file that will be output using this option contains one column for each 
 The task regressors are convolved with a hemodynamic model, the nuisance covariates are normalized.
 The file can be visualized using various plotting tools (e.g. vdesignplot or gnuplot).
 
+Note that a region-of-interest mask is required. The mask should exclude non-brain voxels,
+and it may cover the entire brain. In the example below, the mask is in the file "braimmask.nii".
+
 
 
 **Caution:**
@@ -60,7 +63,7 @@ Examples:
 
 ::
 
-   vlisa_prewhitening -in run_*.v -design des_*.txt -contrast 0 1 -1 -out result.v -plotdesign X.txt
+   vlisa_prewhitening -in run_*.v -design des_*.txt -contrast 0 1 -1  -mask brainmask.nii -out result.v -plotdesign X.txt
    vdesignplot -in X.txt
 
 
@@ -70,7 +73,7 @@ The resulting image can later be thresholded using the program "vlisa_applythres
 
 ::
 
-   vlisa_prewhitening -in run_*.v -design des_*.txt -contrast 0 1 -1 -out result.v -alpha 1.0
+   vlisa_prewhitening -in run_*.v -design des_*.txt -contrast 0 1 -1  -mask brainmask.nii -out result.v -alpha 1.0
    vlisa_applythreshold -in result.v -out thresholded.v -threshold 0.05
 
 ::
@@ -106,6 +109,7 @@ Parameters of 'vlisa_prewhitening':
     -col1    Whether to add a constant first column. Default: true
     -alpha   FDR significance level. Default: 0.05
     -perm    Number of permutations. Default: 5000
+    -mask    Region of interest mask.
     -minval  Signal threshold.
     -seed    Seed for random number generation. Default: 99402622
     -radius  Bilateral parameter (radius in voxels). Default: 2

@@ -17,10 +17,10 @@ extern void VGetStats(double *data,int nt,int i0,double *ave,double *sigma);
 
 void VSubtractMovingAverage(VAttrList list,float window,int del)
 { 
-  int slice,row,col,j,k;
-  double ave=0,sigma=0,sum=0,nx=0,tiny=1.0e-6;
+  int slice,row,col,i,j,k;
+  double ave=0,sigma=0,sum=0,nx=0;
 
-
+  
   /* get image dimensions */
   int nslices = VAttrListNumImages(list);
   VImage *src = VAttrListGetImages(list,nslices);
@@ -31,11 +31,16 @@ void VSubtractMovingAverage(VAttrList list,float window,int del)
   double smax = VPixelMaxValue(src[0]);
   double smin = VPixelMinValue(src[0]);
 
-
-  VAttrList geolist = VGetGeoInfo(list);
-  if (!geolist) VError(" no geoinfo");
-  double *D = VGetGeoPixdim(geolist,NULL);
-  double tr = D[4]/1000.0;
+  double tr=0;
+  VFloat xtr=-1;
+  if (VGetAttr(VImageAttrList(src[0]),"repetition_time",NULL,VFloatRepn,&xtr) == VAttrFound) {
+    tr = (double)xtr;
+    if (tr > 100) tr /= 1000.0;  /* convert to seconds */
+  }
+  else {
+    VError(" TR information missing");
+  }
+  if (tr < TINY) VError("FreqFilter: implausible or missing TR" );
   int wn = (int)(0.5 * window / tr);
   fprintf(stderr," Subtract moving mean,  window size: %.4f sec (%d time points)\n",window,2*wn+1);
 
@@ -44,6 +49,19 @@ void VSubtractMovingAverage(VAttrList list,float window,int del)
   double *y = (double *)VCalloc(ntimesteps,sizeof(double));
 
 
+  /* ini dest image */
+  int flag=0;
+  VImage *dst = (VImage *)VCalloc(nslices,sizeof(VImage));
+  if (VPixelRepn(src[0]) != VFloatRepn) {
+    flag=1;
+    for (i=0; i<nslices; i++) {
+      dst[i] = VCreateImage(ntimesteps,nrows,ncols,VFloatRepn);
+      VFillImage(dst[i],VAllBands,0);
+      VCopyImageAttrs (src[i], dst[i]);
+    }
+  }
+  
+  
   /* subtract moving average */
   for (slice=0; slice<nslices; slice++) {
     if (slice%5==0)fprintf(stderr," slice  %5d  of  %d\r",slice,nslices);
@@ -57,7 +75,7 @@ void VSubtractMovingAverage(VAttrList list,float window,int del)
 
 	/* get mean,sigma over entire time series */
 	VGetStats(x,ntimesteps,del,&ave,&sigma);
-	if (sigma < tiny) continue;
+	if (sigma < TINY) continue;
 
 
 	/* subtract moving median */
@@ -82,10 +100,26 @@ void VSubtractMovingAverage(VAttrList list,float window,int del)
 
 	  if (y[j] < smin) y[j] = smin;
 	  if (y[j] >= smax) y[j] = smax;
-	  VSetPixel(src[slice],j,row,col,y[j]);
+	  if (flag == 0) VSetPixel(src[slice],j,row,col,y[j]);
+	  else VPixel(dst[slice],j,row,col,VFloat) = y[j];
 	}
       }
     }
   }
   fprintf(stderr,"\n");
+  VFree(x);
+  VFree(y);
+  if (flag == 0) return;
+
+
+  /* update attr list */
+  VAttrListPosn posn;
+  i=0;
+  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
+    if (VGetAttrRepn (& posn) != VImageRepn) continue;
+    VDestroyImage(src[i]);
+    if (i >= nslices) break;
+    VSetAttrValue (& posn, NULL,VImageRepn,dst[i]);
+    i++;
+  } 
 }

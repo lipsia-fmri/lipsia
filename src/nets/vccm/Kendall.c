@@ -52,8 +52,7 @@ double kendall(size_t **xrank,double *r,int n,int m,int otype)
   return (chi_square - nx)/(sqrt(2.0*nx));
 }
 
-double
-VKendall_W(gsl_matrix *data,int nvoxels,int otype)
+double VKendall_W(gsl_matrix *data,int nvoxels,int otype)
 {
   int i,j,n,m;
   double W0;

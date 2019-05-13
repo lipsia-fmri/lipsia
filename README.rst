@@ -1,5 +1,5 @@
 
-LIPSIA 3.0: fMRI analysis tools
+LIPSIA 3.1.0 (May 13, 2019): fMRI analysis tools
 ======================================
 
 Lipsia is a collection of tools for the analysis of fMRI data. Its main focus is on new algorithms
@@ -24,14 +24,14 @@ Statistical inference (LISA) in examples:
 *Onesample test at the 2nd level* (`vlisa_onesample`_). 
 Example: the input is a set of contrast maps called "data_*.nii.gz"::
 
-  vlisa_onesample -in data_*.nii.gz -out result.v
+  vlisa_onesample -in data_*.nii.gz -mask mask.nii -out result.v
   vnifti -in result.v -out result.nii
 
 
 *Twosample test at the 2nd level* (`vlisa_twosample`_). 
 Example: input are two sets of contrast maps called "data1_*.nii.gz" and "data2_*.nii.gz"::
 
-  vlisa_twosample -in1 data1_*.nii.gz -in2 data2_*.nii.gz -out result.v
+  vlisa_twosample -in1 data1_*.nii.gz -in2 data2_*.nii.gz -mask mask.nii -out result.v
   vnifti -in result.v -out result.nii
 
 
@@ -40,7 +40,7 @@ Example: input are two runs acquired in the same session called "run1.nii.gz" an
 Preprocessing should include a correction for baseline drifts!::
 
 
-  vlisa_prewhitening -in run1.nii.gz run2.nii.gz -design des1.txt des2.txt -out result.v
+  vlisa_prewhitening -in run1.nii.gz run2.nii.gz -design des1.txt des2.txt -mask mask.nii -out result.v 
   vnifti -in result.v -out result.nii
 
 

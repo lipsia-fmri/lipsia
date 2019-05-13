@@ -109,6 +109,7 @@ int main (int argc, char *argv[])
 {
   static VArgVector in_files1;
   static VString  out_filename="";
+  static VString  mask_filename="";
   static VFloat   alpha = 0.05;
   static VShort   radius = 2;
   static VFloat   rvar = 2.0;
@@ -124,6 +125,7 @@ int main (int argc, char *argv[])
     {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
     {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},
+    {"mask", VStringRepn, 1, (VPointer) &mask_filename, VRequiredOpt, NULL, "Mask"},
     {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},
     {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Bilateral parameter (radius in voxels)"},
     {"rvar",VFloatRepn,1,(VPointer) &rvar,VOptionalOpt,NULL,"Bilateral parameter (radiometric)"},
@@ -163,11 +165,16 @@ int main (int argc, char *argv[])
 
 
   /* images  */
+  VImage mask = VReadImageFile(mask_filename);
+  if (mask==NULL) VError("Error reading mask file %s",mask_filename);
+  
   nimages = in_files1.number;
   src1 = (VImage *) VCalloc(nimages,sizeof(VImage));
   for (i = 0; i < nimages; i++) {
     in_filename = ((VString *) in_files1.vector)[i];
     list1   = VReadAttrList(in_filename,0L,TRUE,FALSE);
+    VMaskMinval(list1,mask,0.0);
+    
     src1[i] = VReadImage(list1);
     if (src1[i] == NULL) VError(" no input image found");
     if (VPixelRepn(src1[i]) != VFloatRepn) VError(" input pixel repn must be float");
@@ -175,9 +182,14 @@ int main (int argc, char *argv[])
     else if (npix != VImageNPixels(src1[i])) VError(" inconsistent image dimensions");
 
     /* use geometry info from 1st file */
-    if (geolist == NULL) geolist = VGetGeoInfo(list1);
+    if (geolist == NULL) {
+      geolist = VGetGeoInfo(list1);
+      double *D = VGetGeoPixdim(geolist,NULL);
+      if (fabs(D[0]-4.0) < TINY) VError(" The input must be a list of separate 3D images, not one 4D file");
+    }
   }
 
+  
 
 
   /* ini random permutations */

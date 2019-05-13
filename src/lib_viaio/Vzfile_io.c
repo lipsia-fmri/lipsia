@@ -43,7 +43,7 @@ int CheckPipe(char *filename)
 
 
 /* read gzipped file into data container, unpack one MByte at a time */
-char *VReadGzippedDataZ(gzFile *fp,size_t *len)
+char *VReadGzippedDataZ(gzFile fp,size_t *len)
 {
   int i=0,err=0,ulen=0;
   char *buf = (char *) VCalloc(N,sizeof(char));
@@ -251,4 +251,32 @@ void VImageDimensions(VImage *src,int nimages,int *bands,int *rows,int *cols)
   *bands = nbands;
   *rows = nrows;
   *cols = ncols;
+}
+
+
+void VDimensions(VImage *src,int nimages,int *nslices,int *nrows,int *ncols,int *nvolumes)
+{
+  int i=0;
+
+  int xbands = VImageNBands(src[0]);
+  int xrows = VImageNRows(src[0]);
+  int xcols = VImageNColumns(src[0]);
+  for (i=1; i<nimages; i++) {
+    if (VImageNBands(src[i]) != xbands) VError(" inconsistent number of bands");
+    if (VImageNRows(src[i]) != xrows) VError(" inconsistent number of rows");
+    if (VImageNColumns(src[i]) != xcols) VError(" inconsistent number of columns");
+  }
+
+  if (nimages <= 1) {
+    *nslices = VImageNBands(src[0]);
+    *nrows = VImageNRows(src[0]);
+    *ncols =  VImageNColumns(src[0]);
+    *nvolumes = 1;
+  }
+  else {
+    *nslices = nimages;
+    *nrows = VImageNRows(src[0]);
+    *ncols =  VImageNColumns(src[0]);
+    *nvolumes = VImageNBands(src[0]);
+  }
 }

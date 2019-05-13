@@ -214,6 +214,7 @@ int main (int argc, char *argv[])
   static VArgVector in_files1;
   static VArgVector in_files2;
   static VString  out_filename="";
+  static VString  mask_filename="";
   static VFloat   alpha = 0.05;
   static VShort   testtype = 0;
   static VShort   radius = 2;
@@ -231,6 +232,7 @@ int main (int argc, char *argv[])
     {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
     {"alpha",VFloatRepn,1,(VPointer) &alpha,VOptionalOpt,NULL,"FDR significance level"},
     {"perm",VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},
+    {"mask", VStringRepn, 1, (VPointer) &mask_filename, VRequiredOpt, NULL, "Mask"},
     {"test",VShortRepn,1,(VPointer) &testtype,VOptionalOpt,TSTDict,"type of test"},
     {"seed",VLongRepn,1,(VPointer) &seed,VOptionalOpt,NULL,"Seed for random number generation"},
     {"radius",VShortRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Bilateral parameter (radius in voxels)"},
@@ -268,6 +270,10 @@ int main (int argc, char *argv[])
   omp_set_num_threads(num_procs);
 #endif /* _OPENMP */
 
+  /* read mask */
+  VImage mask = VReadImageFile(mask_filename);
+  if (mask==NULL) VError("Error reading mask file %s",mask_filename);
+
 
   /* number of inputs */
   nimages1 = in_files1.number;
@@ -280,6 +286,7 @@ int main (int argc, char *argv[])
   for (i = 0; i < nimages1; i++) {
     in_filename = ((VString *) in_files1.vector)[i];
     list1   = VReadAttrList(in_filename,0L,TRUE,FALSE);
+    VMaskMinval(list1,mask,0.0);
     src1[i] = VReadImage(list1);
     if (src1[i] == NULL) VError(" no input image found");
     if (VPixelRepn(src1[i]) != VFloatRepn) VError(" input pixel repn must be float");
@@ -296,6 +303,7 @@ int main (int argc, char *argv[])
   for (i = 0; i < nimages2; i++) {
     in_filename = ((VString *) in_files2.vector)[i];
     list2   = VReadAttrList(in_filename,0L,TRUE,FALSE);
+    VMaskMinval(list2,mask,0.0);
     src2[i] = VReadImage(list2);
     if (src2[i] == NULL) VError(" no input image found");
     if (VPixelRepn(src2[i]) != VFloatRepn) VError(" input pixel repn must be float");

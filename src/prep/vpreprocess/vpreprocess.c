@@ -30,38 +30,34 @@
 #include <viaio/mu.h>
 #include <viaio/option.h>
 
-
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-#include <fftw3.h>
 
-#define ABS(x) ((x) > 0 ? (x) : -(x))
 extern void Gauss4d(VAttrList list,double *sigma);
-
-
+extern void VMinval(VAttrList list,VString mask_filename,double minval);
+extern void VFreqFilter(VAttrList list,VFloat highpass,VFloat lowpass,VBoolean stop);
+extern void VSpatialFilter(VAttrList, VDouble);
 
 int main(int argc, char *argv[]) 
 {
   static VDouble  fwhm     =  0;
-  static VFloat   high     =  0;
-  static VFloat   low      =  0;
+  static VFloat   lowpass  =  0;
+  static VFloat   highpass =  0;
   static VBoolean stop     =  FALSE;
-  static VFloat   sharp    =  0.8;
-  static VFloat   minval   =  0;
+  static VDouble  minval   =  NO_MINVAL;
+  static VString  mask_filename = "";
   static VOptionDescRec  options[] = {
-    {"fwhm", VDoubleRepn, 1, (VPointer) &fwhm, VOptionalOpt, NULL, "Spatial filter: FWHM in mm"},
-    {"high", VFloatRepn, 1, (VPointer) &high, VOptionalOpt, NULL, "Temporal Filter: Cutoff for high pass/stop in seconds"},
-    {"low",  VFloatRepn, 1, (VPointer) &low, VOptionalOpt, NULL, "Temporal Filter: Cutoff for low pass/stop in seconds"},
-    {"stop",  VBooleanRepn, 1, (VPointer) &stop, VOptionalOpt, NULL, "Temporal Filter: Stop insted of pass filter"},
-    {"minval", VFloatRepn, 1, (VPointer) &minval, VOptionalOpt, NULL, "Signal threshold"}
+    {"fwhm", VDoubleRepn, 1, (VPointer) &fwhm, VOptionalOpt, NULL, "FWHM of spatial Gaussfilter (in mm)"},
+    {"highpass",  VFloatRepn, 1, (VPointer) &highpass, VOptionalOpt, NULL, "Suppress slow oscillations (in secs)"},
+    {"lowpass", VFloatRepn, 1, (VPointer) &lowpass, VOptionalOpt, NULL, "Suppress fast oscillations (in secs)"},
+    {"stop",  VBooleanRepn, 1, (VPointer) &stop, VOptionalOpt, NULL, "Invert bandpass filter"},
+    {"mask", VStringRepn, 1, (VPointer) &mask_filename, VOptionalOpt, NULL, "Mask (optional)"},
+    {"minval", VDoubleRepn, 1, (VPointer) &minval, VOptionalOpt, NULL, "Signal threshold"}
   };
   FILE *out_file = NULL,*in_file=NULL;
   VString in_filename=NULL;
-
-  extern void VSpatialFilter(VAttrList, VDouble);
-  extern void VFreqFilter(VAttrList, VFloat, VFloat, VBoolean, VFloat);
   char *prg=GetLipsiaName("vpreprocess");
   fprintf (stderr, "%s\n", prg);
 
@@ -69,8 +65,7 @@ int main(int argc, char *argv[])
   VParseFilterCmdZ(VNumber(options), options, argc, argv, &in_file, &out_file,&in_filename);
 
   if (fwhm < 0) VError("fwhm must be non-negative");
-  if (low > high && high > 0) VError("low must be less than high");
-  if (low < 0 || high < 0) VError("high and low must be non-negative");
+  if (highpass < lowpass && highpass > 0) VError("highpass must be > lowpass (specified in seconds)");
 
 
 
@@ -80,13 +75,13 @@ int main(int argc, char *argv[])
   if (list == NULL) VError(" error reading input file %s",in_file);
 
 
-  /* apply minval */
-  if (minval > 0) VApplyMinval(list, (VFloat)minval);
+  /* apply brain mask or threshold, if needed */
+  VMinval(list,mask_filename,(double)minval);
+ 
 
-
-  /* apply freq filter */
-  if (low > 0 || high > 0) {
-    VFreqFilter(list, high, low, stop, sharp);
+  /* apply bandpass filter */
+  if (highpass > 0 || lowpass > 0) {
+    VFreqFilter(list,highpass,lowpass,stop);
   }
 
 

@@ -40,26 +40,24 @@ In this case, frequencies between '-high' and '-low' are suppressed. Example:
 
    vpreprocess  -in input.v -out output.v -low 3 -high 100 -stop true
 
+   
+The parameter '-minval' can be used to exclude voxels (e.g. voxels outside the brain) from the analysis.
+If a region of interest mask is specified, it takes precedence over the parameter '-minval'.
+
 
 
 Parameters of 'vpreprocess'
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  -help     Usage information.
-
  -in       Input file.
-
  -out      Output file.
-
  -fwhm     Spatial filter: FWHM in mm. Default: 0
-
- -low      Temporal Filter: Cutoff for low pass/stop in seconds. Default: 0
-
- -high     Temporal Filter: Cutoff for high pass/stop in seconds. Default: 0
-
- -stop     Temporal Filter: Stop instead of pass filter. Default: false
-
- -minval   Signal threshold. The filters are only applied above this value. Default: 0
+ -lowpass  Suppress fast oscillations (in secs). Default: 0
+ -highpass  Suppress slow oscillations (in secs). Default: 0
+ -stop     Invert bandpass filter. Default: false
+ -mask     Region of interest mask (optional).
+ -minval   Signal threshold. Default: -1e+06.
 
 
 .. index:: preprocess

@@ -10,7 +10,7 @@ SRC = Aniso2d.c Aniso3d.c Bicubic.c Binarize.c Binmorph3d.c Border3d.c BorderPoi
       Rotate2d.c RotationMatrix.c Sample2d.c Sample3d.c Scale2d.c Scale3d.c \
       SelectBig.c ShapeMoments.c Shear.c SimplePoint.c Skel2d.c Skel3d.c Smooth3d.c \
       Spline.c Thin3d.c Topoclass.c VCheckPlane.c VolumesOps.c VPoint_hpsort.c \
-      Contrast.c RegistrationUtils.c Resample.c StatsConversions.c
+      Contrast.c RegistrationUtils.c Resample.c StatsConversions.c FreqFilter.c
 
 OBJ = $(SRC:.c=.o)
 

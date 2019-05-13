@@ -23,7 +23,6 @@
 #define MIN_HEADER_SIZE 348
 #define NII_HEADER_SIZE 352
 
-#define TINY 1.0e-10
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
 extern int isinff(float x);

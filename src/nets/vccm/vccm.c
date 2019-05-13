@@ -39,8 +39,7 @@ VDictEntry TypeDict[] = {
 
 
 
-double
-Correlation(const float *arr1,const float *arr2,int n)
+double Correlation(const float *arr1,const float *arr2,int n)
 {
   int i;
   double sx,sy,sxx,syy,sxy,rx;
@@ -66,8 +65,7 @@ Correlation(const float *arr1,const float *arr2,int n)
 }
 
 
-VImage
-VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,int type,int otype,VShort minval)
+VImage VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,int type,int otype)
 {
   VImage map=NULL,dest=NULL;
   int i,j,k,s,nvoxels,nt,len,last,b,r,c,bb,rr,cc,rad2,nrows,ncols;
@@ -76,32 +74,8 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
   gsl_matrix_float **mat=NULL;
 
 
-  /* exclude voxels not covered by data */
   nrows = VImageNRows(mask);
   ncols = VImageNColumns(mask);
-
-  for (s=0; s<nsubjects; s++) {
-    for (b=0; b<nslices; b++) {
-      if (VImageNRows(src[s][b]) < 3) {
-	for (r=0; r<nrows; r++) {
-	  for (c=0; c<ncols; c++) VSetPixel(mask,b,r,c,0);
-	}
-      }
-      else {
-	/*
-	if (VImageNRows(src[s][b]) != nrows) VError(" inconsistent image dimensions, subj %d, nrows %d %d ",
-						    s,nrows,VImageNRows(src[s][b]));
-	if (VImageNColumns(src[s][b]) != ncols) 
-	  VError(" inconsistent image dimensions, subj %d, ncols %d %d",s,ncols,VImageNColumns(src[s][b])); 
-	*/
-	for (r=0; r<nrows; r++) {
-	  for (c=0; c<ncols; c++) {
-	    if (VPixel(src[s][b],0,r,c,VShort) < minval) VSetPixel(mask,b,r,c,0);
-	  }
-	}
-      }
-    }
-  }
 
 
   /* count number of voxels, number of timesteps */
@@ -109,20 +83,21 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
   for (b=0; b<nslices; b++) {
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-	if (VGetPixel(mask,b,r,c) < 0.5) continue;
+	if (VGetPixel(mask,b,r,c) < 0.001) continue;
 	if (VImageNBands(src[0][b]) > nt)
 	  nt = VImageNBands(src[0][b]);
 	nvoxels++;
       }
     }
   }
+  
   /* get shortest length of time series across subjects */
   nt = 99999;
   for (s=0; s<nsubjects; s++) {
     for (b=0; b<nslices; b++) {
       for (r=0; r<nrows; r++) {
 	for (c=0; c<ncols; c++) {
-	  if (VGetPixel(mask,b,r,c) < 0.5) continue;
+	  if (VGetPixel(mask,b,r,c) < 0.001) continue;
 	  if (VImageNBands(src[s][b]) < nt)
 	    nt = VImageNBands(src[s][b]);
 	}
@@ -140,17 +115,17 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
   nt = last - first + 1;
   if (nt < 2) VError(" not enough timesteps, nt= %d",nt);
   
-  fprintf(stderr,"# first= %d, last= %d, ntimesteps= %d\n",
+  fprintf(stderr," first= %d, last= %d, ntimesteps= %d\n",
           (int)first,(int)last,(int)nt);
-  fprintf(stderr,"# nsubjects= %d,  nvoxels= %d\n",nsubjects,nvoxels);
-  fprintf(stderr,"# type= %s\n",TypeDict[type].keyword);
+  fprintf(stderr," nsubjects= %d,  nvoxels= %d\n",nsubjects,nvoxels);
+  fprintf(stderr," type= %s\n",TypeDict[type].keyword);
   
 
 
   /*
   ** store voxel addresses
   */
-  map = VCreateImage(1,3,nvoxels,VShortRepn);
+  map = VCreateImage(1,3,nvoxels,VIntegerRepn);
   if (map == NULL) VError(" error allocating addr map");
   VFillImage(map,VAllBands,0);
 
@@ -158,11 +133,11 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
   for (b=0; b<nslices; b++) {
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-	if (VGetPixel(mask,b,r,c) < 0.5) continue;
-	if (i >= nvoxels) VError(" nox= %d",i);
-	VPixel(map,0,0,i,VShort) = b;
-	VPixel(map,0,1,i,VShort) = r;
-	VPixel(map,0,2,i,VShort) = c;
+	if (VGetPixel(mask,b,r,c) < 0.001) continue;
+	if (i >= nvoxels) VError(" nvox= %d",i);
+	VPixel(map,0,0,i,VInteger) = b;
+	VPixel(map,0,1,i,VInteger) = r;
+	VPixel(map,0,2,i,VInteger) = c;
 	i++;
       }
     }
@@ -180,14 +155,14 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
     if (!mat[s]) VError(" err allocating mat[s]");
 
     for (i=0; i<nvoxels; i++) {      
-      b = VPixel(map,0,0,i,VShort);
-      r = VPixel(map,0,1,i,VShort);
-      c = VPixel(map,0,2,i,VShort);
+      b = VPixel(map,0,0,i,VInteger);
+      r = VPixel(map,0,1,i,VInteger);
+      c = VPixel(map,0,2,i,VInteger);
 
       float *ptr = gsl_matrix_float_ptr(mat[s],i,0);
       int k;
       for (k=first; k<=last; k++) {
-	*ptr++ = (float) VPixel(src[s][b],k,r,c,VShort);
+	*ptr++ = (float) VGetPixel(src[s][b],k,r,c);
       }
     }
   }
@@ -198,7 +173,6 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
   dest = VCreateImage(nslices,nrows,ncols,VFloatRepn);
   VFillImage(dest,VAllBands,0);
   VCopyImageAttrs (src[0][0], dest);
-  VSetAttr(VImageAttrList(dest),"modality",NULL,VStringRepn,"conimg");
 
 
   /*
@@ -208,10 +182,10 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
 
   rad2 = 3*9;
   for (i=0; i<nvoxels; i++) {
-    if (i%10 == 0) fprintf(stderr," i: %7d\r",i);
-    b = VPixel(map,0,0,i,VShort);
-    r = VPixel(map,0,1,i,VShort);
-    c = VPixel(map,0,2,i,VShort);
+    if (i%10 == 0) fprintf(stderr," i: %7d  of  %d\r",i,nvoxels);
+    b = VPixel(map,0,0,i,VInteger);
+    r = VPixel(map,0,1,i,VInteger);
+    c = VPixel(map,0,2,i,VInteger);
         
     len = 0;
     for (s=0; s<nsubjects; s++) {
@@ -220,9 +194,9 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
       k = 0;
       for (j=0; j<nvoxels; j++) {
 	if (i == j) continue;
-	bb = VPixel(map,0,0,j,VShort);
-	rr = VPixel(map,0,1,j,VShort);
-	cc = VPixel(map,0,2,j,VShort);
+	bb = VPixel(map,0,0,j,VInteger);
+	rr = VPixel(map,0,1,j,VInteger);
+	cc = VPixel(map,0,2,j,VInteger);
 	/* exclude because of spatial smoothness: */
 	if ((SQR(b-bb) + SQR(r-rr) + SQR(c-cc)) < rad2) continue; 
 
@@ -243,9 +217,9 @@ VCCM(VImage **src, VImage mask, int nsubjects, int nslices,int first,int length,
     else
       VError(" illegal type");
 
-    b = VPixel(map,0,0,i,VShort);
-    r = VPixel(map,0,1,i,VShort);
-    c = VPixel(map,0,2,i,VShort);
+    b = VPixel(map,0,0,i,VInteger);
+    r = VPixel(map,0,1,i,VInteger);
+    c = VPixel(map,0,2,i,VInteger);
     VPixel(dest,b,r,c,VFloat) = v;
   }
   fprintf(stderr,"\n");
@@ -262,25 +236,19 @@ int main (int argc, char *argv[])
   static VShort otype  = 0; 
   static VShort first  = 2;
   static VShort length = 0;
-  static VShort minval = 0;
   static VOptionDescRec options[] = {
     {"in", VStringRepn, 0, & in_files, VRequiredOpt, NULL,"Input files" },
-    {"mask",VStringRepn,1,(VPointer) &mask_filename,VRequiredOpt,NULL,"mask file"},   
-    {"first",VShortRepn,1,(VPointer) &first,VOptionalOpt,NULL,"first timestep to use"},
+    {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
+    {"mask",VStringRepn,1,(VPointer) &mask_filename,VRequiredOpt,NULL,"Mask file"},   
+    {"first",VShortRepn,1,(VPointer) &first,VOptionalOpt,NULL,"First timestep to use"},
     {"length",VShortRepn,1,(VPointer) &length,VOptionalOpt,NULL,
-     "length of time series to use, '0' to use full length"},
-    {"type",VShortRepn,1,(VPointer) &type,VOptionalOpt,TypeDict,"type"},
-    {"gauss",VShortRepn,1,(VPointer) &otype,VOptionalOpt,NULL,"use gaussian version of kendall"},
-    {"minval",VShortRepn,1,(VPointer) &minval,VOptionalOpt,NULL,"signal threshold"},
-    {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" }
+     "Length of time series to use, '0' to use full length"},
+    {"type",VShortRepn,1,(VPointer) &type,VOptionalOpt,TypeDict,"Type of metric"},
+    {"gauss",VShortRepn,1,(VPointer) &otype,VOptionalOpt,NULL,"Use gaussian version of kendall"},
   };
-  FILE *fp=NULL,*fpo=NULL;
-  VStringConst in_filename;
-  VAttrList list=NULL,list1=NULL,out_list=NULL,geolist=NULL;
-  VAttrListPosn posn;
-  VImage xsrc,**src,mask=NULL,dest=NULL,disc=NULL;
-  int i=0,j=0,nsubjects=0,nslices=0;
-  int b,r,c;
+  VString in_filename;
+  VAttrList list=NULL,geolist=NULL;
+  int b,r,c,i=0;
   float u;
   char *prg = GetLipsiaName("vccm");
   
@@ -301,72 +269,51 @@ int main (int argc, char *argv[])
   /*
   ** read mask
   */
-  fp = VOpenInputFile (mask_filename, TRUE);
-  list1 = VReadFile (fp, NULL);
-  if (! list1) VError("Error reading mask file");
-  fclose(fp);
-
-  for (VFirstAttr (list1, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & mask);
-    if (VPixelRepn(mask) != VBitRepn && VPixelRepn(mask) != VUByteRepn && VPixelRepn(mask) != VShortRepn) {
-      mask = NULL;
-      continue;
-    }
-  }
+  VAttrList mask_list = VReadAttrList(mask_filename,0L,TRUE,FALSE);
+  if (mask_list == NULL) VError(" error reading %s",mask_filename);
+  VImage mask = VReadImage(mask_list);
   if (mask == NULL) VError(" no mask found");
 
 
 
   /* 
-  ** read images  
+  ** read input images  
   */
-  nsubjects = in_files.number;
-  src = (VImage **) VCalloc(nsubjects,sizeof(VImage *));
-  fprintf(stderr,"# nsubjects= %d\n",nsubjects);
-
+  int nslices=0,nt=0,nrows=0,ncols=0;
+  int xslices=0,xnt=0,xrows=0,xcols=0;
+  int nsubjects = (int)in_files.number;
+  fprintf(stderr," nsubjects= %d\n",nsubjects);
+  if (nsubjects < 2) VError(" not enough input files (%d), CCM should be used on >= 2 data sets",nsubjects);
+  VImage **src = (VImage **) VCalloc(nsubjects,sizeof(VImage *));
+  
   for (i=0; i<nsubjects; i++) {
+    in_filename = ((VString *) in_files.vector)[i];
+    list    = VReadAttrList(in_filename,0L,TRUE,FALSE);
+    xslices = VAttrListNumImages(list);
+    if (i==0) nslices = xslices;
+    else if (nslices != xslices) VError(" inconsistent dimensions in input files");
+    src[i] = VAttrListGetImages(list,nslices);
+    if (i==0) VImageDimensions(src[i],nslices,&nt,&nrows,&ncols);
+    else {
+      VImageDimensions(src[i],xslices,&xnt,&xrows,&xcols);
+      if (nrows != xrows) VError(" inconsistent dimensions in input files");
+      if (ncols != xcols) VError(" inconsistent dimensions in input files");
+      if (nt != xnt) VError(" inconsistent dimensions in input files");
+    }
 
-    in_filename = ((VStringConst *) in_files.vector)[i];
-    fprintf(stderr," %3d:  %s\n",i,in_filename);
-    fp = VOpenInputFile (in_filename, TRUE);
-    list = VReadFile (fp, NULL);
-    if (! list)  VError("Error reading image");
-    fclose(fp);
-
+    /* use geometry info from 1st file */
     if (geolist == NULL) geolist = VGetGeoInfo(list);
-
-    j=0;
-    for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-      if (VGetAttrRepn (& posn) != VImageRepn) continue;
-      VGetAttrValue (& posn, NULL, VImageRepn, & xsrc);
-      if (VPixelRepn(xsrc) != VShortRepn) continue;
-      j++;
-    }
-    if (i == 0) nslices = j;
-    else if (j != nslices) VError(" inconsistent number of slices %d %d",j,nslices);
-
-    src[i] = (VImage *) VCalloc(nslices,sizeof(VImage));
-    j=0;
-    for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-      if (VGetAttrRepn (& posn) != VImageRepn) continue;
-      VGetAttrValue (& posn, NULL, VImageRepn, & xsrc);
-      if (VPixelRepn(xsrc) != VShortRepn) continue;
-      if (i >= nsubjects || j >= nslices) VError(" i,j= %d %d",i,j);
-      src[i][j] = xsrc;
-      j++;
-    }
   }
 
 
   /*
-  ** do CCM
+  **  CCM
   */
-  dest = VCCM(src,mask,nsubjects,nslices,(int)first,(int)length,(int)type,(int)otype,minval);
+  VImage dest = VCCM(src,mask,nsubjects,nslices,(int)first,(int)length,(int)type,(int)otype);
 
 
   /* invert to get discordant map */
-  disc = VCreateImageLike(dest);
+  VImage disc = VCreateImageLike(dest);
   VFillImage(disc,VAllBands,0);
   for (b=0; b<VImageNBands(dest); b++) {
     for (r=0; r<VImageNRows(dest); r++) {
@@ -382,7 +329,7 @@ int main (int argc, char *argv[])
   /* 
   ** output
   */
-  out_list = VCreateAttrList();
+  VAttrList out_list = VCreateAttrList();
   if (geolist != NULL) {
     double *D = VGetGeoDim(geolist,NULL);
     D[0] = 3;  /* 3D */
@@ -394,9 +341,9 @@ int main (int argc, char *argv[])
   VAppendAttr (out_list,"discordant",NULL,VImageRepn,disc);
 
   VHistory(VNumber(options),options,prg,&list,&out_list);
-  fpo = VOpenOutputFile (out_filename, TRUE);
-  if (! VWriteFile (fpo, out_list)) exit (1);
-  fclose(fpo);
-  fprintf (stderr, "# %s: done.\n", argv[0]);
+  FILE *fp = VOpenOutputFile (out_filename, TRUE);
+  if (! VWriteFile (fp, out_list)) exit (1);
+  fclose(fp);
+  fprintf (stderr, "%s: done.\n", argv[0]);
   exit(0);
 }

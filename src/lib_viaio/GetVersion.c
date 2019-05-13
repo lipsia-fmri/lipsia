@@ -6,7 +6,7 @@
 
 char *LipsiaVersion() 
 {
-  char *str="3.0";
+  char *str="3.1.0";
   return str;
 }
 

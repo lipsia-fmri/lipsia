@@ -34,13 +34,16 @@ The parameter '-contrast' is used to specify the contrast vector.
 The length of the contrast vector must match the number of columns of the design file.
 Each element of the contrast vector corresponds to a column in the design file.
 
+Note that a region-of-interest mask is required. The mask should exclude non-brain voxels,
+and it may cover the entire brain. In the example below, the mask is in the file "braimmask.nii".
+
 
 
 Example:
 
 ::
 
-   vlisa_2ndlevel -in images_*.nii.gz -out result.v -design design.mat
+   vlisa_2ndlevel -in images_*.nii.gz -out result.v -mask brainmask.nii -design design.mat
         -grp design.grp -contrast 1 0 0 0 -nuisance regressors.txt
 
 
@@ -60,6 +63,7 @@ Parameters of 'vlisa_2ndlevel':
     -demean  Whether to subtract mean in nuisance regressors. Default: true
     -alpha   FDR significance level. Default: 0.05
     -perm    Number of permutations. Default: 5000
+    -mask    Region of interest mask.
     -seed    Seed for random number generation. Default: 99402622
     -radius  Bilateral parameter (radius in voxels). Default: 2
     -rvar    Bilateral parameter (radiometric). Default: 2.0

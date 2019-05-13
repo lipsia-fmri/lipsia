@@ -18,8 +18,6 @@
 #include <gsl/gsl_multifit.h>
 
 
-#define ABS(x) ((x) < 0 ? -(x) : (x))
-
 
 void VGetStats(double *data,int nt,int i0,double *ave,double *sigma)
 {
@@ -41,7 +39,6 @@ void VGetStats(double *data,int nt,int i0,double *ave,double *sigma)
 void VSubtractPolynomial(VAttrList list,VShort type,VShort i0)
 { 
   int slice,row,col,i,j;
-  double tiny=1.0e-6;
 
 
   /* get image dimensions */
@@ -61,6 +58,19 @@ void VSubtractPolynomial(VAttrList list,VShort type,VShort i0)
     fprintf(stderr," Subtract cubic polynmial drift\n");
   if (type == 3)
     fprintf(stderr," Subtract polynmial of order 5\n");
+
+  
+  /* ini dest image */
+  int flag=0;
+  VImage *dst = (VImage *)VCalloc(nslices,sizeof(VImage));
+  if (VPixelRepn(src[0]) != VFloatRepn) {
+    flag=1;
+    for (i=0; i<nslices; i++) {
+      dst[i] = VCreateImage(ntimesteps,nrows,ncols,VFloatRepn);
+      VFillImage(dst[i],VAllBands,0);
+      VCopyImageAttrs (src[i], dst[i]);
+    }
+  }
 
 
   /* ini regression matrix */
@@ -106,7 +116,7 @@ void VSubtractPolynomial(VAttrList list,VShort type,VShort i0)
 
 	double mean=0,sigma=0;
 	VGetStats(y->data,ntimesteps,i0,&mean,&sigma);
-	if (sigma < tiny) continue;
+	if (sigma < TINY) continue;
 
 
 	/* remove linear trend */
@@ -164,10 +174,24 @@ void VSubtractPolynomial(VAttrList list,VShort type,VShort i0)
 	  double u = a*y->data[j] + mean;
 	  if (u > smax) u = smax;
 	  if (u < smin) u = smin;
-	  VSetPixel(src[slice],j,row,col,u);
+	  if (flag == 0) VSetPixel(src[slice],j,row,col,u);
+	  else VPixel(dst[slice],j,row,col,VFloat) = u;
 	}
       }
     }
   }
   fprintf(stderr,"\n");
+  if (flag==0) return;
+
+
+  /* update attr list */
+  VAttrListPosn posn;
+  i=0;
+  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
+    if (VGetAttrRepn (& posn) != VImageRepn) continue;
+    VDestroyImage(src[i]);
+    if (i >= nslices) break;
+    VSetAttrValue (& posn, NULL,VImageRepn,dst[i]);
+    i++;
+  } 
 }

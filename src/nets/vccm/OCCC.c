@@ -16,8 +16,7 @@
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
 
-double
-Cov(double *arr1,double *arr2,int n)
+double Cov(double *arr1,double *arr2,int n)
 {
   int i;
   double nx,sum,ave1,ave2;
@@ -40,8 +39,7 @@ Cov(double *arr1,double *arr2,int n)
 }
 
 
-void
-AveVar(double *arr,int n,double *ave,double *var)
+void AveVar(double *arr,int n,double *ave,double *var)
 {
   int i;
   double u,sum1,sum2,nx,mean;
@@ -60,8 +58,7 @@ AveVar(double *arr,int n,double *ave,double *var)
 }
 
 
-double
-VOCCC(gsl_matrix *data,int nvoxels,int verbose)
+double VOCCC(gsl_matrix *data,int nvoxels,int verbose)
 {
   int i,j,k;
   double sum1,sum2,sum3,mean,varx,u,v;

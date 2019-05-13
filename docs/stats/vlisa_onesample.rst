@@ -9,11 +9,13 @@ For ease of use, the input images may be specified using wildcards as shown belo
 The output is a map thresholded such that FDR < alpha for every voxel. The default is alpha=0.05.
 The resulting image shows (1-FDR) so that larger values indicate higher significance.
 
+Note that a region-of-interest mask is required. The mask should exclude non-brain voxels,
+and it may cover the entire brain. In the example below, the mask is in the file "braimmask.nii".
 
 
 ::
 
-   vlisa_onesample -in images_*.v -out result.v
+   vlisa_onesample -in images_*.v -mask brainmask.nii -out result.v
 
 
 
@@ -31,8 +33,6 @@ To convert the output to the Nifti format, use the following command:
 
 
 
-
-
 Parameters of 'vlisa_onesample':
 ```````````````````````````````````
 
@@ -41,6 +41,7 @@ Parameters of 'vlisa_onesample':
     -out     Output file.
     -alpha   FDR significance level. Default: 0.05
     -perm    Number of permutations. Default: 5000
+    -mask    Region of interest mask.
     -seed    Seed for random number generation. Default: 99402622
     -radius  Bilateral parameter (radius in voxels). Default: 2
     -rvar    Bilateral parameter (radiometric). Default: 2.0

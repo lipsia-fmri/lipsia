@@ -398,8 +398,7 @@ VDictEntry WDict[] = {
 };
 
 
-int 
-main (int argc,char *argv[])
+int main (int argc,char *argv[])
 { 
   static VShort ftype  = 0;
   static VShort wtype  = 0;

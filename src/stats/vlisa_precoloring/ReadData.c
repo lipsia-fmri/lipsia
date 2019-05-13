@@ -18,8 +18,6 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_math.h>
 
-#define TINY 1.0e-8
-
 
 /*
 ** get global mean regressor

@@ -9,169 +9,156 @@
 #include <math.h>
 
 
-/* estimate threshold for image background, multiple lists */
-float VGetMinvalNlists(VAttrList *list,int nlists)
+/* read voxel value */
+double VGetVoxel(VImage *src,int nimages,int b,int r,int c,int j)
 {
-  VImage src=NULL;
-  VAttrListPosn posn;
-  int row,col,i,k;
-  double umin = 1.0e+12;
-  double sum=0,nx=0,mx=0,u=0,tiny=1.0e-8;
+  double u=0;
+  if (nimages <= 1) {  /* 3D */
+    u = VGetPixel(src[j],b,r,c);
+  }
+  else {  /* 4D */
+    u = VGetPixel(src[b],j,r,c);
+  }
+  return u;
+}
 
-  for (k=0; k<nlists; k++) {
-    for (VFirstAttr (list[k], & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-      if (VGetAttrRepn (& posn) != VImageRepn) continue;
-      VGetAttrValue (& posn, NULL,VImageRepn, & src);
-      for (i=0; i<VImageNBands(src); i++) {
-	for (row=0; row<VImageNRows(src); row++) {
-	  for (col=0; col<VImageNColumns(src); col++) {
-	    u = VGetPixel(src,i,row,col);
-	    if (fabs(u) > tiny) {
-	      if (u < umin) umin = u;
-	      sum += u;
-	      nx++;
+/* write a voxel value */
+int VSetVoxel(VImage *src,int nvolumes,int b,int r,int c,int j,double value)
+{
+  if (j >= nvolumes) return -1;
+  if (nvolumes <= 1) {  /* 3D */
+    VSetPixel(src[j],b,r,c,value);
+  }
+  else {  /* 4D */
+    VSetPixel(src[b],j,r,c,value);
+  }
+  return 1;
+}
+
+/* read a single image from a file */
+VImage VReadImageFile(VString filename)
+{
+  VImage image=NULL;
+  VAttrList list=NULL;
+  if (strlen(filename) > 1) {
+    list = VReadAttrList(filename,0L,TRUE,FALSE);
+    image = VReadImage(list);
+  }
+  return image;
+}
+
+
+/* apply mask or threshold */
+void VMaskMinval(VAttrList list,VImage mask,double minval)
+{
+  int b,r,c,j;
+  double u;
+  if (mask == NULL && minval < NO_MINVAL+0.001) return;
+
+  int nslices=0,nrows=0,ncols=0,nvolumes=0;
+  int nimages = VAttrListNumImages(list);
+  VImage *src = VAttrListGetImages(list,nimages);
+  VDimensions(src,nimages,&nslices,&nrows,&ncols,&nvolumes);
+
+  if (mask != NULL) {
+    if (nslices != VImageNBands(mask))
+      VError(" Number of slices in mask inconsistent with input image (%d %d)",(int)VImageNBands(mask),nslices);
+    if (nrows != VImageNRows(mask))
+      VError(" Number of rows in mask inconsistent with input image (%d %d)",(int)VImageNRows(mask),nrows);
+    if (ncols != VImageNColumns(mask))
+      VError(" Number of columns in mask inconsistent with input image (%d %d)",(int)VImageNColumns(mask),ncols);
+  }
+  
+  for (j=0; j<nvolumes; j++) {
+    for (b=0; b<nslices; b++) {
+      for (r=0; r<nrows; r++) {
+	for (c=0; c<ncols; c++) {
+	  
+	  if (mask != NULL) {
+	    u = VGetPixel(mask,b,r,c);
+	    if (fabs(u) < TINY) {
+	      VSetVoxel(src,nvolumes,b,r,c,j,0.0);
 	    }
-	    mx++;
 	  }
-	}
-      }
-    }
-  }
-  double mean = sum/nx;
-  float minval = (float)(mean*0.875);
-
-  /* many zero voxels, probably pre-segmented */
-  if (nx/mx < 0.875) minval = (float)(umin-tiny);
-
-  return minval;
-}
-
-
-/* estimate threshold for image background, single list */
-float VGetMinval(VAttrList list)
-{
-  VImage src=NULL;
-  VAttrListPosn posn;
-  int row,col,i;
-  double sum=0,nx=0,mx=0,u=0,tiny=1.0e-8;
-  double umin = 1.0e+12;
-
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src);
-    for (i=0; i<VImageNBands(src); i++) {
-      for (row=0; row<VImageNRows(src); row++) {
-	for (col=0; col<VImageNColumns(src); col++) {
-	  u = VGetPixel(src,i,row,col);
-	  if (fabs(u) > tiny) {
-	    if (u < umin) umin = u;
-	    sum += u;
-	    nx++;
-	  }
-	  mx++;
-	}
-      }
-    }
-  }
-  double mean = sum/nx;
-  float minval = (float)(mean*0.875);
-
-  /* many zero voxels, probably pre-segmented */
-  if (nx/mx < 0.875) minval = (float)(umin-tiny);
-
-  return minval;
-}
-
-
-/* apply minval to list of functional slices */
-void VApplyMinval(VAttrList list,VFloat minval)
-{
-  VImage src=NULL;
-  VAttrListPosn posn;
-  int r,c,j,n,m;
-  double sum,nx,u;
-
-
-  /* apply minval */
-  m = 0;
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    VGetAttrValue (& posn, NULL,VImageRepn, & src);
-    if (VImageNRows(src) < 2) continue;
-
-    n = VImageNBands(src);
-
-    for (r=0; r<VImageNRows(src); r++) {
-      for (c=0; c<VImageNColumns(src); c++) {
-
-	sum = nx = 0;
-	for (j=0; j<n; j++) {
-	  u = (double)VGetPixel(src,j,r,c);
-	  sum += u;
-	  nx++;
-	}
-
-	if (sum/nx < minval) {
-	  for (j=0; j<n; j++) VSetPixel(src,j,r,c,0.0);
-	}
-	m++;
-      }
-    }
-  }
-  if (m < 1) VError("No voxels above threshold 'minval', use lower threshold");
-}
-
-
-void VApplyMinvalNlists(VAttrList *list,int nlists,float minval)
-{
-  VAttrListPosn posn;
-  int slice,row,col,i,k,nrows=0,ncols=0,ntimesteps=0;
-
-  /* alloc src image */
-  int nslices = VAttrListNumImages(list[0]);
-  VImage **src = (VImage **) VCalloc(nlists,sizeof(VImage *));
-  int *nt = (int *) VCalloc(nlists,sizeof(int));
-  int ntt=0;
-  i = nrows = ncols = 0;
-  for (k=0; k<nlists; k++) {
-    src[k] = (VImage *) VCalloc(nslices,sizeof(VImage));
-    ntt = 0;
-    i = 0;
-    for (VFirstAttr (list[k], & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-      if (VGetAttrRepn (& posn) != VImageRepn) continue;
-      if (i >= nslices) VError(" inconsistent number of slices, %d %d %d",k,i,nslices);
-      VGetAttrValue (& posn, NULL,VImageRepn, & src[k][i]);
-      if (VImageNBands(src[k][i]) > ntt) ntt = VImageNBands(src[k][i]);
-      if (VImageNRows(src[k][i])  > nrows)  nrows = VImageNRows(src[k][i]);
-      if (VImageNColumns(src[k][i]) > ncols) ncols = VImageNColumns(src[k][i]);
-      i++;
-    }
-    ntimesteps += ntt;
-    nt[k] = ntt;
-  }
-
-  double sum=0,nx=0,mean=0;
-  for (slice=0; slice<nslices; slice++) {
-    for (row=0; row<nrows; row++) {
-      for (col=0; col<ncols; col++) {
-
-	sum = nx = 0;
-	for (k=0; k<nlists; k++) {
-	  for (i=0; i<nt[k]; i++) {
-	    sum += VGetPixel(src[k][slice],i,row,col);
-	    nx++;
-	  }
-	}
-	mean = sum/nx;
-
-	if (mean < minval) {
-	  for (k=0; k<nlists; k++) {
-	    for (i=0; i<nt[k]; i++) {
-	      VSetPixel(src[k][slice],i,row,col,0.0);
+	  else {
+	    u = VGetVoxel(src,nvolumes,b,r,c,j);
+	    if (u < minval) {
+	      VSetVoxel(src,nvolumes,b,r,c,j,0.0);
 	    }
 	  }
 	}
       }
     }
   }
+}
+
+/* apply mask or threshold to a single list, read mask file first */
+void VMinval(VAttrList list,VString mask_filename,double minval)
+{
+  VImage mask = VReadImageFile(mask_filename);
+  if (mask == NULL && minval < NO_MINVAL+0.001) return;
+  VMaskMinval(list,mask,minval);
+}
+
+
+/* apply mask or threshold to multiple lists */
+void VMultMinval(VAttrList *list,int nlists,VString mask_filename,double minval)
+{
+  int k;
+  VImage mask = VReadImageFile(mask_filename);
+  if (mask == NULL && minval < NO_MINVAL+0.001) return;
+  for (k=0; k<nlists; k++) {
+    VMaskMinval(list[k],mask,minval);
+  }
+}
+
+
+/* 
+** check if time course is a foreground voxel,
+** normalize if needed
+*/
+int Foreground(double *data,size_t n,int norm)
+{
+  size_t i=0;
+  double u=0,nx=0,sum1=0,sum2=0,mean=0,var=0,sd=0;
+
+  for (i=0; i<n; i++) {
+    u = data[i];
+    sum1 += u;
+    sum2 += u*u;
+  }
+  nx = (double)n;
+  mean = sum1/nx;
+  var = (sum2 - nx * mean * mean) / (nx - 1.0);
+  if (var < TINY) return -1;
+
+  /* subtract mean */
+  if (norm == 1) {
+    for (i=0; i<n; i++) {
+      u = data[i];
+      data[i] = (u-mean);
+    }
+  }
+
+  /* z-scoring */
+  if (norm == 2) {
+    sd = sqrt(var);
+    for (i=0; i<n; i++) {
+      u = data[i];
+      data[i] = (u-mean)/sd;
+    }
+  }
+  return 1;
+}
+
+
+int VCheckMinval(VImage *src,int b,int r,int c,int nt)
+{
+  int j;
+  double s=0;
+  for (j=0; j<nt; j++) {
+    s += VGetPixel(src[b],j,r,c);
+  }
+  if (fabs(s) < TINY) return -1;
+  return 1;
 }

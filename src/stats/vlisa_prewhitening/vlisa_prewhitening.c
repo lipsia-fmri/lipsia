@@ -31,8 +31,6 @@
 #endif /*_OPENMP*/
 
 
-#define MINVAL 1.0e+8
-
 typedef struct TrialStruct {
   int   id;
   float onset;
@@ -67,7 +65,6 @@ extern gsl_matrix *VReadCovariates(VString cfile,VBoolean normalize);
 extern VImage VoxelMap(VAttrList list);
 extern gsl_matrix *VReadImageData(VAttrList *list,int nlists);
 extern void VGetTimeInfos(VAttrList *list,int nlists,double *mtr,float *run_duration);
-extern void VApplyMinvalNlists(VAttrList *list,int nlists,float minval);
 extern void VRowNormalize(gsl_matrix *Data);
 extern void CheckTrialLabels(Trial *trial,int numtrials);
 extern void HistoUpdate(VImage src1,gsl_histogram *hist);

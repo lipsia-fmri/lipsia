@@ -31,12 +31,16 @@ int main(int argc, char *argv[])
   static VShort del = 0;
   static VShort type = 0;  
   static VBoolean linear=TRUE;
-  static VFloat window = 100;
+  static VFloat window = 60;
+  static VDouble  minval   =  NO_MINVAL;
+  static VString  mask_filename = "";
   static VOptionDescRec  options[] = {
     {"type", VShortRepn, 1, (VPointer) &type, VOptionalOpt,TypeDict, "Type of detrending"},   
     {"linear", VBooleanRepn, 1, (VPointer) &linear, VOptionalOpt,NULL, "Whether to first subtract linear drift"},   
     {"window", VFloatRepn, 1, (VPointer) &window, VOptionalOpt,NULL, "Window size in seconds (only for demeaning)"},
     {"del", VShortRepn, 1, (VPointer) &del, VOptionalOpt, NULL, "Number of initial timepoints to ignore"},
+    {"mask", VStringRepn, 1, (VPointer) &mask_filename, VOptionalOpt, NULL, "Mask (optional)"},
+    {"minval", VDoubleRepn, 1, (VPointer) &minval, VOptionalOpt, NULL, "Signal threshold"}
   };
   VString in_file=NULL;
   FILE *out_file = NULL;
@@ -50,6 +54,10 @@ int main(int argc, char *argv[])
   VLong tr=0L;
   VAttrList list = VReadAttrList(in_file,tr,TRUE,FALSE);
   if (list == NULL) VError(" error reading input file %s",in_file);
+
+  
+  /* apply brain mask or threshold, if needed */
+  VMinval(list,mask_filename,(double)minval);
 
 
   /* perform detrending */
