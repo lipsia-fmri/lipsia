@@ -2,11 +2,11 @@ How to install LIPSIA
 ===========================
 
 
-There are two alternatives for installing lipsia. The first possibility is to compile and build everything from scratch on your local machine, which requires the manual installation of several libraries (as described below). The second option is to install a virtual version of lipsia using docker. This is the preferable option for operatings systems outside the linux/unix world and delivers the same performance as the native build.
+You can either build lipsia from scratch (installing all dependencies) or use the docker version (see below).
 
 
 
-Install LIPSIA from source (Linux only)
+Install LIPSIA from source (Linux/Unix/MacOS)
 ========================================
 
 1) Install the necessary compilers and libraries
@@ -17,12 +17,35 @@ Install LIPSIA from source (Linux only)
 * zlib dev
 * BLAS (e.g. openblas)
 * python: numpy, matplotlib
+* git
 
 Ubuntu:
+------------
  ::
 
-    sudo apt-get install build-essential libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev python-tk
+    sudo apt-get install build-essential libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev python-tk git-core
     sudo pip install numpy matplotlib
+
+
+MacOS:
+-------------
+
+You will need to install
+
+* homebrew
+* command-line-tools
+* gsl
+* git
+
+To install these, open a terminal (Applications/Utilities/Terminal). Then run the following commands:
+ ::
+
+    xcode-select --install
+    /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    brew install git
+    brew install gsl
+
+
 
 2) Clone the git repository:
  ::

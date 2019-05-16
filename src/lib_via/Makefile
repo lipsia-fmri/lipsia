@@ -15,12 +15,16 @@ SRC = Aniso2d.c Aniso3d.c Bicubic.c Binarize.c Binmorph3d.c Border3d.c BorderPoi
 OBJ = $(SRC:.c=.o)
 
 STATIC = ${LIPSIA_LIB}/libvia3.0.a
-SHARED = ${LIPSIA_LIB}/libvia3.0.so
+ifneq ($(shell uname),Darwin)
+	SHARED = ${LIPSIA_LIB}/libvia3.0.so
+endif
 
 default: $(STATIC) $(SHARED)
 
+ifneq ($(shell uname),Darwin)
 $(SHARED): $(OBJ)
 	$(CC) -shared -o $@ $^ $(LDFLAGS) $(LDLIBS)
+endif
 
 $(STATIC): $(OBJ)
 	ar rcs $@ $^

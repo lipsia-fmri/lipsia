@@ -25,9 +25,9 @@
 
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
-extern int isinff(float x);
-extern int isnanf(float x);
-
+/* extern int isinff(float x);
+   extern int isnanf(float x);
+*/
 extern char *VReadGzippedData(char *filename,size_t *len);
 extern char *VReadUnzippedData(char *filename,VBoolean nofail,size_t *size);
 extern char *VReadDataContainer(char *filename,VBoolean nofail,size_t *size);
@@ -205,7 +205,8 @@ float VGetValue(char *data,size_t index,int datatype)
   default:
     VError(" unknown datatype %d",datatype);
   }
-  if (isinff(u) || isnanf(u)) u = 0;
+  if (isinf(u) || isnan(u))
+    u = 0;
   return u;
 }
 
@@ -218,7 +219,7 @@ void VCleanData(VImage src)
     for (r=0; r<VImageNRows(src); r++) {
       for (c=0; c<VImageNColumns(src); c++) {
 	u = VGetPixel(src,b,r,c);
-	if (gsl_isinf(u) || gsl_isnan(u)) {
+	if (isinf(u) || isnan(u)) {
 	  u = 0;
 	  VSetPixel(src,b,r,c,u);
 	}

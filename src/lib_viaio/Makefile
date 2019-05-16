@@ -17,12 +17,17 @@ endif
 OBJ = $(SRC:.c=.o)
 
 STATIC = ${LIPSIA_LIB}/libviaio3.0.a
-SHARED = ${LIPSIA_LIB}/libviaio3.0.so
+
+ifneq ($(shell uname),Darwin)
+	SHARED = ${LIPSIA_LIB}/libviaio3.0.so
+endif
 
 default: $(STATIC) $(SHARED)
 
+ifneq ($(shell uname),Darwin)
 $(SHARED): $(OBJ)
 		gcc -shared -o $@ $^ $(LDLIBS)
+endif
 
 $(STATIC): $(OBJ)
 		ar rcs $@ $^
