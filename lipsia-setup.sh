@@ -105,6 +105,7 @@ if (( ! SILENCE &&  ! VERBOSE ));then
 fi
 
 # compiler/linker setup
+LIPSIA_LDFLAGS=""
 if [ "$(uname)" == "Darwin" ]; then
     export ISMAC=1
     export CC=${CC:=$(ls /usr/local/bin/gcc* 2>/dev/null |head -1)}
@@ -135,7 +136,7 @@ elif [ "$(uname)" == "Linux" ]; then
 
     if [ "$(uname -a | grep -c Ubuntu)" -ne 0 ]; then
 	# ubuntu's ld per default sets "--as-needed", switch it off:
-	LDFLAGS="$LDFLAGS -Xlinker --no-as-needed"
+	LIPSIA_LDFLAGS+=" -Xlinker --no-as-needed"
     elif [ "$(uname -a | grep -c .fc[1-9]..)" -ne 0 ]; then
 	# fedora, should just work
 	:
@@ -181,7 +182,7 @@ export LIPSIA_CFLAGS="-O2 -ansi -Wall"
 #export LIPSIA_CFLAGS="-march=native -fast -ansi -Wall"
 ############################################################################
 
-LIPSIA_CPPFLAGS=-I${LIPSIA_DEV}/include
+LIPSIA_CPPFLAGS="-I${LIPSIA_DEV}/include"
 LIPSIA_LDFLAGS+=" -L${LIPSIA_DEV}/lib"
 
 # try to adjust the paths to gsl
