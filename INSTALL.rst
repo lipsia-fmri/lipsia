@@ -15,7 +15,6 @@ Install LIPSIA from source (Linux/Unix/MacOS)
 * gsl dev
 * boost dev
 * zlib dev
-* BLAS (e.g. openblas)
 * python: numpy, matplotlib
 * git
 
@@ -23,28 +22,37 @@ Ubuntu:
 ------------
  ::
 
-    sudo apt-get install build-essential libgsl0-dev libboost-dev zlib1g-dev libopenblas-dev python-tk git-core
+    sudo apt-get install build-essential libgsl0-dev libboost-dev zlib1g-dev python-tk git-core
     sudo pip install numpy matplotlib
 
+Fedora:
+------------
+ ::
+
+    sudo dnf install g++ gcc git zlib-devel boost-devel gsl-devel zlib-devel
+    sudo pip install numpy matplotlib
+
+    ( "yum" instead of "dnf" for Red Hat, Centos, and the like )
 
 MacOS:
 -------------
 
 You will need to install
 
-* homebrew
 * command-line-tools
+* homebrew
+* gcc
 * gsl
-* git
+* boost
 
 To install these, open a terminal (Applications/Utilities/Terminal). Then run the following commands:
  ::
 
     xcode-select --install
     /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-    brew install git
+    brew install gcc
     brew install gsl
-
+    brew install boost    
 
 
 2) Clone the git repository:

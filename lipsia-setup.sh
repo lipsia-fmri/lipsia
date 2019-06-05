@@ -20,6 +20,7 @@ MY_PLACE=${I_AM%/*} # does 'dirname' exist on a mac ?
 VERBOSE=0
 SILENCE=0
 ISMAC=0
+ISLINUX=0
 
 function Usage () {
     echo -e "Usage:
@@ -31,7 +32,7 @@ function Usage () {
 }
 
 function Summary () {
-    if [ $SILENCE -eq 0 ];then
+    if (( ! SILENCE ));then
 	ECHO
 	ECHO CC=$CC
 	ECHO CXX=$CXX
@@ -40,10 +41,9 @@ function Summary () {
 	ECHO CFLAGS="${LIPSIA_CFLAGS}"
 	ECHO LIPSIA_INST="$LIPSIA_INST"
 	ECHO LIPSIA_DEV="${LIPSIA_DEV}"
-	if [ $ISMAC -eq 0 ];then
+	if (( ISLINUX )); then
 	    ECHO LIPSIA_LD_LIBRARY_PATH="${LIPSIA_LD_LIBRARY_PATH}"
 	fi
-	ECHO
     fi
 }
 
@@ -63,7 +63,7 @@ function Prepend () {
 }
 
 function ECHO () {
-    if [ $SILENCE -eq 0 -a $VERBOSE -ne 0 ];then
+    if (( VERBOSE && ! SILENCE ));then
 	echo $*
     fi
 }
@@ -94,13 +94,13 @@ function Find_LIB () {
 for((ARG=1;ARG<=$#;ARG++)); do
     OPTION=${!ARG}
     case $OPTION in
-	-v ) : $((VERBOSE++)); if [ $VERBOSE -gt 1 ]; then ECHO "verbose"; fi ;;
+	-v ) : $((VERBOSE++)); if (( VERBOSE > 1 )); then ECHO "verbose"; fi ;;
 	-s ) SILENCE=1 ;;
 	-* ) Usage; return ;;	
     esac    
 done
 
-if [ $SILENCE -eq 0 -a $VERBOSE -eq 0 ];then
+if (( ! SILENCE &&  ! VERBOSE ));then
     echo --- ${BASH_SOURCE[0]}: make me quiet with -s or chatty with -v
 fi
 
@@ -129,6 +129,7 @@ if [ "$(uname)" == "Darwin" ]; then
     fi
 elif [ "$(uname)" == "Linux" ]; then
     # not much to do here
+    export ISLINUX=1
     export CC=${CC:=gcc}
     export CXX=${CXX:=g++}
 
@@ -181,7 +182,7 @@ export LIPSIA_CFLAGS="-O2 -ansi -Wall"
 ############################################################################
 
 LIPSIA_CPPFLAGS=-I${LIPSIA_DEV}/include
-LIPSIA_LDFLAGS=-L${LIPSIA_DEV}/lib
+LIPSIA_LDFLAGS+=" -L${LIPSIA_DEV}/lib"
 
 # try to adjust the paths to gsl
 D=$(Find_H 'gsl_math.h')
@@ -230,10 +231,13 @@ if [ -n "$GSL_LIB_DIR" ]; then
     D="${GSL_LIB_DIR}"
     if [ "${D/\/usr/\/lib/}" = "$D" ];then
 	LIPSIA_LDFLAGS+=" -L$D"
+	ECHO added path to libgsl \($D\) 	
     fi
-    if [ $ISMAC -eq 0 -a "${D/\/usr\/lib/}" = "$D" -a "${D/\/usr\/local\/lib/}" = "${D}" ];then
-	Prepend LIPSIA_LD_LIBRARY_PATH "${D}"
-	Prepend LD_LIBRARY_PATH "${D}"
+    if (( ISLINUX ));then
+	if [ "${D/\/usr\/lib/}" = "$D" -a "${D/\/usr\/local\/lib/}" = "${D}" ];then
+	    Prepend LIPSIA_LD_LIBRARY_PATH "${D}"
+	    Prepend LD_LIBRARY_PATH "${D}"
+	fi
     fi
 fi
 
@@ -241,20 +245,22 @@ export CPPFLAGS="${LIPSIA_CPPFLAGS}"
 export LDFLAGS="${LIPSIA_LDFLAGS}"
 export CFLAGS="${LIPSIA_CFLAGS}"
 
-if [ $ISMAC -eq 0 -a $SILENCE -eq 0 ];then
+if (( ISLINUX && ! SILENCE ));then
     echo
     echo "( \"${LIPSIA_LD_LIBRARY_PATH}\" should be added to \$LD_LIBRARY_PATH permanently )"
 fi
 
-if [ $VERBOSE -ne 0 ];then
+if (( VERBOSE ));then
     Summary
 fi
 ####################################################################################
-if [ $SILENCE -eq 0 ];then
+if (( ! SILENCE ));then
+    echo
     if [ "${PWD}" != "${LIPSIA_DEV}/src" ]; then
 	echo "Ok: \"cd ${LIPSIA_DEV}/src; make\"."
     else
 	echo Ok: try \"make\"
     fi
+    echo
 fi
 ####################################################################################
