@@ -15,7 +15,7 @@ char *GetLipsiaName(char *prgname)
 {
   int len1 = strlen(prgname);
   int len2 = strlen(LipsiaVersion());
-  char *str = VCalloc(len1+len2+2,sizeof(char));
+  char *str = VCalloc(len1+len2+5,sizeof(char));
   sprintf(str,"%s V%s",prgname,LipsiaVersion());
   return str;
 }
