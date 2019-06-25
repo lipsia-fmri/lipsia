@@ -163,7 +163,6 @@ int main (int argc, char *argv[])
   /* get design file and its inverse */
   gsl_matrix *X0 = XRead2ndLevel(design_filename);
   fprintf(stderr," design file dimensions:  %d x %d\n",(int)X0->size1,(int)X0->size2);
-  if (X0->size2 == 1) VError(" Please use 'vlisa_onesample' for onesample tests");
   if (X0->size1 != nimages) 
     VError(" number of input images (%d) does not match number of rows in design file (%d)",nimages,(int)X0->size1);
 
@@ -207,6 +206,7 @@ int main (int argc, char *argv[])
 
   /* no nuisance covariates */
   else {
+    if (X0->size2 == 1) VError(" Please use 'vlisa_onesample' for onesample tests");
     permflag = (int *) VCalloc(X0->size2,sizeof(int));
     for (j=0; j<X0->size2; j++) permflag[j] = 1;
     X = gsl_matrix_calloc(X0->size1,X0->size2);

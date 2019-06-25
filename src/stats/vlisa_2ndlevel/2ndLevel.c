@@ -86,7 +86,7 @@ double DoF(gsl_matrix *X,gsl_matrix *XInv,double *xtrace)
 void GLM2(VImage *src,gsl_matrix *X,gsl_vector *contrast,int *permflag,int *permtable,int *signtable,int signswitch,VImage dest)
 {
   int i,j,ip,b,r,c;
-  double t=0,z=0,sum=0,tsigma=0,d=0,err=0,var=0,u=0,tiny=1.0e-6;
+  double t=0,z=0,sum=0,tsigma=0,d=0,err=0,var=0,u=0,tiny=TINY;
 
   int ncols   = VImageNColumns(src[0]);
   int nrows   = VImageNRows(src[0]);

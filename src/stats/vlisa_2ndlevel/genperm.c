@@ -102,11 +102,12 @@ void genperm(long seed,int *exchange,int signswitch,
 int SignSwitch (gsl_matrix *X,gsl_vector *contrast,int *permflag)
 {
   int i,j;
-  double s1=0,s2=0,nx=0,u=0,mean=0,var=0,tiny=1.0e-6;
+  double s1=0,s2=0,nx=0,u=0,mean=0,var=0;
 
   int signswitch = -1;
   for (j=0; j<X->size2; j++) {
     if (permflag[j] == 0) continue;
+    if (fabs(contrast->data[j]) < TINY) continue;
     s1 = s2 = nx = 0;
     for (i=0; i<X->size1; i++) { 
       u = gsl_matrix_get(X,i,j);
@@ -116,9 +117,9 @@ int SignSwitch (gsl_matrix *X,gsl_vector *contrast,int *permflag)
     }
     mean = s1/nx;
     var = (s2 - nx * mean * mean) / (nx - 1.0);
-    if (var < tiny && signswitch >= 0)
+    if (var < TINY && signswitch >= 0)
       VError(" Implausible design, two columns have zero variance: %d %d",signswitch+1,j+1);
-    if (var < tiny) signswitch = j;
+    if (var < TINY) signswitch = j;
   }
   return signswitch;
 }
