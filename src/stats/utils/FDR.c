@@ -75,7 +75,7 @@ void ApplyFdrThreshold(VImage dest,double alpha)
 void FDR(VImage src,VImage dest,gsl_histogram *nullhist,gsl_histogram *realhist,double alpha)
 {
   size_t j;
-  double u=0,tiny=1.0e-8;
+  double u=0,tiny=0.002;
   double hmin = gsl_histogram_min (realhist);
   double hmax = gsl_histogram_max (realhist);
 
@@ -93,7 +93,7 @@ void FDR(VImage src,VImage dest,gsl_histogram *nullhist,gsl_histogram *realhist,
 
 	u = VGetPixel(src,b,r,c);
 	if (u > hmax) u = hmax-tiny;
-	if (u < hmin) u = hmax+tiny;
+	if (u < hmin) u = hmin+tiny;
 	if (fabs(u) > 0) {
 	  if (gsl_histogram_find (realhist,(double)u,&j) == GSL_SUCCESS) {
 	    VPixel(dest,b,r,c,VFloat) = 1.0 - Fdr[j];
