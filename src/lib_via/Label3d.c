@@ -25,20 +25,66 @@ Gabriele Lohmann, MPI-CBS
 #include <string.h>
 
 
+/*
+** array implementation of queues, following
+** Aho, Ullman, "Foundations of Computer Science in C"
+** Computer Science Press, 1995, pp. 319 ff
+**
+*/
 typedef struct {
   Voxel *A;
   long front,rear;
 } Queue;
 
-static Queue queue;
-static long QueueSize=0;
-static long msize=0;
-typedef int BOOLEAN;
 
-static void QueueClear(Queue *);
-static BOOLEAN QueueEmpty(Queue *); 
-static BOOLEAN deQueue(Queue *, Voxel *);
-static BOOLEAN enQueue(Queue *, Voxel);
+typedef int BOOLEAN;
+#define TRUE  1
+#define FALSE 0
+
+void QueueClear(Queue *pQ)
+{
+  pQ->front = 0;
+  pQ->rear  = 0;
+}
+
+BOOLEAN QueueEmpty(Queue *pQ) 
+{
+  return (pQ->front == pQ->rear);
+}
+
+
+BOOLEAN deQueue(Queue *pQ, Voxel *pe)
+{
+  if (pQ->front == pQ->rear) {
+    fprintf(stderr," deQueue: empty\n");
+    return FALSE;
+  }
+  else {
+    (*pe) = pQ->A[(pQ->rear)++];
+    return TRUE;
+  }
+}
+
+BOOLEAN enQueue(Queue *pQ,Voxel e,long *QueueSize,long *msize)
+{
+  if (pQ->front > (*msize)) (*msize) = pQ->front;
+  
+  if (pQ->front < (*QueueSize) - 1) {
+    pQ->A[(pQ->front)++] = e;
+    return TRUE;
+  }
+  else if (pQ->rear > 2) {
+    pQ->A[--(pQ->rear)] = e;
+    return TRUE;
+  }
+  else {
+    (*QueueSize) += (*QueueSize) * 0.333;
+    pQ->A = (Voxel *) VRealloc(pQ->A,sizeof(Voxel) * (*QueueSize));
+    pQ->A[(pQ->front)++] = e;
+    return TRUE;
+  }
+}
+
 
 #define VPutPixel(image,b,r,c,repn,value) \
   if (repn == VShortRepn) VPixel((image),(b),(r),(c),VShort) = (value); \
@@ -66,7 +112,7 @@ VImage VLabelImage3d(VImage src,VImage dest,long neighb,VRepnKind repn,long *num
   long b0,b1,r0,r1,c0,c1,b,r,c,bb,rr,cc;
   long ba[6],ra[6],ca[6],m;
   
-  msize = 0;
+  long msize = 0;
   if (VPixelRepn(src) != VBitRepn) 
     VError("Input image must be of type VBit");
 
@@ -107,6 +153,10 @@ VImage VLabelImage3d(VImage src,VImage dest,long neighb,VRepnKind repn,long *num
   /*
   ** set up Queue
   */
+  Queue queue;
+  msize = 0;
+  label = 0;
+  
   if (numlabels != NULL) *numlabels = 0;
 
   nblack = 0;
@@ -115,11 +165,9 @@ VImage VLabelImage3d(VImage src,VImage dest,long neighb,VRepnKind repn,long *num
     if (*src_pp++ > 0) nblack++;
   if (nblack < 1) return dest;
 
-  QueueSize = (float)(nblack) * 0.666;
+  long QueueSize = (float)(nblack) * 0.666;
   if (QueueSize < 128) QueueSize=128;
   queue.A = (Voxel *) VMalloc(sizeof(Voxel) * QueueSize);
-  msize = 0;
-  label = 0;
 
   /*
   ** depth first search
@@ -158,7 +206,7 @@ VImage VLabelImage3d(VImage src,VImage dest,long neighb,VRepnKind repn,long *num
 	  v.b = b;
 	  v.r = r;
 	  v.c = c;
-	  if (enQueue(&queue,v) == FALSE) VError(" error in enQueue");
+	  if (enQueue(&queue,v,&QueueSize,&msize) == FALSE) VError(" error in enQueue");
 	  VPutPixel(dest,b,r,c,repn,label);
 
 	  while (! QueueEmpty(&queue)) {
@@ -191,7 +239,7 @@ VImage VLabelImage3d(VImage src,VImage dest,long neighb,VRepnKind repn,long *num
 		  vv.b = bb;
 		  vv.r = rr;
 		  vv.c = cc;
-		  if (enQueue(&queue,vv) == FALSE) VError(" error in enQueue");
+		  if (enQueue(&queue,vv,&QueueSize,&msize) == FALSE) VError(" error in enQueue");
 		  VPutPixel(dest,bb,rr,cc,repn,label);
 		  n++;
 		}
@@ -235,7 +283,7 @@ VImage VLabelImage3d(VImage src,VImage dest,long neighb,VRepnKind repn,long *num
 	  v.b = b;
 	  v.r = r;
 	  v.c = c;
-	  if (enQueue(&queue,v) == FALSE) VError(" error in enQueue");
+	  if (enQueue(&queue,v,&QueueSize,&msize) == FALSE) VError(" error in enQueue");
 	  VPutPixel(dest,b,r,c,repn,label);
 
 	  while (! QueueEmpty(&queue)) {
@@ -272,7 +320,7 @@ VImage VLabelImage3d(VImage src,VImage dest,long neighb,VRepnKind repn,long *num
 	      vv.b = ba[i];
 	      vv.r = ra[i];
 	      vv.c = ca[i];
-	      if (enQueue(&queue,vv) == FALSE) VError(" error in enQueue");
+	      if (enQueue(&queue,vv,&QueueSize,&msize) == FALSE) VError(" error in enQueue");
 	      n++;
 	    }
 	  }
@@ -292,59 +340,3 @@ VImage VLabelImage3d(VImage src,VImage dest,long neighb,VRepnKind repn,long *num
 }
 
 
-/*
-** array implementation of queues, following
-** Aho, Ullman, "Foundations of Computer Science in C"
-** Computer Science Press, 1995, pp. 319 ff
-**
-*/
-
-#define TRUE  1
-#define FALSE 0
-
-static void QueueClear(Queue *pQ)
-{
-  pQ->front = 0;
-  pQ->rear  = 0;
-}
-
-static BOOLEAN
-QueueEmpty(Queue *pQ) 
-{
-  return (pQ->front == pQ->rear);
-}
-
-
-static BOOLEAN
-deQueue(Queue *pQ, Voxel *pe)
-{
-  if (pQ->front == pQ->rear) {
-    fprintf(stderr," deQueue: empty\n");
-    return FALSE;
-  }
-  else {
-    (*pe) = pQ->A[(pQ->rear)++];
-    return TRUE;
-  }
-}
-
-static BOOLEAN 
-enQueue(Queue *pQ, Voxel e)
-{
-  if (pQ->front > msize) msize = pQ->front;
-  
-  if (pQ->front < QueueSize - 1) {
-    pQ->A[(pQ->front)++] = e;
-    return TRUE;
-  }
-  else if (pQ->rear > 2) {
-    pQ->A[--(pQ->rear)] = e;
-    return TRUE;
-  }
-  else {
-    QueueSize += QueueSize * 0.333;
-    queue.A = (Voxel *) VRealloc(queue.A,sizeof(Voxel) * QueueSize);
-    pQ->A[(pQ->front)++] = e;
-    return TRUE;
-  }
-}

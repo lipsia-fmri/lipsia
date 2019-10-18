@@ -80,12 +80,17 @@ VImage VFilterGauss3d (VImage src,VImage dest,double *sigma)
   else {
     xsrc = VConvertImageCopy(src,NULL,VAllBands,VFloatRepn);
   }
-  
+
+  /* ini dest image */
+  int nbands = VImageNBands(src);
+  int nrows = VImageNRows(src);
+  int ncols = VImageNColumns(src);
+  dest = VSelectDestImage("VFilterGauss3d",dest,nbands,nrows,ncols,VPixelRepn(src));
+
 
   /* separable filter */
   xdest = VConvolveCol(xsrc,xdest,kernel_col,dim_col);
   tmp   = VConvolveRow(xdest,tmp,kernel_row,dim_row);
-  xdest = VConvolveBand(tmp,xdest,kernel_slice,dim_slice);
 
   VFree(kernel_col);
   VFree(kernel_row);
@@ -94,10 +99,12 @@ VImage VFilterGauss3d (VImage src,VImage dest,double *sigma)
 
   /* convert back to original pixel repn */
   if (VPixelRepn(src) == VFloatRepn) {
-    return xdest;
+    dest = VConvolveBand(tmp,dest,kernel_slice,dim_slice);
+    return dest;
   }
   else {
     VDestroyImage(xsrc);
+    xdest = VConvolveBand(tmp,xdest,kernel_slice,dim_slice);
     dest = VConvertImageCopy(xdest,NULL,VAllBands,VPixelRepn(src));
     VDestroyImage(xdest);
     return dest;

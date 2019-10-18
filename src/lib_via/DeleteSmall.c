@@ -100,5 +100,6 @@ VImage VDeleteSmall (VImage src,VImage dest,int msize)
       }
     }
   }
+  VFree(table);
   return dest;
 }

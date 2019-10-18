@@ -22,6 +22,7 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_cblas.h>
+#include <gsl/gsl_math.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +33,9 @@
 #define SQR(x) ((x) * (x))
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif /*_OPENMP*/
 
 /* re-implementation of cblas_sspmv,  cblas_sspmv causes problems */
 void my_sspmv(float *A,float *x,float *y,int n)
@@ -56,19 +60,19 @@ void my_sspmv(float *A,float *x,float *y,int n)
 }
 
 
-int Normalize(double *data,int n)
+double Normalize(double *data,int n)
 {
   int i;
-  double sum,tiny=1.0e-6;
-  
+  double sum,nx=(double)n;
+
   sum = 0;
   for (i=0; i<n; i++) sum += data[i];
-  sum /= (double)n;
-  if (sum < tiny) return -1;
-  
+  sum /= nx;
+
   for (i=0; i<n; i++) data[i] -= sum;
-  return 1;
+  return sum;
 }
+
 
 double Tukey(double x,double wx)
 {
@@ -138,10 +142,12 @@ void FFT(double *in,double *xcos,double *xsin,gsl_matrix *tablecos,gsl_matrix *t
   nx = 1;
   kx = 0;
   for (k=0; k<n; k++) {
+    if (k >= tablecos->size1) VError(" k= %d",k);
+    if (k >= tablesin->size1) VError(" k= %d",k);
     sum1 = sum2 = 0;
     /* w = 2.0*PI*kx/nx; */
     ix = 0;
-    for (i=1; i<n; i++) {
+    for (i=0; i<n; i++) {
       sum1 += in[i]*gsl_matrix_get(tablecos,k,i);
       sum2 += in[i]*gsl_matrix_get(tablesin,k,i);
       ix++;
@@ -153,14 +159,34 @@ void FFT(double *in,double *xcos,double *xsin,gsl_matrix *tablecos,gsl_matrix *t
 }
 
 
-
-void EigenvectorCentrality(float *A,float *ev,int n)
+void DegreeCentrality(float *A,float *ev,size_t n)
 {
-  int i,iter,maxiter;
+  size_t i,j,k;
+  double sum=0,nx=(double)n;
+  fprintf(stderr," degree centrality, n= %lu\n",n);
+
+  for (i=0; i<n; i++) {
+    sum=0;
+    for (j=0; j<n; j++) {
+      if (i==j) continue;
+      if (j < i) k=j+i*(i+1)/2;
+      else k=i+j*(j+1)/2;
+      sum += A[k];
+    }
+    ev[i] = (float)(100.0*sum/nx);
+  }
+}
+
+
+
+
+void EigenvectorCentrality(float *A,float *ev,size_t n)
+{
+  size_t i,iter,maxiter;
   float sum,d,nx;
   static float *y=NULL;
 
-  fprintf(stderr," power iteration, n= %d\n",n);
+  fprintf(stderr," power iteration, n= %lu\n",n);
   if (y==NULL) y = (float *) VCalloc(n,sizeof(float));
   if (!y) VError(" err allocating vector ");
   nx = sqrt((double)n);
@@ -182,7 +208,7 @@ void EigenvectorCentrality(float *A,float *ev,int n)
       d += SQR(ev[i] - y[i]/sum);
       ev[i] = y[i]/sum;
     }
-    fprintf(stderr," %5d  %f\n",iter,d);
+    fprintf(stderr," %5lu  %f\n",iter,d);
     if (d < 1.0e-6) break;
   }
   for (i=0; i<n; i++) ev[i] *= 100.0;
@@ -190,12 +216,11 @@ void EigenvectorCentrality(float *A,float *ev,int n)
 }
 
 
-VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float *ev, int n)
+VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float *ev, size_t n)
 {
-  VImage dest=NULL;
-  int i,b,r,c;
+  size_t i,b,r,c;
   
-  dest = VCreateImage(nslices,nrows,ncols,VFloatRepn);
+  VImage dest = VCreateImage(nslices,nrows,ncols,VFloatRepn);
   VFillImage(dest,VAllBands,0);
   VCopyImageAttrs (src, dest);
 
@@ -203,6 +228,7 @@ VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float
     b = VPixel(map,0,0,i,VInteger);
     r = VPixel(map,0,1,i,VInteger);
     c = VPixel(map,0,2,i,VInteger);
+    /* if (ev[i] > 0) fprintf(stderr," %6d    %3d %3d %3d  %f\n",i,c,r,b,ev[i]); */
     VPixel(dest,b,r,c,VFloat) = ev[i];
   }
   return dest;
@@ -213,18 +239,15 @@ VImage WriteOutput(VImage src,VImage map,int nslices,int nrows, int ncols, float
 VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlags,
 		       VShort first,VShort length,VShort type)
 {
-  VImage dest0=NULL;
-  int b,r,c,k0,k,kk,n,p=0;
-  size_t i,j;
-  size_t ii,m,nvox;
+  int b,r,c,j,k,kk,k0,n,p;
+  size_t i;
+  size_t m,nvox;
   int last;
   gsl_matrix *matcos=NULL,*matsin=NULL;
   float *A=NULL,*ev=NULL;
   float tr=-1,xtr=-1;
   double *in,*xsin=NULL,*xcos=NULL,*w=NULL;
-  double nx,u,v,sumx,freq=0;
-  double re,im,x,y,cs,qs,c1,s1,c2,s2;
-  double tiny=1.0e-6;
+  double nx,u,sumx,freq=0;
   gsl_matrix *tablecos=NULL,*tablesin=NULL;
   double pi = 2.0*acos(0);
 
@@ -245,15 +268,15 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
 
 
   /* get time steps to include */
-  if (length < 1) length = ntimesteps-2;
+  if (first < 0) first = 0;
+  if (length <= 0) length = ntimesteps;
   last = first + length -1;
   if (last >= ntimesteps) last = ntimesteps-1;
-  if (first < 0) first = 1;
 
   n = last - first + 1;
   if (n < 2) VError(" not enough timesteps, nt= %d",n);
   nx = (double)n;
-
+      
 
   /* 
   ** get freq range 
@@ -287,7 +310,7 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
     if (VImageNRows(src[b]) < 2) continue;
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-	if (VGetPixel(mask,b,r,c) < 0.01) continue;
+	if (fabs(VGetPixel(mask,b,r,c)) < TINY) continue;
 	nvox++;
       }
     }
@@ -313,7 +336,7 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
     if (VImageNRows(src[b]) < 2) continue;
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
-	if (VGetPixel(mask,b,r,c) < 0.01) continue;
+	if (fabs(VGetPixel(mask,b,r,c)) < TINY) continue;
 	VPixel(map,0,0,i,VInteger) = b;
         VPixel(map,0,1,i,VInteger) = r;
         VPixel(map,0,2,i,VInteger) = c;
@@ -343,21 +366,25 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
   if (!matsin) VError(" err alloc matsin");
   Tables(tablecos,tablesin);
 
-   for (i=0; i<nvox; i++) {
+  for (i=0; i<nvox; i++) {
 
     b = VPixel(map,0,0,i,VInteger);
     r = VPixel(map,0,1,i,VInteger);
     c = VPixel(map,0,2,i,VInteger);
 
+    
     j = 0;
-    for (k=first; k<=last; k++)
-      in[j++] = (double) VGetPixel(src[b],k,r,c);
-    if (Normalize(in,n) < 0) continue;
+    for (k=first; k<=last; k++) {
+      in[j++] = (double) VGetPixel(src[b],k-first,r,c);
+    }
+    double q = Normalize(in,n);
+    if (fabs(q) < TINY) continue;
+
     
     FFT(in,xcos,xsin,tablecos,tablesin);
     nx = (double)n;
+    
     sumx = 0;
-  
     for (k=-p; k<=p; k++) {
       kk = k+k0;
       if (kk < 0) kk = -k;
@@ -366,13 +393,13 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
       sumx += w[ABS(k)]*u;
     }
     xmap[i] = sumx;
-
+    
     for (k=0; k<n; k++) {
       gsl_matrix_set(matcos,i,k,xcos[k]);
       gsl_matrix_set(matsin,i,k,xsin[k]);
-    }
+    } 
   }
-
+    
 
   /*
   ** compute spectral coherence matrix
@@ -382,21 +409,23 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
   A = (float *) VCalloc(m,sizeof(float));
   if (!A) VError(" err allocating matrix");
   memset(A,0,m*sizeof(float));
+   size_t progress=0;
 
-  ii = 0;
+
+  
+#pragma omp parallel for shared(progress) schedule(guided) firstprivate(A,xmap)
   for (i=0; i<nvox; i++) {
-    if (i%100 == 0) fprintf(stderr," %7ld  of  %ld\r",(long)i,(long)nvox);
+    if (i%1000 == 0) fprintf(stderr," %d000  of  %ld\r",(int)(++progress),(long)nvox);
     
-    x = xmap[i];
+    size_t j=0,kij=0;
+    int k=0,kk=0;
+    double v=0,x=0,y=0,cs=0,qs=0,c1,s1,c2,s2,re,im;
 
-    for (j=0; j<=i; j++) {
-      if (i == j) {
-	ii++;
-	continue;
-      }
+    x = xmap[i];
+    for (j=0; j<i; j++) {
+      
       y = xmap[j];
-      if (x*y < tiny) continue;
- 
+
       cs = qs = 0;
       for (k=-p; k<=p; k++) {
 
@@ -418,21 +447,24 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
       }
       
       if (type == 0) {  /* spectral coherence */
-	v = (cs*cs + qs*qs) / (x*y);
-	v = sqrt(v);
+	if (x*y > TINY) {
+	  v = (cs*cs + qs*qs) / (x*y);
+	  v = sqrt(v);
+	}
+	else v = -1;
       }
       else {            /* phase sync */
 	v = atan2(qs,cs)/pi;
 	/* v = 1.0 - ABS(v); */
 	v = cos(v);
       }
+      if (v < TINY) v = TINY;  /* make matrix irreducible */
 
-      if (v < tiny) v = tiny;  /* make matrix irreducible */
-      A[ii] = v;
-      ii++;
+      kij=j+i*(i+1)/2;
+      A[kij] = v;
     }
   }
-
+  
   /* free space */
   gsl_matrix_free(matcos);
   gsl_matrix_free(matsin);
@@ -443,7 +475,8 @@ VAttrList VSpectralECM(VAttrList list,VImage mask,VDouble wavelength,VShort nlag
   */
   ev = (float *) VCalloc(nvox,sizeof(float));
   EigenvectorCentrality(A,ev,nvox);
-  dest0 = WriteOutput(src[0],map,nslices,nrows,ncols,ev,nvox);
+  /* DegreeCentrality(A,ev,nvox); */
+  VImage dest0 = WriteOutput(src[0],map,nslices,nrows,ncols,ev,nvox);
   VSetAttr(VImageAttrList(dest0),"name",NULL,VStringRepn,"eigenvector_centrality");
   VAttrList out_list = VCreateAttrList();
   VAppendAttr(out_list,"image",NULL,VImageRepn,dest0);
@@ -461,10 +494,11 @@ int main (int argc,char *argv[])
 { 
   static VDouble  wavelength = 10;
   static VShort   nlags      = 10;
-  static VShort   first      = 2;
+  static VShort   first      = 0;
   static VShort   length     = 0;
   static VShort   type       = 0;
   static VString  mask_filename   = "";
+  static VShort   nproc  = 0;
   static VOptionDescRec  options[] = {
     {"wavelength", VDoubleRepn,1,(VPointer) &wavelength,VRequiredOpt,NULL,"wavelength in secs"},
     {"first",VShortRepn,1,(VPointer) &first,VOptionalOpt,NULL,"first timestep to use"},
@@ -472,7 +506,8 @@ int main (int argc,char *argv[])
     {"mask",VStringRepn,1,(VPointer) &mask_filename,VRequiredOpt,NULL,"mask"},
     {"nlags",VShortRepn,1,(VPointer) &nlags,VOptionalOpt,NULL,
      "num lags in cross-corr, use 0 to get default value"},
-    {"type",VShortRepn,1,(VPointer) &type,VOptionalOpt,TYPDict,"frequency or phase coherence"}
+    {"type",VShortRepn,1,(VPointer) &type,VOptionalOpt,TYPDict,"frequency or phase coherence"},
+    {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"}
   };
   FILE *in_file,*out_file;
   VString in_filename=NULL;
@@ -482,6 +517,17 @@ int main (int argc,char *argv[])
   /* parse command line */
   VParseFilterCmdZ (VNumber (options),options,argc,argv,&in_file,&out_file,&in_filename);
   if (type > 2) VError(" illegal type");
+
+
+  
+  /* omp-stuff */
+#ifdef _OPENMP
+  int num_procs=omp_get_num_procs();
+  if (nproc > 0 && nproc < num_procs) num_procs = nproc;
+  fprintf(stderr,"using %d cores\n",(int)num_procs);
+  omp_set_num_threads(num_procs);
+#endif /* _OPENMP */
+
 
 
   /* read mask */
