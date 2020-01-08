@@ -169,7 +169,7 @@ int main (int argc,char *argv[])
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
     VGetAttrValue (& posn, NULL,VImageRepn, & tmp);
-    if (VPixelRepn(tmp) != VShortRepn) continue;
+    /* if (VPixelRepn(tmp) != VShortRepn) continue; */
     nslices++;
   }
   if (nslices < 1) VError(" no slices");
@@ -181,7 +181,7 @@ int main (int argc,char *argv[])
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
     VGetAttrValue (& posn, NULL,VImageRepn, & src[i]);
-    if (VPixelRepn(src[i]) != VShortRepn) continue;
+    /* if (VPixelRepn(src[i]) != VShortRepn) continue; */
     if (VImageNBands(src[i]) > ntimesteps) ntimesteps = VImageNBands(src[i]);
     if (VImageNRows(src[i])  > nrows)  nrows = VImageNRows(src[i]);
     if (VImageNColumns(src[i]) > ncols) ncols = VImageNColumns(src[i]);
@@ -239,7 +239,7 @@ int main (int argc,char *argv[])
   VAttrList out_list = VCreateAttrList();  
   if (geoinfo != NULL) VSetGeoInfo(geoinfo,out_list);
   for (slice=0; slice<nslices; slice++) {
-    dest[slice] = VCreateImage(nt,nrows,ncols,VShortRepn);
+    dest[slice] = VCreateImage(nt,nrows,ncols,VPixelRepn(src[slice]));
     VFillImage(dest[slice],VAllBands,0);
     VCopyImageAttrs (src[slice], dest[slice]);
     VAppendAttr(out_list,"image",NULL,VImageRepn,dest[slice]);
@@ -261,7 +261,7 @@ int main (int argc,char *argv[])
 
 	for (k=0; k<ntimesteps; k++) {
 	  xx[k] = tr*((double)k);
-	  yy[k] = (double)VPixel(src[slice],k,row,col,VShort);
+	  yy[k] = (double)VGetPixel(src[slice],k,row,col);
 	}
 	gsl_spline_init (spline, xx, yy, ntimesteps);
 
@@ -273,7 +273,7 @@ int main (int argc,char *argv[])
 	  if (xi < experiment_duration && xi >= 0) {
 	    if (gsl_spline_eval_e (spline,xi,acc,&yi) == GSL_EDOM) continue;
 	  }
-	  VPixel(dest[slice],k,row,col,VShort) = yi;
+	  VSetPixel(dest[slice],k,row,col,yi);
 	  k++;
 	}
       }

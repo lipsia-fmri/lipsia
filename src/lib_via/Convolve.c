@@ -44,7 +44,7 @@ VImage VConvolveCol(VImage src,VImage dest,float *kernel,int dim)
   ncols  = VImageNColumns (src);
   nbands = VImageNBands (src);
 
-  dest = VSelectDestImage("VConvolveCol",dest,nbands,nrows,ncols,VFloatRepn);
+  if (dest == NULL) dest = VCreateImageLike(src);
   VFillImage(dest,VAllBands,0);
 
   for (b=0; b<nbands; b++) {
@@ -57,6 +57,7 @@ VImage VConvolveCol(VImage src,VImage dest,float *kernel,int dim)
 	for (cc=c0; cc<=c1; cc++) {
 	  if (cc >= 0 && cc < ncols) {
 	    x = VGetPixel(src,b,r,cc);
+	    if (k >= dim) continue;
 	    sum += x * kernel[k];
 	  }
 	  k++;
@@ -91,7 +92,7 @@ VImage VConvolveRow (VImage src,VImage dest,float *kernel,int dim)
   ncols  = VImageNColumns (src);
   nbands = VImageNBands (src);
 
-  dest = VSelectDestImage("VConvolveRow",dest,nbands,nrows,ncols,VFloatRepn);
+  if (dest == NULL) dest = VCreateImageLike(src);
   VFillImage(dest,VAllBands,0);
 
   for (b=0; b<nbands; b++) {
@@ -105,6 +106,7 @@ VImage VConvolveRow (VImage src,VImage dest,float *kernel,int dim)
 	for (rr=r0; rr<=r1; rr++) {	 
 	  if (rr >= 0 && rr < nrows) {
 	    x = VGetPixel(src,b,rr,c);
+	    if (k >= dim) continue;
 	    sum += x * kernel[k];
 	    k++;
 	  }
@@ -138,7 +140,7 @@ VImage VConvolveBand (VImage src,VImage dest,float *kernel,int dim)
   ncols  = VImageNColumns (src);
   nbands = VImageNBands (src);
 
-  dest = VSelectDestImage("VConvolveBand",dest,nbands,nrows,ncols,VFloatRepn);
+  if (dest == NULL) dest = VCreateImageLike(src);
   VFillImage(dest,VAllBands,0);
 
   for (b=0; b<nbands; b++) {
@@ -152,6 +154,7 @@ VImage VConvolveBand (VImage src,VImage dest,float *kernel,int dim)
 	for (bb=b0; bb<=b1; bb++) {
 	  if (bb >= 0 && bb < nbands) {
 	    x = VGetPixel(src,bb,r,c);
+	    if (k >= dim) continue;
 	    sum += x * kernel[k];
 	  }
 	  k++;
