@@ -93,6 +93,7 @@ void VUpdateGeoinfo(VAttrList geolist,int dimtype,VLong tr)
 {
   double *D = VGetGeoDim(geolist,NULL);
   D[0] = (double)dimtype;
+  if (dimtype == 3) D[4] = 1;
   VSetGeoDim(geolist,D);
 
   double *E = VGetGeoPixdim(geolist,NULL);
