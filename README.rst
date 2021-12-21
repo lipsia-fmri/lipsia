@@ -4,6 +4,9 @@ LIPSIA 3.1.0 (May 13, 2019): fMRI analysis tools
 
 Lipsia is a collection of tools for the analysis of fMRI data. Its main focus is on new algorithms
 such as statistical inference (LISA), Eigenvector centrality mapping (ECM) and network detection in task-fMRI (TED).
+
+The development of the Lipsia open access software package was financially supported by the Horizon 2020/CDS-QUAMRI/634541 project. This support is gratefully acknowledged.
+
 Below, a brief description follows. For further details see `documentation`_.
 
 
