@@ -38,10 +38,7 @@ Network tools
 
 `vecm`_: Eigenvector centrality mapping (ECM)
 
-`vbcm`_: Bipartite connectivity mapping (BCM)
-
 `vccm`_: Connectivity concordance mapping (CCM)
-
 
 
 .. _vnifti: conv/vnifti.rst
