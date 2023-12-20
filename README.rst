@@ -5,7 +5,8 @@ LIPSIA 3.1.0 (May 13, 2019): fMRI analysis tools
 Lipsia is a collection of tools for the analysis of fMRI data. Its main focus is on new algorithms
 such as statistical inference (LISA), Eigenvector centrality mapping (ECM) and network detection in task-fMRI (TED).
 
-The development of the Lipsia open access software package was financially supported by the Horizon 2020/CDS-QUAMRI/634541 project. This support is gratefully acknowledged.
+The development of the Lipsia open access software package was financially supported by the Horizon 2020/CDS-QUAMRI/634541 project. 
+This support is gratefully acknowledged.
 
 Below, a brief description follows. For further details see `documentation`_.
 
@@ -19,6 +20,28 @@ Lipsia currently supports Linux and all other operating systems via Docker. Foll
 Documentation
 ```````````````````````
 Find the full lipsia documentation here: `documentation`_.
+
+
+
+A new machine learning algorithm (VEGA) in examples:
+```````````````````````````````````````````````````
+
+  vnifti -in brainmask.nii -out brainmask.v
+
+
+  vedgeselect -in brainmask.v -out edgeselect.v -numsel 1000000
+  
+  
+  for i in {1...390}; do
+    vnetmatrix -in fMRIdata_$1.v -out conmat_$1.v -select edgeselect.v
+  done
+
+
+  vega -in conmat_*.v -regresor IQ.txt -sel edgesel.v -mask brainmask.v -nsubj 390
+    -dimX 1000 -ncomp 10 -kfold 6 -ntree 2000 -rname IQ -out z.v -qthr 0.5
+
+
+
 
 
 Statistical inference (LISA) in examples:
