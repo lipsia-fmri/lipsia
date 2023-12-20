@@ -46,9 +46,7 @@ Semi-blind machine learning (SML) in an example:
   
 
 
-  vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt \
-    -xtrain Edu_train.txt -xtest Edu_test.txt -dimX 800 -npls 10 -nensembles 1000 -seed 12345  \
-    -out results.txt
+  vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt -dimX 800 -npls 10 -nensembles 1000 -seed 12345 -out results.txt
 
 
 
