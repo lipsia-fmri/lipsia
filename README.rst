@@ -30,9 +30,14 @@ Semi-blind machine learning (SML) in an example:
   It is assumed that the connectomes have been precomputed and exist in csv-format. The first step is to
   convert the connectomes into the lipsia-format. This is done using he lipsia program *vreadconnectome*. 
   The example below shows how this is done. Here the training set consists of 400 subjects, the test set has 100
-  subjects. The information about the target variable of interest (e.g.IQ) must be supplied as a text-file where each line
-  contains the value of one subject. The ordering of the rows of the text-files must correspond to the ordering in which
-  the connectomes are input into *vsml*.  The output is a text file showing the predictions of the target variable
+  subjects. The information about the target variable of interest (e.g.IQ) must be supplied as a text-file ("IQ_train.txt")
+  Likewise, information about supplementary non-imaging information 
+  (e.g. educational levels) must be supplied as text-files ("Edu_train.txt", "Edu_test"). Each row of those text-file contains
+  the value (e.g. IQ or educational level) as a number.
+  The ordering of the rows of the text-files must correspond to the ordering in which
+  the connectomes are input into *vsml*.  
+  
+  The output of *vsml* is a text file showing the predictions of the target variable
   for the subjects of the test set.
   
  
@@ -44,7 +49,8 @@ Semi-blind machine learning (SML) in an example:
   
 
 
-  vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt -dimX 800 -npls 10 -nensembles 1000 -seed 12345 -out results.txt
+  vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt \
+      -dimX 800 -npls 10 -nensembles 1000 -seed 12345 -out results.txt
 
 
 
