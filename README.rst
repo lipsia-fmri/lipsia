@@ -32,7 +32,10 @@ Semi-blind machine learning (SML) in an example:
   as shown in the example below. Here the training set consists of 400 subjects, the test set has 100
   subjects. 
   
-  The information about the target variable of interest (e.g.IQ) must be supplied as a text-file ("IQ_train.txt")
+  The information about the target variable of interest (e.g.IQ) must be supplied as a text-file for all subjects of the
+  training set ("IQ_train.txt"). If this information is also available for the test set, 
+  it can optionally be supplied ("IQ_test.txt") and will be used to report the accuracy of the prediction.
+  
   Likewise, information about supplementary non-imaging information 
   (e.g. educational levels) must be supplied as text-files ("Edu_train.txt", "Edu_test"). Each row of those text-file contains
   the value (e.g. IQ or educational level) as a number.
