@@ -1,9 +1,9 @@
 
-LIPSIA 3.1.0 (May 13, 2019): fMRI analysis tools
+LIPSIA 3.1.0: fMRI analysis tools
 ======================================
 
 Lipsia is a collection of tools for the analysis of fMRI data. Its main focus is on new algorithms
-such as statistical inference (LISA), Eigenvector centrality mapping (ECM) and network detection in task-fMRI (TED).
+such as statistical inference (LISA), semi-blind machine learning (SML) and Eigenvector centrality mapping (ECM).
 
 The development of the Lipsia open access software package was financially supported by the Horizon 2020/CDS-QUAMRI/634541 project. 
 This support is gratefully acknowledged.
@@ -23,23 +23,32 @@ Find the full lipsia documentation here: `documentation`_.
 
 
 
-A new machine learning algorithm (VEGA) in examples:
+Semi-blind machine learning (SML) in an example:
 ```````````````````````````````````````````````````
 
-  vnifti -in brainmask.nii -out brainmask.v
-
-
-  vedgeselect -in brainmask.v -out edgeselect.v -numsel 1000000
+  SML is implemented in the program *vsml*. It expects connectome data for all subjects of the training and the test set.
+  It is assumed that the connectomes have been precomputed and exist in csv-format. The first step is to
+  convert the connectomes into the lipsia-format. This is done using he lipsia program *vreadconnectome*. 
+  The example below shows how this is done. Here the training set consists of 400 subjects, the test set has 100
+  subjects. The information about the target variable of interest (e.g.IQ) must be supplied as a text-file where each line
+  contains the value of one subject. The ordering of the rows of the text-files must correspond to the ordering in which
+  the connectomes are input into *vsml*.  The output is a text file showing the predictions of the target variable
+  for the subjects of the test set.
   
-  
-  for i in {1...390}; do
-    vnetmatrix -in fMRIdata_$1.v -out conmat_$1.v -select edgeselect.v
+ 
+  for i in {1...400}; do
+    vreadconnectome -in traindata_${i}.csv -out traindata_${i}.v -ncomponents 100
   done
+  
+  for i in {1...100}; do
+    vreadconnectome -in testdata_${i}.csv -out testdata_${i}.v -ncomponents 100
+  done
+  
 
 
-  vega -in conmat_*.v -regresor IQ.txt -sel edgesel.v -mask brainmask.v -nsubj 390
-    -dimX 1000 -ncomp 10 -kfold 6 -ntree 2000 -rname IQ -out z.v -qthr 0.5
-
+  vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt \
+    -xtrain Edu_train.txt -xtest Edu_test.txt -dimX 800 -npls 10 -nensembles 1000 -seed 12345  \
+    -out results.txt
 
 
 
