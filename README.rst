@@ -37,12 +37,10 @@ Semi-blind machine learning (SML) in an example:
   
  
   for i in {1...400}; do
-    vreadconnectome -in traindata_${i}.csv -out traindata_${i}.v -ncomponents 100
-  done
+    vreadconnectome -in traindata_${i}.csv -out traindata_${i}.v -ncomponents 100; done
   
   for i in {1...100}; do
-    vreadconnectome -in testdata_${i}.csv -out testdata_${i}.v -ncomponents 100
-  done
+    vreadconnectome -in testdata_${i}.csv -out testdata_${i}.v -ncomponents 100; done
   
 
 
