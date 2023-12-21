@@ -257,6 +257,7 @@ int main (int argc, char *argv[])
   fprintf(stderr,"# A: Blind machine learning (no supplementary info)\n");
   fprintf(stderr,"# B: Semi-blind machine learning without bias control\n");
   fprintf(stderr,"# C: Semi-blind machine learning with bias control\n");
+  fprintf(stderr,"# X: Predictions based solely on supplementaru info, no fMRI\n");
   fprintf(stderr,"# AX: bias in A\n");
   fprintf(stderr,"# BX: bias in B\n");
   fprintf(stderr,"# CX: bias in C\n");
