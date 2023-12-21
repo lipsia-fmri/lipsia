@@ -30,7 +30,7 @@ Semi-blind machine learning (SML):
   The program **vsml** expects as input connectome data for all subjects of the training and the test set.
   It is assumed that these connectomes have been precomputed using some other software tool and exist as text-files in csv-format.
   The first step of the processing chain is to convert these connectomes into the lipsia-format. 
-  This is done using the rogram **vreadconnectome** as shown in the example below. 
+  This is done using the program **vreadconnectome** as shown in the example below. 
   In our example, the training set consists of 400 subjects, the test set has 100 subjects. 
   
   The information about the target variable of interest (e.g.IQ) must be supplied as a text-file for all subjects of the
@@ -52,13 +52,12 @@ Semi-blind machine learning (SML):
   Example usage:
   
   for i in {1...400}; do
-    vreadconnectome -in traindata_${i}.csv -out traindata_${i}.v -ncomponents 100; done
+    *vreadconnectome -in traindata_${i}.csv -out traindata_${i}.v -ncomponents 100; done*
   
   for i in {1...100}; do
-    vreadconnectome -in testdata_${i}.csv -out testdata_${i}.v -ncomponents 100; done
+    *vreadconnectome -in testdata_${i}.csv -out testdata_${i}.v -ncomponents 100; done*
   
-
-  vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt -out results.txt
+  *vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt -out results.txt*
 
 
 
