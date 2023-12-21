@@ -29,7 +29,6 @@ int main(int argc,char *argv[])
   };
   FILE *out_file;
   size_t i;
-  float u=0;
 
   
   /* parse command line */
@@ -37,20 +36,10 @@ int main(int argc,char *argv[])
 
   size_t ncomponents = (size_t) xcomponents;  
   size_t dim = ncomponents*(ncomponents-1)/2;
-  size_t len  = 30*dim;
+  size_t len  = 40*dim;
   char *buf  = (char *) VCalloc(len,sizeof(char));
+  if (buf == NULL) VError(" error allocating buffer, file too big");
   char *token = "";
-
-
-  /*
-  FILE *fq = fopen(in_filename,"w");
-  for (i=0; i<dim-1; i++) {
-    fprintf(fq,"%.3f,",(float)i);
-  }
-  fprintf(fq,"%.3f\n",(float)i);
-  fclose(fq);
-  exit(0);
-  */
 
   
   FILE *fp = fopen(in_filename,"r");
@@ -58,15 +47,24 @@ int main(int argc,char *argv[])
   memset(buf,0,len);
   if (fgets(buf,len,fp) == FALSE) VError(" err reading input file");
 
+  i=0;
+  while ((buf[0] =='#' || buf[0] == '%' || buf[0] == '$' || buf[0] == ' ' || buf[0] == '\n')  && i < 10000) {
+    memset(buf,0,len);
+    if (fgets(buf,len,fp) == FALSE) VError(" err reading input file");
+    i++;
+  }
+  if (i > 9999) VError(" read error");
+
   float *A = (float *)VCalloc(dim,sizeof(float));
   token = strtok(buf,",");
-  for (i=0; i<dim; i++) {
-    if (token == NULL) VError(" file has only %lu entries. It should have %lu entries",i,dim);
-    sscanf(token,"%f",&u);
+  i=0;
+  while( token != NULL ) {
+    A[i] = atof(token);
     token = strtok(NULL,",");
-    A[i] = u;
+    i++;
   }
   fclose(fp);
+  if (i != dim) VError(" Input file is expected to have %lu entries, but %lu were found",dim,i);
 
 
   VAttrList alist = VCreateAttrList();
