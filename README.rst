@@ -1,5 +1,5 @@
 
-LIPSIA 3.1.0: fMRI analysis tools
+LIPSIA 3.1.1: fMRI analysis tools
 ======================================
 
 Lipsia is a collection of tools for the analysis of fMRI data. Its main focus is on new algorithms
@@ -14,7 +14,8 @@ Below, a brief description follows. For further details see `documentation`_.
 
 Installation
 ```````````````````````
-Lipsia currently supports Linux and all other operating systems via Docker. Follow the instructions here: `install`_.
+Lipsia currently supports Linux and all other operating systems via Singularity and Docker, see the files
+"singularity-recipe.txt" and/or "Dockerfile". Follow the instructions here: `install`_.
 
 
 Documentation
@@ -49,7 +50,7 @@ Semi-blind machine learning (SML):
   
   
   
-  Example usage:
+  *Example usage:*
   
   for i in {1...400}; do
     **vreadconnectome -in traindata_${i}.csv -out traindata_${i}.v -ncomponents 100; done**
@@ -60,6 +61,11 @@ Semi-blind machine learning (SML):
   **vsml -train train_\*.v -test test_\*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt -out results.txt**
 
 
+
+
+*Reference:*
+  
+Lohmann et al (2023) "Improving the reliability of fMRI-based predictions of intelligence via semi-blind machine learning", bioRxiv, https://doi.org/10.1101/2023.11.03.565485
 
 
 
