@@ -55,7 +55,7 @@ Semi-blind machine learning (SML):
     **vreadconnectome -in traindata_${i}.csv -out traindata_${i}.v -ncomponents 100; done**
   
   for i in {1...100}; do
-    *vreadconnectome -in testdata_${i}.csv -out testdata_${i}.v -ncomponents 100; done*
+    **vreadconnectome -in testdata_${i}.csv -out testdata_${i}.v -ncomponents 100; done**
   
   **vsml -train train_\*.v -test test_\*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt -out results.txt**
 
