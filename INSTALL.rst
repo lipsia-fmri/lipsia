@@ -1,8 +1,17 @@
-How to install LIPSIA
-===========================
+How to install LIPSIA using Singularity
+=========================================
 
+The easiest way to install Lipsia is via a singularity container. To build a singularity container for lipsia, execute the following command:
 
-You can either build lipsia from scratch (installing all dependencies) or use the docker version (see below).
+> singularity build lipsia.sif ./singularity-recipe.txt 
+
+This creates a container called "lipsia.sif". Its size is around 220 MByte.
+To execute programs within this container, do the following:
+
+> ./lipsia.sif exec vsml
+
+This will execute the lipsia-program called "vsml". Other lipsia-programs can be called in a similar way.
+
 
 
 
