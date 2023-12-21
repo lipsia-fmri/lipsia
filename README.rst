@@ -23,29 +23,34 @@ Find the full lipsia documentation here: `documentation`_.
 
 
 
-Semi-blind machine learning (SML) in an example:
+Semi-blind machine learning (SML):
 ```````````````````````````````````````````````````
 
-  SML is implemented in the program *vsml*. It expects connectome data for all subjects of the training and the test set.
-  It is assumed that the connectomes have been precomputed and exist in csv-format. The first step is to
-  convert the connectomes into the lipsia-format. This is done using the lipsia program *vreadconnectome*
-  as shown in the example below. Here the training set consists of 400 subjects, the test set has 100
-  subjects. 
+  SML is implemented in the program **vsml**. In the following, its usage is illustrated in an example.  
+  The program **vsml** expects as input connectome data for all subjects of the training and the test set.
+  It is assumed that these connectomes have been precomputed using some other software tool and exist as text-files in csv-format.
+  The first step of the processing chain is to convert these connectomes into the lipsia-format. 
+  This is done using the rogram **vreadconnectome** as shown in the example below. 
+  In our example, the training set consists of 400 subjects, the test set has 100 subjects. 
   
   The information about the target variable of interest (e.g.IQ) must be supplied as a text-file for all subjects of the
   training set ("IQ_train.txt"). If this information is also available for the test set, 
   it can optionally be supplied ("IQ_test.txt") and will be used to report the accuracy of the prediction.
   
   Likewise, information about supplementary non-imaging information 
-  (e.g. educational levels) must be supplied as text-files ("Edu_train.txt", "Edu_test"). Each row of those text-file contains
-  the value (e.g. IQ or educational level) as a number.
-  The ordering of the rows of the text-files must correspond to the ordering in which
-  the connectomes are input into *vsml*.  
+  (e.g. educational levels) must be supplied as text-files ("Edu_train.txt", "Edu_test.txt"). 
+  Each row in these files contains a numerical value corresponding to a subject's attribute (e.g. IQ or educational level). 
+  The order of rows in these text files should align with the sequence in which the connectomes are input into **vsml**.
   
-  The output of *vsml* is a text file showing the predictions of the target variable
-  for the subjects of the test set.
+  A few more parameters can optionally be supplied to **vsml** to adjust the partial least squares regression and ensemble learning process,
+  but default settings of these parameters should usually work well enough. 
+
+  The output of *vsml* is a text file ("results.txt") showing the predictions of the target variable for the subjects of the test set.
   
- 
+  
+  
+  Example usage:
+  
   for i in {1...400}; do
     vreadconnectome -in traindata_${i}.csv -out traindata_${i}.v -ncomponents 100; done
   
@@ -53,9 +58,8 @@ Semi-blind machine learning (SML) in an example:
     vreadconnectome -in testdata_${i}.csv -out testdata_${i}.v -ncomponents 100; done
   
 
+  vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt -out results.txt
 
-  vsml -train train_*.v -test test_*.v -ytrain IQ_train.txt -ytest IQ_test.txt -xtrain Edu_train.txt -xtest Edu_test.txt \
-      -dimX 800 -npls 10 -nensembles 1000 -seed 12345 -out results.txt
 
 
 
