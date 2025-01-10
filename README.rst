@@ -2,11 +2,11 @@
 LIPSIA 3.1.1: fMRI analysis tools
 ======================================
 
-Lipsia is a collection of tools for the analysis of fMRI data. Its main focus is on new algorithms
-such as statistical inference (LISA), semi-blind machine learning (SML) and Eigenvector centrality mapping (ECM).
-
-The development of the Lipsia open access software package was financially supported by the Horizon 2020/CDS-QUAMRI/634541 project. 
-This support is gratefully acknowledged.
+Lipsia is a collection of tools for the analysis of functional magnetic resonance imaging (fMRI) data.
+Its primary focus lies in implementing novel algorithms, including laminar-specific fMRI analysis (cylarim),
+statistical inference (LISA), and Eigenvector centrality mapping (ECM).
+Lipsia is designed with a focus on compactness and ease of installation,
+making it readily accessible for researchers to incorporate these advanced analysis methods into their workflows.
 
 Below, a brief description follows. For further details see `documentation`_.
 
@@ -14,18 +14,58 @@ Below, a brief description follows. For further details see `documentation`_.
 
 Installation
 ```````````````````````
-Lipsia currently supports Linux and all other operating systems via Singularity and Docker, see the files
+Lipsia supports Linux and other operating systems via Singularity and Docker, see the files
 "singularity-recipe.txt" and/or "Dockerfile". Follow the instructions here: `install`_.
 
 
-Documentation
+
+Lipsia file format
+```````````````````````````````````````
+Lipsia uses its own data format, which is called vista (extension *.v).
+Many lipsia programs also accept gzipped files or nifti-files as input (*.v.gz or *.nii.gz).
+The output is always in unzipped vista-format.
+You can easily convert your NIfTI data from and to lipsia with the program *vnifti*::
+
+  vnifti -in data.nii -out data.v
+  vnifti -in data.nii.gz -out data.v
+  vnifti -in result.v -out result.nii
+
+
+
+
+Getting started
 ```````````````````````
-Find the full lipsia documentation here: `documentation`_.
+
+Lipsia generally uses the "-in" parameter to specify input images
+and "-out" for output images. Many programs within Lipsia offer additional parameters,
+such as brain masks or thresholds, to fine-tune the analysis.
+
+As an example, consider Eigenvector Centrality Mapping (ECM).
+To compute an ECM map, you would typically use the following command-line instruction::
+
+  vecm -in functional.nii.gz -mask brainmask.nii.gz -out ecm.v
+
+This command processes the input fMRI data (functional.nii.gz) within the specified brain mask
+(brainmask.nii.gz) and generates an ECM map in the vista format (ecm.v).
+
+To further process or visualize the ECM map with tools that may not support the vista format,
+you can convert it to NIfTI format using the following command::
+
+  vnifti -in ecm.v -out ecm.nii
 
 
 
-Laminar-specific fMRI analysis (Cylarim) - preliminary
-``````````````````````````````````````````````````````````````
+*Reference:*
+ 
+Lohmann, G. (2010), "Eigenvector centrality mapping for analyzing connectivity patterns in fMRI data of the human brain"
+ PLoS ONE, https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0010232>
+
+
+
+
+
+Laminar-specific fMRI analysis (Cylarim) - under construction
+````````````````````````````````````````````````````````````````
 
 Laminar-specific fMRI is implemented in several programs: **vrim**, **vmetric**, **vcylarim** and **vcylarim_stats**.
 The programs **vrim** and **vmetric** implement preparatory steps used for generating a rim image and a metric image.
@@ -42,9 +82,48 @@ compute contrasts between the GLM coefficients.
   
   *Example usage:*
 
-    vcylarim -in zmap.v -metric metric.v -mask mask.v -rim rim.v -radius 3 -out cylglm.v
+    vcylarim -in zmap.v -metric metric.v -mask mask.v -rim rim.v -radius 3 -out cylbeta.v
     
-    vcylarim_stats -in cylglm.v -out zmiddle.v -ty middle
+    vcylarim_stats -in cylbeta.v -out result.v -type middle
+
+
+
+
+
+Statistical inference (LISA) in examples:
+```````````````````````````````````````````````````
+
+*Onesample test at the 2nd level* (`vlisa_onesample`_). 
+Example: the input is a set of contrast maps called "data_*.nii.gz"::
+
+  vlisa_onesample -in data_*.nii.gz -mask mask.nii -out result.v
+  vnifti -in result.v -out result.nii
+
+
+*Twosample test at the 2nd level* (`vlisa_twosample`_). 
+Example: input are two sets of contrast maps called "data1_*.nii.gz" and "data2_*.nii.gz"::
+
+  vlisa_twosample -in1 data1_*.nii.gz -in2 data2_*.nii.gz -mask mask.nii -out result.v
+  vnifti -in result.v -out result.nii
+
+
+*Single subject test (1st level)* (`vlisa_prewhitening`_). 
+Example: input are two runs acquired in the same session called "run1.nii.gz" and "run2.nii.gz".
+
+
+  vlisa_prewhitening -in run1.nii.gz run2.nii.gz -design des1.txt des2.txt -mask mask.nii -out result.v 
+  vnifti -in result.v -out result.nii
+
+
+Note: preprocessing should include a correction for baseline drifts::
+
+
+
+*Reference:*
+  
+Lohmann et al (2018) "LISA improves statistical analysis for fMRI",
+Nature Comm, https://www.nature.com/articles/s41467-018-06304-z
+
 
 
 
@@ -93,79 +172,3 @@ Semi-blind machine learning (SML):
   
 Lohmann et al (2023) "Improving the reliability of fMRI-based predictions of intelligence via semi-blind machine learning", bioRxiv, https://doi.org/10.1101/2023.11.03.565485
 
-
-
-Statistical inference (LISA) in examples:
-```````````````````````````````````````````````````
-
-*Onesample test at the 2nd level* (`vlisa_onesample`_). 
-Example: the input is a set of contrast maps called "data_*.nii.gz"::
-
-  vlisa_onesample -in data_*.nii.gz -mask mask.nii -out result.v
-  vnifti -in result.v -out result.nii
-
-
-*Twosample test at the 2nd level* (`vlisa_twosample`_). 
-Example: input are two sets of contrast maps called "data1_*.nii.gz" and "data2_*.nii.gz"::
-
-  vlisa_twosample -in1 data1_*.nii.gz -in2 data2_*.nii.gz -mask mask.nii -out result.v
-  vnifti -in result.v -out result.nii
-
-
-*Single subject test (1st level)* (`vlisa_prewhitening`_). 
-Example: input are two runs acquired in the same session called "run1.nii.gz" and "run2.nii.gz".
-Preprocessing should include a correction for baseline drifts!::
-
-
-  vlisa_prewhitening -in run1.nii.gz run2.nii.gz -design des1.txt des2.txt -mask mask.nii -out result.v 
-  vnifti -in result.v -out result.nii
-
-
-
-Eigenvector centrality mapping (ECM) in examples:
-```````````````````````````````````````````````````
-
-Example: input is an fMRI data set called "data.nii.gz" and a brain mask called "mask.nii.gz".::
-
-  vecm -in data.nii.gz -mask mask.nii.gz -j 0 -out ecm.v
-  vnifti -in ecm.v -out ecm.nii
-
-
-
-
-Lipsia file format
-```````````````````````````````````````
-Lipsia uses its own data format, which is called vista (extension *.v).
-Many lipsia programs also accept gzipped files or nifti-files as input (*.v.gz or *.nii.gz).
-The output is always in unzipped vista-format.
-You can easily convert your nifti data from and to lipsia with the program *vnifti*::
-
-  vnifti -in data.nii -out data.v
-  vnifti -in data.nii.gz -out data.v
-  vnifti -in result.v -out result.nii
-
-
-Alternatively, you can import a folder with DICOM files into the vista format::
-
-  vdicom -in dir_dicom
-
-
-
-Preprocessing
-```````````````````````
-The current release contains only a rudimentary set of preprocessing tools.
-Preprocessing should therefore be performed beforehand using other software packages.
-Note that some lipsia algorithms require that the preprocessing pipeline
-contains a removal of baseline drifts.
-This step can be done using the lipsia program "vpreprocess" if it was omitted
-in the initial preprocessing.
-
-
-
-.. _install: INSTALL.rst
-.. _documentation: docs/index_github.rst
-
-
-.. _vlisa_onesample: docs/stats/vlisa_onesample.rst
-.. _vlisa_twosample: docs/stats/vlisa_twosample.rst
-.. _vlisa_prewhitening: docs/stats/vlisa_prewhitening.rst
