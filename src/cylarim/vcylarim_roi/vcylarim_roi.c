@@ -38,8 +38,8 @@ int main (int argc, char **argv)
   static VString  roi_filename="";
   static VString  txt_filename="";
   static VOptionDescRec options[] = {
+    {"out", VStringRepn,1,(VPointer) &txt_filename,VRequiredOpt,NULL,"Output txt file"},
     {"roi", VStringRepn,1,(VPointer) &roi_filename,VRequiredOpt,NULL,"ROI image"},
-    {"txt", VStringRepn,1,(VPointer) &txt_filename,VRequiredOpt,NULL,"Output txt file"},
   };
   VString in_file=NULL;
   size_t n=0;
