@@ -4,7 +4,7 @@ CFLAGS  += -fopenmp
 
 
 PROG = vcylarim_roi
-SRC = vcylarim_roi.c ROIstats.c ROIprint.c ROIbeta.c ../cylutils/Conv.c ../cylutils/Cylinders.c
+SRC = vcylarim_roi.c ROIplot.c ../cylutils/Conv.c
 OBJ=$(SRC:.c=.o)
 
 ${PROG}: ${OBJ}
