@@ -30,6 +30,9 @@ Example:
  
 Example output:
 ``````````
+
+.. container:: no-space
+   
    0   -0.02029  -0.21332   0.13843
    1    0.13023  -0.05394   0.29205
    2    0.13844   0.01691   0.27366
@@ -47,4 +50,4 @@ Parameters of 'vcylarim_plot'
 
 
 
-.. index:: cylarim_roi
+.. index:: cylarim_plot
