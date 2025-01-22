@@ -1,7 +1,7 @@
-vcylarim_roi
+vcylarim_plot
 =====================
 
-The inputs into the program  **vcylarim_roi** are a file containing
+The inputs into the program  **vcylarim_plot** are a file containing
 the GLM-coefficients computed by **vcylarim**, and also a region of interest (ROI).
 It produces a txt file as output that can be used for plotting laminar-specific results.
 
@@ -23,7 +23,7 @@ Example:
 
  :: 
  
-   vcylarim_roi -in cylbeta.v -roi roi.nii -out list.txt
+   vcylarim_plot -in cylbeta.v -roi roi.nii -out list.txt
 
 
  
@@ -37,7 +37,7 @@ Example output:
 
  
 
-Parameters of 'vcylarim_roi'
+Parameters of 'vcylarim_plot'
 ````````````````````````````````
 
 -help     Prints usage information.

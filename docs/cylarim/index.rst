@@ -21,7 +21,7 @@ Contents:
    vcylarim
    vcylarim_stats
    vcylarim_getmask
-   vcylarim_roi
+   vcylarim_plot
    vrim
    vmetric
    

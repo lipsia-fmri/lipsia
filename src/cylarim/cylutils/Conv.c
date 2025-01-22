@@ -46,7 +46,7 @@ VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn)
 	u = VGetPixel(src,b,r,c);
 	
 	if (repn == VBitRepn) {
-	  if (u < 0.1) VPixel(dest,b,r,c,VBit) = 0;
+	  if (u < 0.0001) VPixel(dest,b,r,c,VBit) = 0;
 	  else VPixel(dest,b,r,c,VBit) = 1;
 	}
 	else if (repn == VUByteRepn) {
