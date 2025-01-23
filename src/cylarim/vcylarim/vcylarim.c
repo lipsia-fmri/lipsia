@@ -114,7 +114,7 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
 	for (j=0; j<ncov; j++) {
 	  VPixel(covimage[j],b,r,c,VFloat) += w*bcov->data[j];
 	}
-	VPixel(edfimage,b,r,c,VFloat) += edf;
+	VPixel(edfimage,b,r,c,VFloat) += w*edf;
       }
     }
     gsl_vector_free(beta);
