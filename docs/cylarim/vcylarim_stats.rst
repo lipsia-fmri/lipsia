@@ -3,16 +3,19 @@ vcylarim_stats
 
 The program  **vcylarim_stats** expects the GLM-coefficients computed by **vcylarim** as its input,
 and produces a laminar-specific map. The GLM coefficients corresponding to the three layers
-are called dx, mx, sx, respectively.
+are called d (deep), m (middle), s (superficial), respectively.
 Below is a list of output options.
 
 
- - deep ( dx)
- - middle ( mx )
- - superficial ( sx )
- - xdeep  ( 2dx - mx - sx ) 
- - xmiddle  ( 2mx - dx - sx ) 
- - xsuperficial   ( 2sx - mx - sx ) 
+ - deep ( d)
+ - middle ( m )
+ - superficial ( s )
+ - xdeep  ( 2d - m - s ) 
+ - xmiddle  ( 2m - d - s ) 
+ - xsuperficial   ( 2s - m - s ) 
+ - zdeep  ( conjunction((d-m),(d-s)) ) 
+ - zmiddle  ( conjunction((m-d),(m-s)) ) 
+ - zsuperficial  ( conjunction((s-m),(s-d)) ) 
 
 
 

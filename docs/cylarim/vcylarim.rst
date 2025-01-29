@@ -9,12 +9,15 @@ Optionally, they can also be obtained using the software package LayNii.
 Note that the rim image must use the following codes: 
 1(CSF/GM boundary), 2:(WM/GM boundary), 3:(cortex interior).
 
-The output of **vcylarim** is a file that contains four images. 
+The output of **vcylarim** is a file that contains seven images. 
 The first three images contain the GLM-coefficients estimated for the deep, middle and superficial layers.
-The fourth image contains the intercept values. The GLM coefficients are estimated separately for each cylinder.
+The fourth image contains the intercept values. The following three images contain
+z-values of the laminar contrasts (deep-middle), (deep-superficial), (middle-superficial).
+The output of **vcylarim**  is subsequently used by **vcylarim_stats** to compute various laminar statistics.
+
+The GLM coefficients are estimated separately for each cylinder.
 In most voxels, several cylinders overlap. In these voxels, the GLM coefficients 
 estimated of the overlapping cylinders are averaged.
-
 
 
 
@@ -34,9 +37,8 @@ obtain useful masks.
 The parameter "-radius" specifies the radii of the cylinders in mm.
 The parameter "-equivol" specifies whether or not equivolume correction should be applied to each cylinder.
 **vcylarim** implements parallel computations uses openmp. The number of processors to use can be specified with 
-the parameter "-j". The output (cylbeta.v) contains four images containing the estimated GLM coefficients.
-This file should be analyzed in subsequent processing steps using **cylarim_stats**.
-
+the parameter "-j". The output (cylbeta.v) contains several images as explained above.
+This file can be analyzed in subsequent processing steps using **cylarim_stats**.
 
 
 

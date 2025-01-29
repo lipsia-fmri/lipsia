@@ -3,7 +3,8 @@ vcylarim_plot
 
 The inputs into the program  **vcylarim_plot** are a file containing
 the GLM-coefficients computed by **vcylarim**, and also a region of interest (ROI).
-It produces a txt file as output that can be used for plotting laminar-specific results.
+The original spatial resolution (prior to upsampling) should also be provided.
+The program produces a txt file as output that can be used for plotting laminar-specific results.
 
 The output txt file contains three rows, one for each layer.
 
@@ -13,8 +14,11 @@ The second row begins with an index '1', and shows results for the middle layer.
 
 The second row begins with an index '2', and shows results for the superficial layer.
 
-The second column in each row is the median value of all beta values within the given ROI
-of that layer. The third column is the lower quartile, the fourth colum is the upper quartile.
+The second column in each row is the mean value of all beta values within the given ROI
+of that cortical layer. The third and fourth columns are the lower and upper bounds
+of the 95 percent confidence interval. The degrees of freedom required for this purpose
+are approximated by estimating the number of non-zero voxels in the ROI (prior to upsampling),
+divided by 4, which is generally a very conservative estimate.
 
 
 
@@ -23,7 +27,7 @@ Example:
 
  :: 
  
-   vcylarim_plot -in cylbeta.v -roi roi.nii -out list.txt
+   vcylarim_plot -in cylbeta.v -roi roi.nii -resolution 0.8 0.8 0.8 -out list.txt
 
 
  
@@ -40,17 +44,17 @@ Example output:
      - lower quartile
      - upper quartile
    * - 0
-     - -0.02029
-     - -0.21332
-     -  0.13843
+     - 0.072
+     - 0.052
+     - 0.081
    * - 1	       
-     - 0.13023
-     - -0.05394
-     - 0.29205	       
+     - 0.104
+     - 0.086
+     - 0.125    
    * - 2
-     - 0.13844
-     - 0.01691
-     - 0.27366
+     - 0.048
+     - 0.032
+     - 0.059
 
 
  
