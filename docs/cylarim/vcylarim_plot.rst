@@ -41,8 +41,8 @@ Example output:
       
    * - layer ID
      - median
-     - lower quartile
-     - upper quartile
+     - lower bound
+     - upper bound
    * - 0
      - 0.072
      - 0.052
