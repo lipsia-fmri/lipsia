@@ -7,7 +7,7 @@ It expects as input an activation map, a rim image and a metric image.
 They can be generated using the cylarim-programs called **vrim** and **vmetric**.
 Optionally, they can also be obtained using the software package LayNii.
 Note that the rim image must use the following codes: 
-1(CSF/GM boundary), 2:(WM/GM boundary), 3:(cortex interior).
+1:(CSF/GM boundary), 2:(WM/GM boundary), 3:(cortex interior).
 
 The output of **vcylarim** is a file that contains seven images. 
 The first three images contain the GLM-coefficients estimated for the deep, middle and superficial layers.
@@ -53,7 +53,7 @@ Parameters of 'vcylarim'
  -metric   Metric image (required)
  -rim      Rim image (required)
  -radius   Cylinder radius in mm. Default: 2
- -equivol  Whether to apply quivolume correction [ true | false ]. Default: false
+ -equivol  Whether to apply equivolume correction [ true | false ]. Default: false
  -j        Number of processors to use, '0' to use all. Default: 0
 
 
