@@ -19,6 +19,7 @@
 
 #include "../cylutils/cyl.h"
 
+extern void SIMPLS1(gsl_matrix *X,gsl_vector *y,gsl_vector *beta,size_t A);
 extern double gaussian(double x,int);
 
 
@@ -39,6 +40,39 @@ void Simple(gsl_vector *y,gsl_vector *mvec,gsl_vector *beta)
 }
 
 
+/* 
+** approximation: convert t to z values 
+*/
+double Xt2z(double t,double df)
+{
+  double z=0,u;
+
+  u = df*log(1.0+t*t/df)*(1.0-0.5/df);
+  if (u <= 0) return 0;
+  z = sqrt(u);
+  if (t < 0) z = -z;
+  return z;
+}
+
+
+void TStats(gsl_vector *beta,gsl_matrix *cov,gsl_vector *t)
+{
+  double bx0=beta->data[0];
+  double bx1=beta->data[1];
+  double bx2=beta->data[2];
+  
+  double c00=gsl_matrix_get(cov,0,0);
+  double c01=gsl_matrix_get(cov,0,1);
+  double c02=gsl_matrix_get(cov,0,2);
+  double c11=gsl_matrix_get(cov,1,1);
+  double c12=gsl_matrix_get(cov,1,2);
+  double c22=gsl_matrix_get(cov,2,2);
+  
+  t->data[0] = (bx0 - bx1)/sqrt(c00 + c11 - 2.0*c01);
+  t->data[1] = (bx0 - bx2)/sqrt(c00 + c22 - 2.0*c02);
+  t->data[2] = (bx1 - bx2)/sqrt(c11 + c22 - 2.0*c12);
+}
+
 
 /* effective degrees of freedom as trace(I-H), where H is the "hat"-matrix */
 double EDF(gsl_multifit_linear_workspace *work)
@@ -56,8 +90,8 @@ double EDF(gsl_multifit_linear_workspace *work)
 }
 
 
-double LayerGLM(VImage zmap,VImage metric,
-		Cylinders *cyl,size_t cid,gsl_vector *beta,gsl_vector *bcov,double *edf,int model)
+double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
+		gsl_vector *beta,gsl_vector *zval,double *edf)
 {
   int b,r,c;
   size_t i,j,k;
@@ -67,11 +101,14 @@ double LayerGLM(VImage zmap,VImage metric,
   double rtcode = -1;
   gsl_matrix *X = NULL;
 
+  *edf=0;
+  gsl_vector_set_zero(beta);
+  gsl_vector_set_zero(zval);
+
+  
   /* cylinder must be big enough for sufficient stats */
   if (n < dim*10) return -1;
   
-  gsl_vector_set_zero(beta);
-  gsl_vector_set_zero(bcov);
   gsl_vector *y = gsl_vector_calloc(n);
   gsl_vector *mvec = gsl_vector_calloc(n);  
 
@@ -117,6 +154,7 @@ double LayerGLM(VImage zmap,VImage metric,
     
     gsl_multifit_linear(X,y,beta,cov,&chisq,work);
 
+    
     /* reciprocal condition number of design matrix */
     double rcond = gsl_multifit_linear_rcond(work);
     if (rcond < 0.001) return -1;
@@ -133,26 +171,21 @@ double LayerGLM(VImage zmap,VImage metric,
     w=0;
     if (fabs(noise_variance) > 0) w = 1.0/noise_variance;
 
-    /* covariances */
-    bcov->data[0] = gsl_matrix_get(cov,0,0);
-    bcov->data[1] = gsl_matrix_get(cov,0,1);
-    bcov->data[2] = gsl_matrix_get(cov,0,2);
-    bcov->data[3] = gsl_matrix_get(cov,1,1);
-    bcov->data[4] = gsl_matrix_get(cov,1,2);
-    bcov->data[5] = gsl_matrix_get(cov,2,2);
 
-      
-    /* beta variance, t-test */
-    /*
-    for (j=0; j<3; j++) betavar->data[j] = gsl_matrix_get(cov,j,j);
-    t = (beta->data[0]-beta->data[1]) /
-      sqrt(gsl_matrix_get(cov,0,0) + gsl_matrix_get(cov,1,1) - 2.0*gsl_matrix_get(cov,0,1));
-    */
-   
+    /* z-values */
+    gsl_vector *tval = gsl_vector_calloc(3);
+    TStats(beta,cov,tval);
+
+    for (i=0; i<3; i++) {      
+      zval->data[i] = Xt2z(tval->data[i],(*edf));
+    }
+
     gsl_multifit_linear_free(work);
     gsl_matrix_free(cov);
+    gsl_vector_free(tval);
     break;
 
+    
   default:
     VError(" unknown model");
   }
@@ -163,7 +196,7 @@ double LayerGLM(VImage zmap,VImage metric,
  ende: ;
   gsl_vector_free(y);
   gsl_vector_free(mvec);
-  if (X !=NULL) gsl_matrix_free(X);
+  if (X!=NULL) gsl_matrix_free(X);
   return rtcode;
 }
 

@@ -19,19 +19,6 @@
 #include <math.h>
 #include <string.h>
 
-/* 
-** approximation: convert t to p values 
-*/
-double Xt2z(double t,double df)
-{
-  double z=0,u;
-
-  u = df*log(1.0+t*t/df)*(1.0-0.5/df);
-  if (u <= 0) return 0;
-  z = sqrt(u);
-  if (t < 0) z = -z;
-  return z;
-}
 
 
 double gmin(double x,double y)
@@ -40,31 +27,30 @@ double gmin(double x,double y)
   else return y;
 }
 
+double gmax(double x,double y)
+{
+  if (x > y) return x;
+  else return y;
+}
+
 
 /* contrast value */
-double getcontrast(gsl_vector *beta,gsl_vector *bcov,double edf,double zthr,int type)
+double getcontrast(gsl_vector *beta,gsl_vector *zval,double zthr,int type)
 {
   double z=0;
   double bx0=beta->data[0];
   double bx1=beta->data[1];
   double bx2=beta->data[2];
+
+  double z01 = zval->data[0];
+  double z02 = zval->data[1];
+  double z12 = zval->data[2];
+
+  double z10 = -z01;
+  double z20 = -z02;
+  double z21 = -z12;
+
   
-  double c00=bcov->data[0];
-  double c01=bcov->data[1];
-  double c02=bcov->data[2];
-  double c11=bcov->data[3];
-  double c12=bcov->data[4];
-  double c22=bcov->data[5];
-
-  double t01 = (bx0 - bx1)/sqrt(c00 + c11 - 2.0*c01);
-  double t02 = (bx0 - bx2)/sqrt(c00 + c22 - 2.0*c02);
-  double t12 = (bx1 - bx2)/sqrt(c11 + c22 - 2.0*c12);
-
-  double z01 = Xt2z(t01,edf);
-  double z02 = Xt2z(t02,edf);
-  double z12 = Xt2z(t12,edf);
-
-
   z=0;
   switch (type) {
 
@@ -77,13 +63,14 @@ double getcontrast(gsl_vector *beta,gsl_vector *bcov,double edf,double zthr,int 
   case 5: z = 2.0*bx2 - bx1 - bx0; break;
 
   case 6: z = gmin(z01,z02); break;    /* deep>middle && deep>superficial */
-  case 7: z = gmin(-z01,z12); break;   /* middle>deep && middle>superficial */
-  case 8: z = gmin(-z12,-z02); break;  /* superficial>deep && superficial>middle */
+  case 7: z = gmin(z10,z12); break;    /* middle>deep && middle>superficial */
+  case 8: z = gmin(z21,z20); break;    /* superficial>deep && superficial>middle */
     
-  case 9:  z = gmin(-z01,-z02);  break;  /* deep<middle && deep<superficial */
-  case 10: z = gmin(z01,-z12);  break;   /* middle<deep && middle<superficial */
-  case 11: z = gmin(z02,z12);   break;   /* superficial<deep && superficial<middle */
+  case 9:  z = gmax(z10,z20);  break;   /* deep<middle or deep<superficial */
+  case 10: z = gmax(z01,z21);  break;   /* middle<deep or middle<superficial */
+  case 11: z = gmax(z02,z12);  break;   /* superficial<deep or superficial<middle */
 
+    
   case 12:  /* max ID */
     z=0;
     if (z01 > zthr && z02 > zthr) z = 1;
@@ -97,7 +84,7 @@ double getcontrast(gsl_vector *beta,gsl_vector *bcov,double edf,double zthr,int 
     if (-z01 < zthr && z12 < zthr) z = 2;
     if (-z02 < zthr && -z12 < zthr) z = 3;
     break;
-    
+
   default:
     VError(" unknown type %d",type);
   }
@@ -114,9 +101,9 @@ VDictEntry TypDict[] = {
   { "xmiddle", 4, 0,0,0,0  },
   { "xsuperficial", 5, 0,0,0,0  },
   
-  { "cdeep", 6, 0,0,0,0  },
-  { "cmiddle", 7, 0,0,0,0  },
-  { "csuperficial", 8, 0,0,0,0  },
+  { "zdeep", 6, 0,0,0,0  },
+  { "zmiddle", 7, 0,0,0,0  },
+  { "zsuperficial", 8, 0,0,0,0  },
  
   { "notdeep", 9, 0,0,0,0  },
   { "notmiddle", 10, 0,0,0,0  },
@@ -124,6 +111,7 @@ VDictEntry TypDict[] = {
 
   { "max", 12, 0,0,0,0 },
   { "min", 13, 0,0,0,0 },
+
   { NULL, 0,0,0,0,0 }
 };
 
@@ -173,25 +161,18 @@ int main(int argc, char *argv[])
   }
   if (n < 1) VError(" no beta images found");
 
-  int ncov=0;
-  VImage *covimage = NULL;
-  VImage edfimage = NULL;
-  if (nbeta == 4) {
-    ncov=6;
-    covimage = (VImage *)VCalloc(ncov,sizeof(VImage));
-    n=0;
-    for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-      if (VGetAttrRepn (& posn) != VImageRepn) continue;
-      if (strcmp(VGetAttrName (& posn),"covariance") == 0) {
-	VGetAttrValue (& posn, NULL,VImageRepn, & src);
-	if (n >= ncov) VError(" too many cov images ");
-	covimage[n] = VCopyImage(src,NULL,VAllBands);
-	n++;
-      }
-      if (strcmp(VGetAttrName (& posn),"edf") == 0) {
-	VGetAttrValue (& posn, NULL,VImageRepn, & src);
-	edfimage = VCopyImage(src,NULL,VAllBands);
-      }
+  
+  VImage *zvalimage = NULL;   /* zval images for permutation tests */
+  size_t nzval=3;
+  zvalimage = (VImage *)VCalloc(nzval,sizeof(VImage));
+  n=0;
+  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
+    if (VGetAttrRepn (& posn) != VImageRepn) continue;
+    if (strcmp(VGetAttrName (& posn),"zvalimage") == 0) {
+      VGetAttrValue (& posn, NULL,VImageRepn, & src);
+      if (n >= nzval) VError(" too many zval images ");
+      zvalimage[n] = VCopyImage(src,NULL,VAllBands);
+      n++;
     }
   }
 
@@ -205,12 +186,10 @@ int main(int argc, char *argv[])
   size_t i,j;
   size_t npixels = VImageNPixels(betaimage[0]);
   gsl_vector *beta = gsl_vector_calloc(nbeta);
-  gsl_vector *bcov=NULL;
-  if (ncov>0) bcov = gsl_vector_calloc(ncov);
+  gsl_vector *zval = gsl_vector_calloc(nzval);
 
-  VFloat *pb,*pc;
+  VFloat *pb,*pz;
   VFloat *pp = VImageData(dest);
-  VFloat *pe = VImageData(edfimage);
   
   for (i=0; i<npixels; i++) {
 
@@ -222,11 +201,11 @@ int main(int argc, char *argv[])
     }
     if (s < TINY) continue;
     
-    for (j=0; j<ncov; j++) {
-      pc = VImageData(covimage[j]);
-      bcov->data[j] = (double)(pc[i]);
+    for (j=0; j<nzval; j++) {
+      pz = VImageData(zvalimage[j]);
+      zval->data[j] = (double)(pz[i]);
     }
-    pp[i] = (float)getcontrast(beta,bcov,(double)pe[i],(double)zthr,(int)type);
+    pp[i] = (float)getcontrast(beta,zval,(double)zthr,(int)type);
   }
 
   

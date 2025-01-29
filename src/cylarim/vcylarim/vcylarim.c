@@ -34,12 +34,13 @@
 #include <omp.h>
 #endif /*_OPENMP*/
 
-extern VImage *VCreate4DImage(VImage *src,int,VAttrList geoinfo,VRepnKind repn);
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
 extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
 extern void HistEqualize(Cylinders *,VImage,VImage);
-extern double LayerGLM(VImage,VImage,Cylinders *cyl,size_t cid,gsl_vector *beta,gsl_vector *bcov,double *,int);
-extern VImage *ConvRGB(VImage *betaimage,VBoolean rgb,VAttrList geoinfo,VRepnKind repn);
+extern double PermGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector *beta,
+		      gsl_vector *zval,double *edf);
+extern double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
+		       gsl_vector *beta,gsl_vector *zval,double *edf);
 
 
 void XWriteOutput(VImage image,VAttrList geolist,char *filename)
@@ -53,8 +54,8 @@ void XWriteOutput(VImage image,VAttrList geolist,char *filename)
 }
 
 
-VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
-	       VBoolean equivol,VImage wimage,VImage *betaimage,VImage *covimage,VImage edfimage)
+void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
+	     VBoolean equivol,VImage *betaimage,VImage *zvalimage)
 {
   size_t i,j,k;
  
@@ -64,11 +65,11 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
 
   
   /* equivolume correction */
+  VImage wimage = VCreateImageLike(zmap);
   VFillImage(wimage,VAllBands,0);
   if (equivol) {
     fprintf(stderr," Equivolume...\n");
     HistEqualize(cyl,wimage,metric);
-    /* XWriteOutput(metric,NULL,"test.v"); */
   }
 
 
@@ -79,10 +80,11 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
   size_t progress=0;
   size_t np = (size_t)((float)cyl->numcylinders/100.0);
   if (np < 1) np = 1;
-  int nbeta=3, ncov=0;
-  if (model == 1) { nbeta=4; ncov=6; }  
+  int nbeta=3,nzval=0;
+  if (model > 0) { nbeta=4; nzval=3;}  
   if (model == 0) fprintf(stderr," layerstats: model-free averaging\n");
   if (model == 1) fprintf(stderr," layerstats: GLM\n");
+  if (model == 2) fprintf(stderr," layerstats: GLM, residual permutation\n");
 
   
 #pragma omp parallel for shared(progress)
@@ -91,34 +93,33 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
     if (k%np==0) fprintf(stderr," beta:  %7.3f\r",(float)(progress)/(float)cyl->numcylinders);
     progress++;
 
-    double edf=0;
+    double edf=0,w=0;
     gsl_vector *beta = gsl_vector_calloc(nbeta);
-    gsl_vector *bcov = NULL;
-    if (ncov>0) bcov = gsl_vector_calloc(ncov);
-    double w = LayerGLM(zmap,metric,cyl,k,beta,bcov,&edf,model);
+    gsl_vector *zval = NULL;
+    if (nzval > 0) zval = gsl_vector_calloc(nzval);    
+    if (model < 2) w = LayerGLM(zmap,metric,cyl,k,model,beta,zval,&edf);
+    else w = PermGLM(zmap,metric,cyl,k,beta,zval,&edf);
     if (w < 0) continue;
 
     for (i=0; i<cyl->addr[k]->size; i++) {
-
       size_t l = cyl->addr[k]->data[i];
       int b = gsl_matrix_int_get(cyl->xmap,l,0);
       int r = gsl_matrix_int_get(cyl->xmap,l,1);
       int c = gsl_matrix_int_get(cyl->xmap,l,2);
 
 #pragma omp critical
-      {
+      {		
 	VPixel(wimage,b,r,c,VFloat) += w;
 	for (j=0; j<nbeta; j++) {
 	  VPixel(betaimage[j],b,r,c,VFloat) += w*beta->data[j];
 	}
-	for (j=0; j<ncov; j++) {
-	  VPixel(covimage[j],b,r,c,VFloat) += w*bcov->data[j];
+	for (j=0; j<nzval; j++) {
+	  VPixel(zvalimage[j],b,r,c,VFloat) += w*zval->data[j];
 	}
-	VPixel(edfimage,b,r,c,VFloat) += w*edf;
       }
     }
     gsl_vector_free(beta);
-    gsl_vector_free(bcov);
+    if (zval != NULL) gsl_vector_free(zval);
   }
   fprintf(stderr,"                       \n");
 
@@ -134,31 +135,24 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
     }
   }
 
-  
-  /* normalize covariance images */
-  for (j=0; j<ncov; j++) {
-    pb = VImageData(covimage[j]);
+
+  /* normalize zval images */
+  for (j=0; j<nzval; j++) {
+    pb = VImageData(zvalimage[j]);
     for (i=0; i<VImageNPixels(wimage); i++) {
       if (pw[i] > 0.001) pb[i] /= pw[i];
       else pb[i] = 0;
     }
   }
-
-
-  /* normalize edf image */
-  pb = VImageData(edfimage);
-  pw = VImageData(wimage);
-  for (i=0; i<VImageNPixels(wimage); i++) {
-    if (pw[i] > 0.001) pb[i] /= pw[i];
-    else pb[i] = 0;
-  }
-  
-  return wimage;
 }
+
+
+
 
 VDictEntry TypeDict[] = {
   { "none", 0, 0,0,0,0 },
   { "glm", 1, 0,0,0,0  },
+  { "perm", 2, 0,0,0,0  },
   { NULL, 0,0,0,0,0 }
 };
 
@@ -270,31 +264,25 @@ int main (int argc, char **argv)
   }
   
 
-  /*  beta images */
-  int nbeta=3,ncov=0;
-  if (model == 1) { nbeta = 4; ncov=6; }
-  VImage wimage = VCreateImageLike(zmap);
+  /* alloc output images */
+  int nbeta=3,nzval=0;
+  if (model > 0) { nbeta = 4; nzval=3; }
   VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage));
   for (i=0; i<nbeta; i++) {
     betaimage[i] = VCreateImageLike(zmap);
     VFillImage(betaimage[i],VAllBands,0);
   }
-  VImage *covimage = NULL;   /* need to store covariances if GLM is used */
-  if (model == 1) covimage = (VImage *)VCalloc(ncov,sizeof(VImage));
-  for (i=0; i<ncov; i++) {
-    covimage[i] = VCreateImageLike(zmap);
-    VFillImage(covimage[i],VAllBands,0);
-  }
-  VImage edfimage = NULL;
-  if (model == 1) {
-    edfimage = VCreateImageLike(zmap);
-    VFillImage(edfimage,VAllBands,0);
+
+  VImage *zvalimage = NULL;
+  if (model > 0) zvalimage = (VImage *)VCalloc(nzval,sizeof(VImage));
+  for (i=0; i<nzval; i++) {
+    zvalimage[i] = VCreateImageLike(zmap);
+    VFillImage(zvalimage[i],VAllBands,0);
   }
 
   
   /* Main */
-  Cylarim(zmap,metric,rim,(double)radius,(int)model,equivol,wimage,betaimage,covimage,edfimage);
-
+  Cylarim(zmap,metric,rim,(double)radius,(int)model,equivol,betaimage,zvalimage);
 
   
   /* write output */
@@ -302,8 +290,7 @@ int main (int argc, char **argv)
   VSetGeoInfo(geolist,out_list);
   VAppendAttr(out_list,"nbeta",NULL,VShortRepn,(VShort)nbeta);
   for (i=0; i<nbeta; i++) VAppendAttr(out_list,"beta",NULL,VImageRepn,betaimage[i]);
-  for (i=0; i<ncov; i++) VAppendAttr(out_list,"covariance",NULL,VImageRepn,covimage[i]);
-  VAppendAttr(out_list,"edf",NULL,VImageRepn,edfimage);
+  for (i=0; i<nzval; i++) VAppendAttr(out_list,"zvalimage",NULL,VImageRepn,zvalimage[i]);
 
   if (! VWriteFile (out_file, out_list)) exit (1);
   fprintf (stderr, "%s: done.\n", argv[0]);
