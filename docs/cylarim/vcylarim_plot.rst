@@ -40,7 +40,7 @@ Example output:
    :widths: 20 20 20 20
       
    * - layer ID
-     - median
+     - mean
      - lower bound
      - upper bound
    * - 0
