@@ -66,6 +66,7 @@ Parameters of 'vcylarim_plot'
 -in       Input file.
 -out      Output txt file.
 -roi      Region of interest. Required.
+-resolution  Spatial resolution prior to upsamling. Required.
 
 
 
