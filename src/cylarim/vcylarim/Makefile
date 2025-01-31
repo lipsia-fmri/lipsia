@@ -5,7 +5,7 @@ CFLAGS  += -fopenmp
 
 
 PROG = vcylarim
-SRC = vcylarim.c LayerGLM.c PermGLM.c ../cylutils/EHist.c ../cylutils/Cylinders.c ../cylutils/Conv.c
+SRC = vcylarim.c LayerGLM.c ../cylutils/EHist.c ../cylutils/Cylinders.c ../cylutils/Conv.c
 OBJ=$(SRC:.c=.o)
 
 ${PROG}: ${OBJ}

@@ -19,24 +19,46 @@
 
 #include "../cylutils/cyl.h"
 
-extern void SIMPLS1(gsl_matrix *X,gsl_vector *y,gsl_vector *beta,size_t A);
 extern double gaussian(double x,int);
-
+extern double SEDF(gsl_matrix *X,gsl_vector *y,gsl_vector *residuals);
+extern double EDF(gsl_multifit_linear_workspace *work);
 
 /* no model, simple averaging */
-void Simple(gsl_vector *y,gsl_vector *mvec,gsl_vector *beta)
+void Simple(gsl_vector *y,gsl_vector *mvec,gsl_vector *mean,gsl_vector *var,gsl_vector *kx)
 {
   size_t i;
-  double s0=0,s1=0,s2=0,nx0=0,nx1=0,nx2=0; 
+  double s0=0,s1=0,s2=0,sd0=0,sd1=0,sd2=0,nx0=0,nx1=0,nx2=0;
+  
   for (i=0; i<y->size; i++){
-    if (mvec->data[i] < 0.333) { s0 += y->data[i]; nx0++; }
-    if (mvec->data[i] >= 0.333 && mvec->data[i] < 0.666) { s1 += y->data[i]; nx1++; }
-    if (mvec->data[i] >= 0.666) { s2 += y->data[i]; nx2++; }
+    if (mvec->data[i] < 0.333) {
+      s0 += y->data[i]; sd0 += y->data[i]*y->data[i];  nx0++;
+    }
+    if (mvec->data[i] >= 0.333 && mvec->data[i] < 0.666) {
+      s1 += y->data[i]; sd1 += y->data[i]*y->data[i]; nx1++;
+    }
+    if (mvec->data[i] >= 0.666) {
+      s2 += y->data[i]; sd2 += y->data[i]*y->data[i];  nx2++;
+    }
   }
-  gsl_vector_set_zero(beta);
-  if (nx0 > 0.5) beta->data[0] = s0/nx0;
-  if (nx1 > 0.5) beta->data[1] = s1/nx1;
-  if (nx2 > 0.5) beta->data[2] = s2/nx2;
+  
+  gsl_vector_set_zero(mean);
+  gsl_vector_set_zero(var);
+  gsl_vector_set_zero(kx);
+  if (nx0 > 0.5) {
+    mean->data[0] = s0/nx0;
+    var->data[0] = (sd0 - nx0 * mean->data[0] * mean->data[0]) / (nx0 - 1.0);
+    kx->data[0] = nx0;
+  }
+  if (nx1 > 0.5) {
+    mean->data[1] = s1/nx1;
+    var->data[1] = (sd1 - nx1 * mean->data[1] * mean->data[1]) / (nx1 - 1.0);
+    kx->data[1] = nx1;
+  }
+  if (nx2 > 0.5) {
+    mean->data[2] = s2/nx2;
+    var->data[2] = (sd2 - nx2 * mean->data[2] * mean->data[2]) / (nx2 - 1.0);
+    kx->data[2] = nx2;
+  }
 }
 
 
@@ -55,7 +77,7 @@ double Xt2z(double t,double df)
 }
 
 
-void TStats(gsl_vector *beta,gsl_matrix *cov,gsl_vector *t)
+void TStats(gsl_vector *beta,gsl_matrix *cov,double edf,gsl_vector *zval)
 {
   double bx0=beta->data[0];
   double bx1=beta->data[1];
@@ -68,30 +90,34 @@ void TStats(gsl_vector *beta,gsl_matrix *cov,gsl_vector *t)
   double c12=gsl_matrix_get(cov,1,2);
   double c22=gsl_matrix_get(cov,2,2);
   
-  t->data[0] = (bx0 - bx1)/sqrt(c00 + c11 - 2.0*c01);
-  t->data[1] = (bx0 - bx2)/sqrt(c00 + c22 - 2.0*c02);
-  t->data[2] = (bx1 - bx2)/sqrt(c11 + c22 - 2.0*c12);
+  double t0 = (bx0 - bx1)/sqrt(c00 + c11 - 2.0*c01);
+  double t1 = (bx0 - bx2)/sqrt(c00 + c22 - 2.0*c02);
+  double t2 = (bx1 - bx2)/sqrt(c11 + c22 - 2.0*c12);
+
+  zval->data[0] = Xt2z(t0,edf);
+  zval->data[1] = Xt2z(t1,edf);
+  zval->data[2] = Xt2z(t2,edf);
 }
 
 
-/* effective degrees of freedom as trace(I-H), where H is the "hat"-matrix */
-double EDF(gsl_multifit_linear_workspace *work)
+/* two-sample Welsh test */
+double Welsh(double mean1,double mean2,double var1,double var2,double nx1,double nx2)
 {
-  size_t i;
-  size_t p = work->p;
-  size_t n = work->n;
-  gsl_matrix *H = gsl_matrix_calloc(p,p);
-  gsl_blas_dgemm(CblasNoTrans,CblasTrans,1,work->Q,work->Q,0.0,H);
-  double trace = 0;
-  for (i=0; i<p; i++) trace += gsl_matrix_get(H,i,i);
-  gsl_matrix_free(H);
-  double edf = (double)(n) - trace;
-  return edf;
-}
+  if (nx1 < 5 || nx2 < 5) return 0;
+ 
+  double s1 = (var1*var1)/(nx1*nx1*(nx1-1.0));
+  double s2 = (var2*var2)/(nx2*nx2*(nx2-1.0));
 
+  double var = (var1/nx1 + var2/nx2);
+  double df = (var*var)/(s1 + s2);
+  
+  double t = (mean1 - mean2)/sqrt(var);
+  double z = Xt2z(t,df);
+  return z;
+}
 
 double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
-		gsl_vector *beta,gsl_vector *zval,double *edf)
+		gsl_vector *beta,gsl_vector *zval)
 {
   int b,r,c;
   size_t i,j,k;
@@ -99,9 +125,7 @@ double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
   size_t n=cyl->addr[cid]->size;
   double u=0,v=0,w=0;
   double rtcode = -1;
-  gsl_matrix *X = NULL;
 
-  *edf=0;
   gsl_vector_set_zero(beta);
   gsl_vector_set_zero(zval);
 
@@ -110,7 +134,7 @@ double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
   if (n < dim*10) return -1;
   
   gsl_vector *y = gsl_vector_calloc(n);
-  gsl_vector *mvec = gsl_vector_calloc(n);  
+  gsl_vector *mvec = gsl_vector_calloc(n);
 
   
   /* fill y-vector with activation map values */
@@ -130,9 +154,25 @@ double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
 
   switch (model) {
 
-  case 0:  /* no model, simple averaging */
-    Simple(y,mvec,beta);
-    w = (double)n;
+  case 0:  /* simple averaging, twosample t-test (Welsh) */
+    ;
+    gsl_vector *var = gsl_vector_calloc(3);
+    gsl_vector *kx = gsl_vector_calloc(3);
+    
+    Simple(y,mvec,beta,var,kx);
+ 
+    zval->data[0] = Welsh(beta->data[0],beta->data[1],var->data[0],var->data[1],
+			  kx->data[0],kx->data[1]);
+ 
+    zval->data[1] = Welsh(beta->data[0],beta->data[2],var->data[0],var->data[2],
+			  kx->data[0],kx->data[2]);
+ 
+    zval->data[2] = Welsh(beta->data[1],beta->data[2],var->data[1],var->data[2],
+			  kx->data[1],kx->data[2]);
+ 
+    gsl_vector_free(kx);
+    gsl_vector_free(var);
+    w = 1.0;
     break;
     
 
@@ -141,7 +181,7 @@ double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
     double chisq=0;
     gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(n,dim);
     gsl_matrix *cov = gsl_matrix_calloc(dim,dim);
-    X = gsl_matrix_calloc(n,dim);
+    gsl_matrix *X = gsl_matrix_calloc(n,dim);
     gsl_matrix_set_all(X,1.0);
     
     for (i=0; i<n; i++) {
@@ -151,38 +191,33 @@ double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
 	gsl_matrix_set(X,i,j,v);
       }
     }
-    
+
+    /* GLM */
     gsl_multifit_linear(X,y,beta,cov,&chisq,work);
 
-    
     /* reciprocal condition number of design matrix */
     double rcond = gsl_multifit_linear_rcond(work);
     if (rcond < 0.001) return -1;
-
     
     /* goodness of fit, R^2 */
     double r2 = 1.0 - chisq/tss;
     if (r2 < 0) goto ende;
-
-      
+ 
+    /* GLM */
+    gsl_multifit_linear(X,y,beta,cov,&chisq,work);
+    
     /* estimate noise variance, low noise results have higher impact on averages */
-    (*edf) = EDF(work);
-    double noise_variance = chisq/(*edf);
+    double edf = (double)(n-4);
+    double noise_variance = chisq/edf;
     w=0;
     if (fabs(noise_variance) > 0) w = 1.0/noise_variance;
 
-
     /* z-values */
-    gsl_vector *tval = gsl_vector_calloc(3);
-    TStats(beta,cov,tval);
-
-    for (i=0; i<3; i++) {      
-      zval->data[i] = Xt2z(tval->data[i],(*edf));
-    }
+    TStats(beta,cov,edf,zval);
 
     gsl_multifit_linear_free(work);
+    gsl_matrix_free(X);
     gsl_matrix_free(cov);
-    gsl_vector_free(tval);
     break;
 
     
@@ -196,7 +231,6 @@ double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
  ende: ;
   gsl_vector_free(y);
   gsl_vector_free(mvec);
-  if (X!=NULL) gsl_matrix_free(X);
   return rtcode;
 }
 

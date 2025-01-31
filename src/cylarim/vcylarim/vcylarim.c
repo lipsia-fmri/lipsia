@@ -37,10 +37,8 @@
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
 extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
 extern void HistEqualize(Cylinders *,VImage,VImage);
-extern double PermGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector *beta,
-		      gsl_vector *zval,double *edf);
 extern double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
-		       gsl_vector *beta,gsl_vector *zval,double *edf);
+		       gsl_vector *beta,gsl_vector *zval);
 
 
 void XWriteOutput(VImage image,VAttrList geolist,char *filename)
@@ -58,7 +56,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
 	     VBoolean equivol,VImage *betaimage,VImage *zvalimage)
 {
   size_t i,j,k;
- 
+
 
   /* create cylinder data struct */
   Cylinders *cyl = VCylinder(rim,metric,radius);  
@@ -80,8 +78,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
   size_t progress=0;
   size_t np = (size_t)((float)cyl->numcylinders/100.0);
   if (np < 1) np = 1;
-  int nbeta=3,nzval=0;
-  if (model > 0) { nbeta=4; nzval=3;}  
+  int nbeta=4,nzval=3;
   if (model == 0) fprintf(stderr," layerstats: model-free averaging\n");
   if (model == 1) fprintf(stderr," layerstats: GLM\n");
   if (model == 2) fprintf(stderr," layerstats: GLM, residual permutation\n");
@@ -93,13 +90,9 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
     if (k%np==0) fprintf(stderr," beta:  %7.3f\r",(float)(progress)/(float)cyl->numcylinders);
     progress++;
 
-    double edf=0,w=0;
     gsl_vector *beta = gsl_vector_calloc(nbeta);
-    gsl_vector *zval = NULL;
-    if (nzval > 0) zval = gsl_vector_calloc(nzval);    
-    if (model < 2) w = LayerGLM(zmap,metric,cyl,k,model,beta,zval,&edf);
-    else w = PermGLM(zmap,metric,cyl,k,beta,zval,&edf);
-    if (w < 0) continue;
+    gsl_vector *zval = gsl_vector_calloc(nzval);    
+    double w = LayerGLM(zmap,metric,cyl,k,model,beta,zval);
 
     for (i=0; i<cyl->addr[k]->size; i++) {
       size_t l = cyl->addr[k]->data[i];
@@ -119,7 +112,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
       }
     }
     gsl_vector_free(beta);
-    if (zval != NULL) gsl_vector_free(zval);
+    gsl_vector_free(zval);
   }
   fprintf(stderr,"                       \n");
 
@@ -152,7 +145,6 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
 VDictEntry TypeDict[] = {
   { "none", 0, 0,0,0,0 },
   { "glm", 1, 0,0,0,0  },
-  { "perm", 2, 0,0,0,0  },
   { NULL, 0,0,0,0,0 }
 };
 
@@ -182,6 +174,7 @@ int main (int argc, char **argv)
 
   
   VParseFilterCmdZ (VNumber (options),options,argc,argv,&in_file,&out_file,&in_filename);
+  if (model < 0 || model > 1) VError(" unknown model %d",model);
 
   
   /* omp-stuff */
@@ -265,16 +258,15 @@ int main (int argc, char **argv)
   
 
   /* alloc output images */
-  int nbeta=3,nzval=0;
-  if (model > 0) { nbeta = 4; nzval=3; }
+  int nbeta=4,nzval=3;
   VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage));
   for (i=0; i<nbeta; i++) {
     betaimage[i] = VCreateImageLike(zmap);
     VFillImage(betaimage[i],VAllBands,0);
   }
 
-  VImage *zvalimage = NULL;
-  if (model > 0) zvalimage = (VImage *)VCalloc(nzval,sizeof(VImage));
+
+  VImage *zvalimage = (VImage *)VCalloc(nzval,sizeof(VImage));
   for (i=0; i<nzval; i++) {
     zvalimage[i] = VCreateImageLike(zmap);
     VFillImage(zvalimage[i],VAllBands,0);
