@@ -78,10 +78,10 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
   size_t progress=0;
   size_t np = (size_t)((float)cyl->numcylinders/100.0);
   if (np < 1) np = 1;
-  int nbeta=4,nzval=3;
+  int nbeta=3,nzval=3;
+  if (model > 0) nbeta=4;
   if (model == 0) fprintf(stderr," layerstats: model-free averaging\n");
   if (model == 1) fprintf(stderr," layerstats: GLM\n");
-  if (model == 2) fprintf(stderr," layerstats: GLM, residual permutation\n");
 
   
 #pragma omp parallel for shared(progress)
@@ -258,7 +258,8 @@ int main (int argc, char **argv)
   
 
   /* alloc output images */
-  int nbeta=4,nzval=3;
+  int nbeta=3,nzval=3;
+  if (model > 0) nbeta=4;
   VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage));
   for (i=0; i<nbeta; i++) {
     betaimage[i] = VCreateImageLike(zmap);

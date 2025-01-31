@@ -31,15 +31,24 @@
 
 
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
-extern void ROIplot(VImage *betaimage,VImage roi,VString filename);
-  
+extern void ROIplot(VImage *betaimage,VImage roi,gsl_vector *,VString filename);
+
+typedef struct FpointStruct{
+  VFloat x;
+  VFloat y;
+  VFloat z;
+} FPoint;
+
+
 int main (int argc, char **argv)
 {
   static VString  roi_filename="";
   static VString  txt_filename="";
+  static FPoint   xreso;
   static VOptionDescRec options[] = {
     {"out", VStringRepn,1,(VPointer) &txt_filename,VRequiredOpt,NULL,"Output txt file"},
     {"roi", VStringRepn,1,(VPointer) &roi_filename,VRequiredOpt,NULL,"ROI image"},
+    {"resolution",VFloatRepn,3,(VPointer) &xreso,VRequiredOpt,NULL,"Resolution in the original data (x,y,z)"},
   };
   VString in_file=NULL;
   size_t n=0;
@@ -50,6 +59,13 @@ int main (int argc, char **argv)
   /* parse command line */
   VParseFilterCmdX(VNumber(options),options,argc,argv,&in_file,NULL);
 
+  
+  /* original resolution prior to upsampling */
+  gsl_vector *reso = gsl_vector_calloc(3);
+  reso->data[0] = xreso.x;
+  reso->data[1] = xreso.y;
+  reso->data[2] = xreso.z;
+
 
   /* beta images */
   VLong tr=0L;
@@ -57,21 +73,15 @@ int main (int argc, char **argv)
   if (list == NULL) VError(" error reading input file %s",in_file);
   VImage src;
   VAttrListPosn posn;
-  int nbeta=0;
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (strcmp(VGetAttrName (& posn),"nbeta") == 0) {
-      VGetAttrValue (& posn, NULL,VShortRepn, & nbeta);
-    }
-  }
+  int nbeta=3;
   VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage));
 
   
   n=0;
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    if (strcmp(VGetAttrName (& posn),"beta") == 0) {
+    if (strcmp(VGetAttrName (& posn),"beta") == 0 && n < nbeta) {
       VGetAttrValue (& posn, NULL,VImageRepn, & src);
-      if (n >= nbeta) VError(" too many beta images ");
       betaimage[n] = VCopyImage(src,NULL,VAllBands);
       n++;
     }
@@ -91,7 +101,9 @@ int main (int argc, char **argv)
 
   
   /* main */
-  ROIplot(betaimage,roi,txt_filename);
+  ROIplot(betaimage,roi,reso,txt_filename);
+
+  
 
   fprintf (stderr, "%s: done.\n", argv[0]);
   return 0;

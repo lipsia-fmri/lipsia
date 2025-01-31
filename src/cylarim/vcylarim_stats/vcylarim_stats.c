@@ -140,21 +140,14 @@ int main(int argc, char *argv[])
   if (list == NULL) VError(" error reading input file %s",in_file);
   VImage src;
   VAttrListPosn posn;
-  int nbeta=0;
-  for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-    if (strcmp(VGetAttrName (& posn),"nbeta") == 0) {
-      VGetAttrValue (& posn, NULL,VShortRepn, & nbeta);
-    }
-  }
-  fprintf(stderr," nbeta: %d\n",nbeta);
+  int nbeta = 3;
   VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage));
   
   int n=0;
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
-    if (strcmp(VGetAttrName (& posn),"beta") == 0) {
+    if (strcmp(VGetAttrName (& posn),"beta") == 0 && n < nbeta) {
       VGetAttrValue (& posn, NULL,VImageRepn, & src);
-      if (n >= nbeta) VError(" too many beta images ");
       betaimage[n] = VCopyImage(src,NULL,VAllBands);
       n++;
     }
