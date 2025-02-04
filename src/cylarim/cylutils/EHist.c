@@ -25,7 +25,7 @@
 #include "../cylutils/cyl.h"
 
 
-void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric)
+void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric,VImage rim)
 {
   int b,r,c;
   size_t i,j,k,l,nbins = 10000;
@@ -100,15 +100,24 @@ void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric)
 
   
   VFloat *pd = VImageData(dest);
+  VFloat *px = VImageData(metric);
   VFloat *pw = VImageData(wimage);
+  VUByte *pu = VImageData(rim);
   for (i=0; i<VImageNPixels(wimage); i++) {
     if (pw[i] > 0.1) {
       pd[i] /= pw[i];
       if (pd[i] < 0.0001) pd[i] = 0.0001;
     }
+    
+    /* add rim points */
+    if (px[i] > 0) {
+      if (pu[i] == 1) pd[i] = 1;
+      if (pu[i] == 2) pd[i] = 0.0001;
+    }
   }
   VCopyImagePixels(dest,metric,VAllBands);
-  
+
+
   VDestroyImage(dest);
   gsl_histogram_pdf_free(cdf);
   gsl_histogram_free(hist);

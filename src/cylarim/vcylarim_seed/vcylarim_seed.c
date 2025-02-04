@@ -34,7 +34,7 @@
 
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
 extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
-extern void HistEqualize(Cylinders *,VImage,VImage);
+extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
 extern void GetResolution(VImage src,gsl_vector *reso);
 
 void ApplySeedMask(VImage metric,VImage rim,int b0,int r0,int c0,int wn)
@@ -101,7 +101,7 @@ VImage VFindCyl(VImage zmap,VImage metric,VImage rim,double radius,VBoolean equi
   VFillImage(wimage,VAllBands,0);
   if (equivol) {
     fprintf(stderr," equivolume...\n");
-    HistEqualize(cyl,wimage,metric);
+    HistEqualize(cyl,wimage,metric,rim);
   }
 
   

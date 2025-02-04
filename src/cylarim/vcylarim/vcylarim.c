@@ -36,7 +36,7 @@
 
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
 extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
-extern void HistEqualize(Cylinders *,VImage,VImage);
+extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
 extern double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
 		       gsl_vector *beta,gsl_vector *zval);
 
@@ -67,7 +67,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
   VFillImage(wimage,VAllBands,0);
   if (equivol) {
     fprintf(stderr," Equivolume...\n");
-    HistEqualize(cyl,wimage,metric);
+    HistEqualize(cyl,wimage,metric,rim);
   }
 
 
@@ -281,6 +281,11 @@ int main (int argc, char **argv)
   /* write output */
   VAttrList out_list = VCreateAttrList();
   VSetGeoInfo(geolist,out_list);
+  char cbuf[64];
+  sprintf(cbuf, "%f",radius);
+  VAppendAttr(out_list,"radius",NULL,VStringRepn,(VString)cbuf);
+  if (equivol==TRUE) VAppendAttr(out_list,"equivolume",NULL,VStringRepn,(VString)"true");
+  else VAppendAttr(out_list,"equivolume",NULL,VStringRepn,(VString)"false");
   VAppendAttr(out_list,"nbeta",NULL,VShortRepn,(VShort)nbeta);
   for (i=0; i<nbeta; i++) VAppendAttr(out_list,"beta",NULL,VImageRepn,betaimage[i]);
   for (i=0; i<nzval; i++) VAppendAttr(out_list,"zvalimage",NULL,VImageRepn,zvalimage[i]);
