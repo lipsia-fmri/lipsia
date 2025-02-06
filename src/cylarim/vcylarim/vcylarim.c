@@ -34,11 +34,12 @@
 #include <omp.h>
 #endif /*_OPENMP*/
 
+extern void GetResolution(VImage src,gsl_vector *reso);
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
-extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
+extern Cylinders *VCylinder(VImage rim,VImage metric,double radius,VBoolean,double);
 extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
-extern double LayerGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,int model,
-		       gsl_vector *beta,gsl_vector *zval);
+extern double PermGLM(VImage,VImage,Cylinders *,size_t,size_t,double,gsl_vector *,gsl_vector *);
+extern double LayerMean(VImage,VImage,Cylinders *,size_t,double,gsl_vector *,gsl_vector *);
 
 
 void XWriteOutput(VImage image,VAttrList geolist,char *filename)
@@ -52,14 +53,14 @@ void XWriteOutput(VImage image,VAttrList geolist,char *filename)
 }
 
 
-void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
-	     VBoolean equivol,VImage *betaimage,VImage *zvalimage)
+void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,size_t numperm,
+	     VBoolean equivol,VImage *betaimage,VImage *zvalimage,VBoolean addrim,double voxel_scale)
 {
   size_t i,j,k;
 
 
   /* create cylinder data struct */
-  Cylinders *cyl = VCylinder(rim,metric,radius);  
+  Cylinders *cyl = VCylinder(rim,metric,radius,addrim,voxel_scale);  
 
   
   /* equivolume correction */
@@ -78,10 +79,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
   size_t progress=0;
   size_t np = (size_t)((float)cyl->numcylinders/100.0);
   if (np < 1) np = 1;
-  int nbeta=3,nzval=3;
-  if (model > 0) nbeta=4;
-  if (model == 0) fprintf(stderr," layerstats: model-free averaging\n");
-  if (model == 1) fprintf(stderr," layerstats: GLM\n");
+  int nbeta=4,nzval=3;
 
   
 #pragma omp parallel for shared(progress)
@@ -91,9 +89,9 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
     progress++;
 
     gsl_vector *beta = gsl_vector_calloc(nbeta);
-    gsl_vector *zval = gsl_vector_calloc(nzval);    
-    double w = LayerGLM(zmap,metric,cyl,k,model,beta,zval);
-
+    gsl_vector *zval = gsl_vector_calloc(nzval);
+    double w = PermGLM(zmap,metric,cyl,k,numperm,voxel_scale,beta,zval);
+    
     for (i=0; i<cyl->addr[k]->size; i++) {
       size_t l = cyl->addr[k]->data[i];
       int b = gsl_matrix_int_get(cyl->xmap,l,0);
@@ -101,7 +99,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
       int c = gsl_matrix_int_get(cyl->xmap,l,2);
 
 #pragma omp critical
-      {		
+      {
 	VPixel(wimage,b,r,c,VFloat) += w;
 	for (j=0; j<nbeta; j++) {
 	  VPixel(betaimage[j],b,r,c,VFloat) += w*beta->data[j];
@@ -116,7 +114,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
   }
   fprintf(stderr,"                       \n");
 
- 
+  
   /* normalize betaimages */
   VFloat *pb = NULL;
   VFloat *pw = VImageData(wimage);
@@ -139,31 +137,24 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,int model,
   }
 }
 
-
-
-
-VDictEntry TypeDict[] = {
-  { "none", 0, 0,0,0,0 },
-  { "glm", 1, 0,0,0,0  },
-  { NULL, 0,0,0,0,0 }
-};
-
 int main (int argc, char **argv)
 {
   static VString    metric_filename="";
   static VString    rim_filename="";
   static VString    mask_filename="";
   static VFloat     radius = 2.0;
-  static VShort     model = 1;
+  static VShort     numperm = 1;
   static VBoolean   equivol = FALSE;
+  static VBoolean   addrim = TRUE;
   static VShort     nproc = 0;
   static VOptionDescRec options[] = {
     {"metric", VStringRepn,1,(VPointer) &metric_filename,VRequiredOpt,NULL,"metric image"},
     {"rim", VStringRepn,1,(VPointer) &rim_filename,VRequiredOpt,NULL,"rim image"},
     {"mask", VStringRepn,1,(VPointer) &mask_filename,VOptionalOpt,NULL,"mask image"},
     {"radius", VFloatRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Cylinder radius in mm"},
-    {"model", VShortRepn,1,(VPointer) &model,VOptionalOpt,TypeDict,"Model type"},
+    {"perm", VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},
     {"equivol", VBooleanRepn,1,(VPointer) &equivol,VOptionalOpt,NULL,"Equivolume correction"},
+    {"addrim", VBooleanRepn,1,(VPointer) &addrim,VOptionalOpt,NULL,"Include rim"},
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
    };
   VString in_filename=NULL;
@@ -174,7 +165,9 @@ int main (int argc, char **argv)
 
   
   VParseFilterCmdZ (VNumber (options),options,argc,argv,&in_file,&out_file,&in_filename);
-  if (model < 0 || model > 1) VError(" unknown model %d",model);
+  if (numperm < 1) VError(" number of permutations must be positive");
+  if (radius < 0.00001) VError(" radius must be positive");
+
 
   
   /* omp-stuff */
@@ -184,8 +177,7 @@ int main (int argc, char **argv)
   if (num_procs > 64) num_procs=64;
   fprintf(stderr," using %d cores\n",(int)num_procs);
   omp_set_num_threads(num_procs);
-#endif /* _OPENMP */
-
+#endif
   
 
   /* read zmap  */
@@ -255,27 +247,25 @@ int main (int argc, char **argv)
     if (pu[i] == 1) px[i] = 1;
     if (pu[i] == 2) px[i] = 0.0001;
   }
-  
+
 
   /* alloc output images */
-  int nbeta=3,nzval=3;
-  if (model > 0) nbeta=4;
+  int nbeta=4,nzval=3;
   VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage));
   for (i=0; i<nbeta; i++) {
     betaimage[i] = VCreateImageLike(zmap);
     VFillImage(betaimage[i],VAllBands,0);
   }
-
-
   VImage *zvalimage = (VImage *)VCalloc(nzval,sizeof(VImage));
   for (i=0; i<nzval; i++) {
     zvalimage[i] = VCreateImageLike(zmap);
     VFillImage(zvalimage[i],VAllBands,0);
   }
-
+  double voxel_scale=1.0;
+ 
   
   /* Main */
-  Cylarim(zmap,metric,rim,(double)radius,(int)model,equivol,betaimage,zvalimage);
+  Cylarim(zmap,metric,rim,(double)radius,(size_t)numperm,equivol,betaimage,zvalimage,addrim,voxel_scale);
 
   
   /* write output */

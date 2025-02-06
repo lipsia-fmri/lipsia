@@ -1,4 +1,8 @@
-
+/*
+** cylarim, residual permutation GLM 
+**
+** G.Lohmann, Jan 2025, MPI-KYB
+*/
 /* From the Vista library: */
 #include <viaio/VImage.h>
 #include <viaio/Vlib.h>
@@ -19,25 +23,59 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <float.h>
 
 #include "../cylutils/cyl.h"
 
 extern double gaussian(double x,int);
-extern double EDF(gsl_multifit_linear_workspace *work);
-extern void TStats(gsl_vector *beta,gsl_matrix *cov,gsl_vector *t);
+
+/* 
+** approximation: convert t to z values 
+*/
+double Xt2z(double t,double df)
+{
+  double z=0,u;
+  if (df < 1.0) return 0;
+
+  u = df*log(1.0+t*t/df)*(1.0-0.5/df);
+  if (u <= 0) return 0;
+  z = sqrt(u);
+  if (t < 0) z = -z;
+  return z;
+}
 
 
-double PermGLM(VImage zmap,VImage metric,
-	       Cylinders *cyl,size_t cid,gsl_vector *beta,gsl_vector *zval,double *edf)
+/* T-values from GLM */
+void TStats(gsl_vector *beta,gsl_matrix *cov,gsl_vector *tval)
+{
+  double bx0=beta->data[0];
+  double bx1=beta->data[1];
+  double bx2=beta->data[2];
+  
+  double c00=gsl_matrix_get(cov,0,0);
+  double c01=gsl_matrix_get(cov,0,1);
+  double c02=gsl_matrix_get(cov,0,2);
+  double c11=gsl_matrix_get(cov,1,1);
+  double c12=gsl_matrix_get(cov,1,2);
+  double c22=gsl_matrix_get(cov,2,2);
+  
+  tval->data[0] = (bx0 - bx1)/sqrt(c00 + c11 - 2.0*c01);
+  tval->data[1] = (bx0 - bx2)/sqrt(c00 + c22 - 2.0*c02);
+  tval->data[2] = (bx1 - bx2)/sqrt(c11 + c22 - 2.0*c12);
+}
+
+/* residual permutations */
+double PermGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,size_t numperm,double voxel_scale,
+	       gsl_vector *beta,gsl_vector *zval)
 {
   int b,r,c;
-  size_t i,j,k,perm,numperm=2000;
+  size_t i,j,k,perm;
   size_t dim=beta->size;
   size_t n=cyl->addr[cid]->size;
   double u=0,v=0,w=0,p=0;
   double rtcode = -1;
-  gsl_matrix *X = NULL;
 
+ 
   /* cylinder must be big enough for sufficient stats */
   if (n < dim*10) return -1;
   
@@ -57,8 +95,11 @@ double PermGLM(VImage zmap,VImage metric,
 
   /* return if z-values in this cylinder have no variance */
   double tss = gsl_stats_tss(y->data,1,y->size);
-  if (tss < 0.001) goto ende;
-
+  if (tss < 0.001) {
+    gsl_vector_free(y);
+    gsl_vector_free(mvec);
+    return -1;
+  }
   
   /* random generator */
   gsl_rng_env_setup();
@@ -68,14 +109,12 @@ double PermGLM(VImage zmap,VImage metric,
   gsl_rng_set(rx,(unsigned long int)seed);
 
 
+  /* non-permuted GLM */
   double chisq=0;
-  double *base = (double *)VCalloc(n,sizeof(double));
-  gsl_vector *residuals = gsl_vector_calloc(n);
-  gsl_vector *xbeta = gsl_vector_calloc(dim);
-  gsl_vector *yx = gsl_vector_calloc(n);
   gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(n,dim);
   gsl_matrix *cov = gsl_matrix_calloc(dim,dim);
-  X = gsl_matrix_calloc(n,dim);
+  gsl_vector *tval = gsl_vector_calloc(3);
+  gsl_matrix *X = gsl_matrix_calloc(n,dim);
   gsl_matrix_set_all(X,1.0);
   
   for (i=0; i<n; i++) {
@@ -97,22 +136,33 @@ double PermGLM(VImage zmap,VImage metric,
   double r2 = 1.0 - chisq/tss;
   if (r2 < 0) goto ende;
 
-      
-  /* estimate noise variance, low noise results have higher impact on averages */
-  (*edf) = EDF(work);
-  double noise_variance = chisq/(*edf);
+ 
+  /* rough estimate of degrees of freedom */
+  double mx = ((double)n)/voxel_scale;
+  if (mx < 5.0) goto ende;
+  double edf = (mx-4.0);
+  double noise_variance = chisq/edf;
   w=0;
   if (fabs(noise_variance) > 0) w = 1.0/noise_variance;
-  rtcode = w;
-
-
-  /* residual permutation test */
-  gsl_vector_int *xperm = gsl_vector_int_calloc(zval->size);
-  gsl_vector *tval = gsl_vector_calloc(3);
-  gsl_vector *tperm = gsl_vector_calloc(3);
-  TStats(beta,cov,tval);
+  rtcode = w;  /* weights to be used for weighted averaging */
 
   
+  /* non-permuted t- and z-values */
+  TStats(beta,cov,tval);
+  for (i=0; i<3; i++) zval->data[i] = Xt2z(tval->data[i],edf);
+  if (numperm < 2) goto ende;
+
+
+  /* alloc residual permutation test */
+  double *base = (double *)VCalloc(n,sizeof(double));
+  gsl_vector *residuals = gsl_vector_calloc(n);
+  gsl_vector *xbeta = gsl_vector_calloc(dim);
+  gsl_vector *yx = gsl_vector_calloc(n);
+  gsl_vector_int *xperm = gsl_vector_int_calloc(zval->size);
+  gsl_vector *tperm = gsl_vector_calloc(3);  
+
+  
+  /* residuals permutations */
   gsl_multifit_linear_residuals(X,y,beta,residuals);
   for (perm=0; perm<numperm; perm++) {
 
@@ -121,37 +171,40 @@ double PermGLM(VImage zmap,VImage metric,
     for (i=0; i<n; i++) yx->data[i] = y->data[i]+base[i];
     gsl_multifit_linear(X,yx,xbeta,cov,&chisq,work);
     gsl_multifit_linear_residuals(X,yx,xbeta,residuals);
-
     TStats(xbeta,cov,tperm);
 
     for (i=0; i<3; i++) {
       if (tperm->data[i] > tval->data[i]) xperm->data[i]++;
     }
   }
-
+  
+  double eps = DBL_EPSILON;
+  double p1 = 1.0 - eps;
+  
   for (i=0; i<3; i++) {
     p = ((double)xperm->data[i])/((double)numperm);
-    if (p < 0.0001) p = 0.0001;
-    if (p > 0.9999) p = 0.9999;    
+    if (p < eps) p = eps;
+    if (p > p1) p = p1;
     zval->data[i] = gsl_cdf_ugaussian_Qinv(p);
   }
 
 
-
   /* free memory */
-  gsl_multifit_linear_free(work);
-  gsl_matrix_free(X);
-  gsl_matrix_free(cov);
   gsl_vector_free(yx);
   gsl_vector_free(xbeta);
+  gsl_vector_free(tperm);
   gsl_vector_int_free(xperm);
   gsl_vector_free(residuals);
   gsl_rng_free(rx);
   VFree(base);
 
  ende: ;
+  gsl_multifit_linear_free(work);
+  gsl_matrix_free(X);
+  gsl_matrix_free(cov);
   gsl_vector_free(y);
   gsl_vector_free(mvec);
+  gsl_vector_free(tval);
 
   return rtcode;
 }
