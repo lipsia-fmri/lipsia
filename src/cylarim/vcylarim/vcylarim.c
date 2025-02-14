@@ -27,6 +27,8 @@
 #include <gsl/gsl_sort_vector.h>
 #include <gsl/gsl_histogram.h>
 #include <gsl/gsl_errno.h>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
 
 #include "../cylutils/cyl.h"
 
@@ -36,11 +38,9 @@
 
 extern void GetResolution(VImage src,gsl_vector *reso);
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
-extern Cylinders *VCylinder(VImage rim,VImage metric,double radius,VBoolean,double);
+extern Cylinders *VCylinder(VImage rim,VImage metric,double radius,VBoolean);
 extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
-extern double PermGLM(VImage,VImage,Cylinders *,size_t,size_t,double,gsl_vector *,gsl_vector *);
-extern double LayerMean(VImage,VImage,Cylinders *,size_t,double,gsl_vector *,gsl_vector *);
-
+extern double LaminarGLM(VImage,VImage,Cylinders *,size_t,gsl_vector *,gsl_vector *);
 
 void XWriteOutput(VImage image,VAttrList geolist,char *filename)
 {
@@ -53,14 +53,13 @@ void XWriteOutput(VImage image,VAttrList geolist,char *filename)
 }
 
 
-void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,size_t numperm,
-	     VBoolean equivol,VImage *betaimage,VImage *zvalimage,VBoolean addrim,double voxel_scale)
+void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
+	     VBoolean equivol,VImage *betaimage,VImage *zvalimage,VBoolean addrim)
 {
   size_t i,j,k;
 
-
   /* create cylinder data struct */
-  Cylinders *cyl = VCylinder(rim,metric,radius,addrim,voxel_scale);  
+  Cylinders *cyl = VCylinder(rim,metric,radius,addrim);  
 
   
   /* equivolume correction */
@@ -80,17 +79,16 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,size_t numperm,
   size_t np = (size_t)((float)cyl->numcylinders/100.0);
   if (np < 1) np = 1;
   int nbeta=4,nzval=3;
-
   
 #pragma omp parallel for shared(progress)
   for (k=0; k<cyl->numcylinders; k++) {
     size_t i,j;
     if (k%np==0) fprintf(stderr," beta:  %7.3f\r",(float)(progress)/(float)cyl->numcylinders);
     progress++;
-
+   
     gsl_vector *beta = gsl_vector_calloc(nbeta);
     gsl_vector *zval = gsl_vector_calloc(nzval);
-    double w = PermGLM(zmap,metric,cyl,k,numperm,voxel_scale,beta,zval);
+    double w = LaminarGLM(zmap,metric,cyl,k,beta,zval);
     
     for (i=0; i<cyl->addr[k]->size; i++) {
       size_t l = cyl->addr[k]->data[i];
@@ -116,8 +114,8 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,size_t numperm,
 
   
   /* normalize betaimages */
-  VFloat *pb = NULL;
   VFloat *pw = VImageData(wimage);
+  VFloat *pb = NULL;
   for (j=0; j<nbeta; j++) {
     pb = VImageData(betaimage[j]);
     for (i=0; i<VImageNPixels(wimage); i++) {
@@ -125,7 +123,6 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,size_t numperm,
       else pb[i] = 0;
     }
   }
-
 
   /* normalize zval images */
   for (j=0; j<nzval; j++) {
@@ -143,7 +140,6 @@ int main (int argc, char **argv)
   static VString    rim_filename="";
   static VString    mask_filename="";
   static VFloat     radius = 2.0;
-  static VShort     numperm = 1;
   static VBoolean   equivol = FALSE;
   static VBoolean   addrim = TRUE;
   static VShort     nproc = 0;
@@ -152,7 +148,6 @@ int main (int argc, char **argv)
     {"rim", VStringRepn,1,(VPointer) &rim_filename,VRequiredOpt,NULL,"rim image"},
     {"mask", VStringRepn,1,(VPointer) &mask_filename,VOptionalOpt,NULL,"mask image"},
     {"radius", VFloatRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Cylinder radius in mm"},
-    {"perm", VShortRepn,1,(VPointer) &numperm,VOptionalOpt,NULL,"Number of permutations"},
     {"equivol", VBooleanRepn,1,(VPointer) &equivol,VOptionalOpt,NULL,"Equivolume correction"},
     {"addrim", VBooleanRepn,1,(VPointer) &addrim,VOptionalOpt,NULL,"Include rim"},
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
@@ -165,7 +160,6 @@ int main (int argc, char **argv)
 
   
   VParseFilterCmdZ (VNumber (options),options,argc,argv,&in_file,&out_file,&in_filename);
-  if (numperm < 1) VError(" number of permutations must be positive");
   if (radius < 0.00001) VError(" radius must be positive");
 
 
@@ -261,11 +255,10 @@ int main (int argc, char **argv)
     zvalimage[i] = VCreateImageLike(zmap);
     VFillImage(zvalimage[i],VAllBands,0);
   }
-  double voxel_scale=1.0;
  
   
   /* Main */
-  Cylarim(zmap,metric,rim,(double)radius,(size_t)numperm,equivol,betaimage,zvalimage,addrim,voxel_scale);
+  Cylarim(zmap,metric,rim,(double)radius,equivol,betaimage,zvalimage,addrim);
 
   
   /* write output */
