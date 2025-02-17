@@ -29,7 +29,8 @@
 
 extern double gaussian(double x,int);
 extern void XWriteOutput(VImage image,VAttrList geolist,char *filename);
-extern double SpatialAutocorrelation(Cylinders *cyl,size_t cid,gsl_vector *residuals);
+extern double Moran(Cylinders *cyl,size_t cid,gsl_vector *,gsl_vector *residuals);
+extern void GetResolution(VImage src,gsl_vector *reso);
 
 /* 
 ** approximation: convert t to z values 
@@ -47,8 +48,8 @@ double Xt2z(double t,double df)
 }
 
 
-/* contrast variances, c^t cov c */
-double contrastVar(gsl_matrix *cov,gsl_vector *c)
+/* contrast variance, c^t cov c */
+double contrastVariance(gsl_matrix *cov,gsl_vector *c)
 {
   size_t i,j;
   double cv = 0.0;
@@ -60,55 +61,43 @@ double contrastVar(gsl_matrix *cov,gsl_vector *c)
   return cv;
 }
 
-
-void ZStats(gsl_vector *beta,gsl_matrix *cov,double chisq,double df,gsl_vector *zval)
+/* z-stats for three contrasts: b0-b1, b0-b2, b1-b2 */
+void ZStats(gsl_vector *beta,gsl_matrix *cov,double edf,gsl_vector *zval)
 {
-  double u=0,edf=0,cv=0,t=0;
+  double cv=0,t=0,tiny=0.0001;
   gsl_vector *contrast = gsl_vector_calloc(beta->size);
   gsl_vector_set_zero(zval);
-  
-  /* residual variance */
-  double sigma2 = chisq/df;
-
+  if (edf < 0.0001) return;
   
   /* contrast 0 */
   gsl_vector_set_zero(contrast);
   contrast->data[0] = 1;
   contrast->data[1] = -1;
-  cv = contrastVar(cov,contrast);
-  t = (beta->data[0] - beta->data[1])/sqrt(sigma2*cv);
-  zval->data[0] = t;
-  edf = 0;
-  gsl_blas_ddot(beta,contrast,&u);
-  if (cv > 0) edf = 2.0*u*u/cv;
-  if (edf > 0) zval->data[0] = Xt2z(t,edf);
+  cv = contrastVariance(cov,contrast);
+  if (cv > tiny) {
+    t = (beta->data[0] - beta->data[1])/sqrt(cv);
+    zval->data[0] = Xt2z(t,edf);
+  }
   
-
   /* contrast 1 */
   gsl_vector_set_zero(contrast);
   contrast->data[0] = 1;
   contrast->data[2] = -1;
-  cv = contrastVar(cov,contrast);
-  t = (beta->data[0] - beta->data[2])/sqrt(sigma2*cv);
-  zval->data[1] = t;
-  edf = 0;
-  gsl_blas_ddot(beta,contrast,&u);
-  if (cv > 0) edf = 2.0*u*u/cv;
-  if (edf > 0) zval->data[1] = Xt2z(t,edf);
+  cv = contrastVariance(cov,contrast);
+  if (cv > tiny) {
+    t = (beta->data[0] - beta->data[2])/sqrt(cv);
+    zval->data[1] = Xt2z(t,edf);
+  }
   
-
   /* contrast 2 */
   gsl_vector_set_zero(contrast);
   contrast->data[1] = 1;
   contrast->data[2] = -1;
-  cv = contrastVar(cov,contrast);
-  t = (beta->data[1] - beta->data[2])/sqrt(sigma2*cv);
-  zval->data[2] = t;
-  edf = 0;
-  gsl_blas_ddot(beta,contrast,&u);
-  if (cv > 0) edf = 2.0*u*u/cv;
-  if (edf > 0) zval->data[2] = Xt2z(t,edf);
-  
+  cv = contrastVariance(cov,contrast);
+  if (cv > tiny) {
+    t = (beta->data[1] - beta->data[2])/sqrt(cv);
+    zval->data[2] = Xt2z(t,edf);
+  }
   gsl_vector_free(contrast);
 }
 
@@ -180,30 +169,32 @@ double LaminarGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector
 
   
   /* spatial residual autocorrelation */
+  gsl_vector *reso = gsl_vector_calloc(3);
+  GetResolution(zmap,reso);
   gsl_vector *residuals = gsl_vector_calloc(n);
   gsl_multifit_linear_residuals(X,y,beta,residuals);
-  double rho = SpatialAutocorrelation(cyl,cid,residuals);
+  double rho = Moran(cyl,cid,reso,residuals);
   gsl_vector_free(residuals);
-  
-  double nx = (double)n;
-  double mx = (double)m;
-  double df = nx-mx;
-  double edf = df;
+  gsl_vector_free(reso);
+
   
   /* simple adjustment for spatial autocorr */
+  double nx = (double)n;
+  double mx = (double)m;
   double neff = nx*(1.0-rho);  /* sample size adjusted for spatial autocorr */
-  if (neff > nx) neff = nx;
-  edf = neff - (double)m;
+  double edf = neff - mx;      /* effective degrees of freedom */
 
   
   /* Satterthwaite Approximation */
+  /*
+  double df = nx-mx;
   edf = ((nx-mx)*(nx-mx))/((nx-mx)*(1.0+(mx-1.0)*rho));
   if (edf > df) edf = df;
-
+  */
   
   /*  z-values */
-  ZStats(beta,cov,chisq,edf,zval);
- 
+  ZStats(beta,cov,edf,zval);
+
   
  ende: ;
   gsl_multifit_linear_free(work);
