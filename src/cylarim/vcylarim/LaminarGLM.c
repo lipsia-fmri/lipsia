@@ -14,9 +14,6 @@
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_blas.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_cdf.h>
 
 
 /* From the standard C library: */
@@ -29,7 +26,7 @@
 
 extern double gaussian(double x,int);
 extern void XWriteOutput(VImage image,VAttrList geolist,char *filename);
-extern double Moran(Cylinders *cyl,size_t cid,gsl_vector *,gsl_vector *residuals);
+extern double Moran(Cylinders *cyl,size_t cid,gsl_vector *,double,gsl_vector *residuals);
 extern void GetResolution(VImage src,gsl_vector *reso);
 
 /* 
@@ -74,6 +71,7 @@ void ZStats(gsl_vector *beta,gsl_matrix *cov,double edf,gsl_vector *zval)
   contrast->data[0] = 1;
   contrast->data[1] = -1;
   cv = contrastVariance(cov,contrast);
+
   if (cv > tiny) {
     t = (beta->data[0] - beta->data[1])/sqrt(cv);
     zval->data[0] = Xt2z(t,edf);
@@ -104,24 +102,24 @@ void ZStats(gsl_vector *beta,gsl_matrix *cov,double edf,gsl_vector *zval)
 
 
 /* Laminar GLM */
-double LaminarGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector *beta,gsl_vector *zval)
+double LaminarGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,double upsampling,gsl_vector *beta,gsl_vector *zval)
 {
   int b,r,c;
   size_t i,j,k;
-  size_t m=beta->size;
+  size_t p=beta->size;
   size_t n=cyl->addr[cid]->size;
-  double u=0,v=0;
-  double rtcode = -1;
-
+  size_t m=zval->size;
+  double u=0,v=0,edf=-1;
  
-  /* cylinder must be big enough for sufficient stats */
-  if (n < m*10) return -1;
-  
   gsl_vector_set_zero(beta);
-  gsl_vector *y = gsl_vector_calloc(n);
-  gsl_vector *mvec = gsl_vector_calloc(n);
+  gsl_vector_set_zero(zval);
+   
+  /* cylinder must be big enough for sufficient stats */
+  if (n < p*10) return -1;
 
   /* fill y-vector with activation map values */
+  gsl_vector *y = gsl_vector_calloc(n);
+  gsl_vector *mvec = gsl_vector_calloc(n);
   for (i=0; i<n; i++) {
     k = cyl->addr[cid]->data[i];
     b = gsl_matrix_int_get(cyl->xmap,k,0);
@@ -142,14 +140,14 @@ double LaminarGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector
 
   /* GLM */
   double chisq=0;
-  gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(n,m);
-  gsl_matrix *cov = gsl_matrix_calloc(m,m);
-  gsl_matrix *X = gsl_matrix_calloc(n,m);
+  gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(n,p);
+  gsl_matrix *cov = gsl_matrix_calloc(p,p);
+  gsl_matrix *X = gsl_matrix_calloc(n,p);
   gsl_matrix_set_all(X,1.0);
    
   for (i=0; i<n; i++) {
     u = mvec->data[i];
-    for (j=0; j<3; j++) {
+    for (j=0; j<m; j++) {
       v = gaussian(u,(int)j);
       gsl_matrix_set(X,i,j,v);
     }
@@ -165,32 +163,33 @@ double LaminarGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector
   /* goodness of fit, R^2 */
   double r2 = 1.0 - chisq/tss;
   if (r2 < 0) goto ende;
-  rtcode = 1;
 
-  
-  /* spatial residual autocorrelation */
-  gsl_vector *reso = gsl_vector_calloc(3);
-  GetResolution(zmap,reso);
-  gsl_vector *residuals = gsl_vector_calloc(n);
-  gsl_multifit_linear_residuals(X,y,beta,residuals);
-  double rho = Moran(cyl,cid,reso,residuals);
-  gsl_vector_free(residuals);
-  gsl_vector_free(reso);
-
-  
-  /* simple adjustment for spatial autocorr */
+  /* degrees of freedom */
   double nx = (double)n;
-  double mx = (double)m;
-  double neff = nx*(1.0-rho);  /* sample size adjusted for spatial autocorr */
-  double edf = neff - mx;      /* effective degrees of freedom */
+  double px = (double)p;
+  double neff = nx;
 
-  
-  /* Satterthwaite Approximation */
+  /* adjust number of observations using upsampling factor */
+  if (upsampling > DBL_EPSILON) neff = nx/upsampling;
+
+  /* effective degrees of freedom */
+  edf = neff - px;
+
+  /* adjust using Moran's I */
   /*
-  double df = nx-mx;
-  edf = ((nx-mx)*(nx-mx))/((nx-mx)*(1.0+(mx-1.0)*rho));
-  if (edf > df) edf = df;
+  if (spatialdecay > 0) { 
+    gsl_vector *reso = gsl_vector_calloc(m);
+    GetResolution(zmap,reso);
+    gsl_vector *residuals = gsl_vector_calloc(n);
+    gsl_multifit_linear_residuals(X,y,beta,residuals);
+    double rho = Moran(cyl,cid,reso,spatialdecay,residuals);
+    neff = nx*(1.0-rho);
+    if (neff > nx) neff = nx;
+    gsl_vector_free(residuals);
+    gsl_vector_free(reso);
+  }
   */
+
   
   /*  z-values */
   ZStats(beta,cov,edf,zval);
@@ -202,7 +201,7 @@ double LaminarGLM(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector
   gsl_matrix_free(cov);
   gsl_vector_free(y);
   gsl_vector_free(mvec);
-  return rtcode;
+  return edf;
 }
 
 

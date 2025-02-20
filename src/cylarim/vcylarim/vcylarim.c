@@ -23,7 +23,6 @@
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_blas.h>
-#include <gsl/gsl_permutation.h>
 #include <gsl/gsl_sort_vector.h>
 #include <gsl/gsl_histogram.h>
 #include <gsl/gsl_errno.h>
@@ -38,9 +37,9 @@
 
 extern void GetResolution(VImage src,gsl_vector *reso);
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
-extern Cylinders *VCylinder(VImage rim,VImage metric,double radius,VBoolean);
+extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
 extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
-extern double LaminarGLM(VImage,VImage,Cylinders *,size_t,gsl_vector *,gsl_vector *);
+extern double LaminarGLM(VImage,VImage,Cylinders *,size_t,double,gsl_vector *,gsl_vector *);
 
 void XWriteOutput(VImage image,VAttrList geolist,char *filename)
 {
@@ -52,14 +51,13 @@ void XWriteOutput(VImage image,VAttrList geolist,char *filename)
   fclose(fp);
 }
 
-
 void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
-	     VBoolean equivol,VImage *betaimage,VImage *zvalimage,VBoolean addrim)
+	     VBoolean equivol,double upsampling,VImage *betaimage,VImage *zvalimage,VBoolean delrim)
 {
   size_t i,j,k;
 
   /* create cylinder data struct */
-  Cylinders *cyl = VCylinder(rim,metric,radius,addrim);  
+  Cylinders *cyl = VCylinder(rim,metric,radius);  
 
   
   /* equivolume correction */
@@ -79,6 +77,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
   size_t np = (size_t)((float)cyl->numcylinders/100.0);
   if (np < 1) np = 1;
   int nbeta=4,nzval=3;
+  double sumw=0,nw=0;
   
 #pragma omp parallel for shared(progress)
   for (k=0; k<cyl->numcylinders; k++) {
@@ -88,7 +87,9 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
    
     gsl_vector *beta = gsl_vector_calloc(nbeta);
     gsl_vector *zval = gsl_vector_calloc(nzval);
-    double w = LaminarGLM(zmap,metric,cyl,k,beta,zval);
+    double w = LaminarGLM(zmap,metric,cyl,k,upsampling,beta,zval);
+    if (w < 0) continue;
+    
     
     for (i=0; i<cyl->addr[k]->size; i++) {
       size_t l = cyl->addr[k]->data[i];
@@ -98,22 +99,26 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
 
 #pragma omp critical
       {
-	VPixel(wimage,b,r,c,VFloat) += w;
+	VPixel(wimage,b,r,c,VFloat) += 1.0;
 	for (j=0; j<nbeta; j++) {
 	  VPixel(betaimage[j],b,r,c,VFloat) += w*beta->data[j];
 	}
 	for (j=0; j<nzval; j++) {
 	  VPixel(zvalimage[j],b,r,c,VFloat) += w*zval->data[j];
 	}
+	sumw += w;
+	nw++;
       }
     }
     gsl_vector_free(beta);
     gsl_vector_free(zval);
   }
-  fprintf(stderr,"                       \n");
+  if (nw < 1) VError(" no cylinders with effective degrees > 0");
+  fprintf(stderr," mean effective degrees of freedom: %.3f\n",sumw/nw);
 
   
   /* normalize betaimages */
+  VUByte *pr = VImageData(rim);
   VFloat *pw = VImageData(wimage);
   VFloat *pb = NULL;
   for (j=0; j<nbeta; j++) {
@@ -121,6 +126,7 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
     for (i=0; i<VImageNPixels(wimage); i++) {
       if (pw[i] > 0.001) pb[i] /= pw[i];
       else pb[i] = 0;
+      if (delrim && pr[i] != 3) pb[i] = 0;
     }
   }
 
@@ -130,9 +136,16 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
     for (i=0; i<VImageNPixels(wimage); i++) {
       if (pw[i] > 0.001) pb[i] /= pw[i];
       else pb[i] = 0;
+      if (delrim && pr[i] != 3) pb[i] = 0;
     }
   }
 }
+
+typedef struct FpointStruct{
+  VFloat x;
+  VFloat y;
+  VFloat z;
+} FPoint;
 
 int main (int argc, char **argv)
 {
@@ -141,7 +154,8 @@ int main (int argc, char **argv)
   static VString    mask_filename="";
   static VFloat     radius = 2.0;
   static VBoolean   equivol = FALSE;
-  static VBoolean   addrim = TRUE;
+  static VBoolean   delrim = FALSE;
+  static FPoint     upreso = {0,0,0};
   static VShort     nproc = 0;
   static VOptionDescRec options[] = {
     {"metric", VStringRepn,1,(VPointer) &metric_filename,VRequiredOpt,NULL,"metric image"},
@@ -149,7 +163,8 @@ int main (int argc, char **argv)
     {"mask", VStringRepn,1,(VPointer) &mask_filename,VOptionalOpt,NULL,"mask image"},
     {"radius", VFloatRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Cylinder radius in mm"},
     {"equivol", VBooleanRepn,1,(VPointer) &equivol,VOptionalOpt,NULL,"Equivolume correction"},
-    {"addrim", VBooleanRepn,1,(VPointer) &addrim,VOptionalOpt,NULL,"Include rim"},
+    {"reso",VFloatRepn,3,(VPointer) &upreso,VOptionalOpt,NULL,"Original resolution needed for upsampling factor (x,y,z)"},
+    {"delrim", VBooleanRepn,1,(VPointer) &delrim,VOptionalOpt,NULL,"Delete rim"},
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
    };
   VString in_filename=NULL;
@@ -172,7 +187,8 @@ int main (int argc, char **argv)
   fprintf(stderr," using %d cores\n",(int)num_procs);
   omp_set_num_threads(num_procs);
 #endif
-  
+
+
 
   /* read zmap  */
   VImage zmap=NULL;
@@ -185,6 +201,17 @@ int main (int argc, char **argv)
   zmap = Convert2Repn(ztmp,zmap,VFloatRepn);
   VDestroyImage(ztmp);
 
+  
+  /* get upsampling factor based on original resolution prior to upsampling */
+  double upsampling = -1;
+  double u = upreso.x * upreso.y * upreso.z;
+  if (u > DBL_EPSILON) {
+    gsl_vector *reso = gsl_vector_calloc(3);
+    GetResolution(zmap,reso);    
+    double v = reso->data[0] * reso->data[1] * reso->data[2];
+    upsampling = u/v;
+    fprintf(stderr," spatial upsampling factor: %.3f\n",upsampling);
+  }
   
   /* metric image */
   VImage metric=NULL;
@@ -258,7 +285,7 @@ int main (int argc, char **argv)
  
   
   /* Main */
-  Cylarim(zmap,metric,rim,(double)radius,equivol,betaimage,zvalimage,addrim);
+  Cylarim(zmap,metric,rim,(double)radius,equivol,upsampling,betaimage,zvalimage,delrim);
 
   
   /* write output */
