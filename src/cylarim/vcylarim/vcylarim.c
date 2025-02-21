@@ -51,8 +51,8 @@ void XWriteOutput(VImage image,VAttrList geolist,char *filename)
   fclose(fp);
 }
 
-void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
-	     VBoolean equivol,double upsampling,VImage *betaimage,VImage *zvalimage,VBoolean delrim)
+VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
+	       VBoolean equivol,double upsampling,VImage *betaimage,VImage *zvalimage)
 {
   size_t i,j,k;
 
@@ -71,6 +71,9 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
 
   /* LayerGLM */  
   VFillImage(wimage,VAllBands,0);
+
+  VImage edfimage = VCreateImageLike(zmap);
+  VFillImage(edfimage,VAllBands,0);
 
   
   size_t progress=0;
@@ -100,12 +103,13 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
 #pragma omp critical
       {
 	VPixel(wimage,b,r,c,VFloat) += 1.0;
+	VPixel(edfimage,b,r,c,VFloat) += w;
 	for (j=0; j<nbeta; j++) {
 	  VPixel(betaimage[j],b,r,c,VFloat) += w*beta->data[j];
 	}
 	for (j=0; j<nzval; j++) {
 	  VPixel(zvalimage[j],b,r,c,VFloat) += w*zval->data[j];
-	}
+	}	
 	sumw += w;
 	nw++;
       }
@@ -113,12 +117,11 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
     gsl_vector_free(beta);
     gsl_vector_free(zval);
   }
-  if (nw < 1) VError(" no cylinders with effective degrees > 0");
+  if (nw < 1) VError(" no cylinders with effective degrees of freedom > 0");
   fprintf(stderr," mean effective degrees of freedom: %.3f\n",sumw/nw);
 
   
   /* normalize betaimages */
-  VUByte *pr = VImageData(rim);
   VFloat *pw = VImageData(wimage);
   VFloat *pb = NULL;
   for (j=0; j<nbeta; j++) {
@@ -126,7 +129,6 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
     for (i=0; i<VImageNPixels(wimage); i++) {
       if (pw[i] > 0.001) pb[i] /= pw[i];
       else pb[i] = 0;
-      if (delrim && pr[i] != 3) pb[i] = 0;
     }
   }
 
@@ -136,9 +138,15 @@ void Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
     for (i=0; i<VImageNPixels(wimage); i++) {
       if (pw[i] > 0.001) pb[i] /= pw[i];
       else pb[i] = 0;
-      if (delrim && pr[i] != 3) pb[i] = 0;
     }
   }
+
+  /* normalize edfimage */
+  pb = VImageData(edfimage);
+  for (i=0; i<VImageNPixels(wimage); i++) {
+    if (pw[i] > 0.001) pb[i] /= pw[i];
+  }
+  return edfimage;
 }
 
 typedef struct FpointStruct{
@@ -154,7 +162,6 @@ int main (int argc, char **argv)
   static VString    mask_filename="";
   static VFloat     radius = 2.0;
   static VBoolean   equivol = FALSE;
-  static VBoolean   delrim = FALSE;
   static FPoint     upreso = {0,0,0};
   static VShort     nproc = 0;
   static VOptionDescRec options[] = {
@@ -164,7 +171,6 @@ int main (int argc, char **argv)
     {"radius", VFloatRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Cylinder radius in mm"},
     {"equivol", VBooleanRepn,1,(VPointer) &equivol,VOptionalOpt,NULL,"Equivolume correction"},
     {"reso",VFloatRepn,3,(VPointer) &upreso,VOptionalOpt,NULL,"Original resolution needed for upsampling factor (x,y,z)"},
-    {"delrim", VBooleanRepn,1,(VPointer) &delrim,VOptionalOpt,NULL,"Delete rim"},
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
    };
   VString in_filename=NULL;
@@ -285,7 +291,7 @@ int main (int argc, char **argv)
  
   
   /* Main */
-  Cylarim(zmap,metric,rim,(double)radius,equivol,upsampling,betaimage,zvalimage,delrim);
+  VImage edfimage = Cylarim(zmap,metric,rim,(double)radius,equivol,upsampling,betaimage,zvalimage);
 
   
   /* write output */
@@ -299,6 +305,7 @@ int main (int argc, char **argv)
   VAppendAttr(out_list,"nbeta",NULL,VShortRepn,(VShort)nbeta);
   for (i=0; i<nbeta; i++) VAppendAttr(out_list,"beta",NULL,VImageRepn,betaimage[i]);
   for (i=0; i<nzval; i++) VAppendAttr(out_list,"zvalimage",NULL,VImageRepn,zvalimage[i]);
+  VAppendAttr(out_list,"edfimage",NULL,VImageRepn,edfimage);
 
   if (! VWriteFile (out_file, out_list)) exit (1);
   fprintf (stderr, "%s: done.\n", argv[0]);

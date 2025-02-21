@@ -109,8 +109,10 @@ VDictEntry TypDict[] = {
   { "notmiddle", 10, 0,0,0,0  },
   { "notsuperficial", 11, 0,0,0,0  },
 
-  { "max", 12, 0,0,0,0 },
-  { "min", 13, 0,0,0,0 },
+  { "max_id", 12, 0,0,0,0 },
+  { "min_id", 13, 0,0,0,0 },
+
+  { "edf", 14, 0,0,0,0 },
 
   { NULL, 0,0,0,0,0 }
 };
@@ -126,6 +128,7 @@ int main(int argc, char *argv[])
   };
   FILE *out_file=NULL;
   VString in_file=NULL;
+  VImage dest = NULL;
   char *prg=GetLipsiaName("vcylarim_stats");
   fprintf (stderr, " %s\n", prg);
 
@@ -133,16 +136,34 @@ int main(int argc, char *argv[])
   /* parse command line */
   VParseFilterCmdX(VNumber(options),options,argc,argv,&in_file,&out_file);
 
-  
-  /* read beta images */
+ 
+
+  /* read input images */
   VLong tr=0L;
   VAttrList list = VReadAttrList(in_file,tr,TRUE,FALSE);
   if (list == NULL) VError(" error reading input file %s",in_file);
   VImage src;
   VAttrListPosn posn;
+
+
+  /* edfimage */
+  if (type == 14) {
+    int k=0;
+    for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
+      if (VGetAttrRepn (& posn) != VImageRepn) continue;
+      if (strcmp(VGetAttrName (& posn),"edfimage") == 0) {
+	VGetAttrValue (& posn, NULL,VImageRepn, & dest);
+	k++;
+      }
+    }
+    if (k==0) VError(" edfimage not found");
+    goto ende;
+  }
+
+
+  /* beta images */
   int nbeta = 3;
-  VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage));
-  
+  VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage)); 
   int n=0;
   for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
     if (VGetAttrRepn (& posn) != VImageRepn) continue;
@@ -168,13 +189,11 @@ int main(int argc, char *argv[])
       n++;
     }
   }
-
-
+   
   /* alloc output image */
-  VImage dest = VCreateImageLike(betaimage[0]);
+  dest = VCreateImageLike(betaimage[0]);
   VFillImage(dest,VAllBands,0);
-
-
+ 
   /* beta contrasts */
   size_t i,j;
   size_t npixels = VImageNPixels(betaimage[0]);
@@ -203,6 +222,7 @@ int main(int argc, char *argv[])
 
   
   /* output */
+ ende: ;
   VAttrList out_list = VCreateAttrList();
   VAttrList geolist = VGetGeoInfo(list);
   VSetGeoInfo(geolist,out_list);
