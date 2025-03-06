@@ -358,7 +358,6 @@ Cylinders *VCylinder(VImage rim,VImage metric,double radius)
   size_t maxint = (size_t)gsl_pow_int((double)2.0,31)-1;
   if (n1+n2 > maxint) VError(" too many rim points (%lu), max is: %lu",n1+n2,maxint);
   if (nx > maxint) VError(" too many cortex points (%lu), max is: %lu",nx,maxint);
-  fprintf(stderr," Number of cortex points: %lu,   max is: %lu\n",nx,maxint);
   
   /* fill voxel address maps */
   gsl_matrix_int *map1 = gsl_matrix_int_calloc(n1,3);
