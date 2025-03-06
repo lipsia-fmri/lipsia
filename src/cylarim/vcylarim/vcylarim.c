@@ -28,6 +28,7 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
+#include <gsl/gsl_cdf.h>
 
 #include "../cylutils/cyl.h"
 
@@ -39,7 +40,10 @@ extern void GetResolution(VImage src,gsl_vector *reso);
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
 extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
 extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
-extern double LaminarGLM(VImage,VImage,Cylinders *,size_t,double,gsl_vector *,gsl_vector *);
+extern double LaminarGLM(VImage,VImage,VImage,Cylinders *,size_t,double,gsl_vector *,gsl_vector *);
+extern double PermGLM(VImage,VImage,VImage,Cylinders *cyl,size_t cid,gsl_vector *beta,gsl_vector *zval);
+extern double ResidualPerm(VImage,VImage,VImage,Cylinders *cyl,size_t cid,gsl_vector *beta,gsl_vector *zval);
+
 
 void XWriteOutput(VImage image,VAttrList geolist,char *filename)
 {
@@ -52,7 +56,7 @@ void XWriteOutput(VImage image,VAttrList geolist,char *filename)
 }
 
 VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
-	       VBoolean equivol,double upsampling,VImage *betaimage,VImage *zvalimage)
+	       VBoolean equivol,VBoolean permtest,double upsampling,VImage *betaimage,VImage *zvalimage)
 {
   size_t i,j,k;
 
@@ -72,53 +76,57 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
   /* LayerGLM */  
   VFillImage(wimage,VAllBands,0);
 
-  VImage edfimage = VCreateImageLike(zmap);
-  VFillImage(edfimage,VAllBands,0);
+  VImage r2image = VCreateImageLike(zmap);
+  VFillImage(r2image,VAllBands,0);
 
-  
   size_t progress=0;
   size_t np = (size_t)((float)cyl->numcylinders/100.0);
   if (np < 1) np = 1;
   int nbeta=4,nzval=3;
   double sumw=0,nw=0;
+
   
 #pragma omp parallel for shared(progress)
   for (k=0; k<cyl->numcylinders; k++) {
     size_t i,j;
-    if (k%np==0) fprintf(stderr," beta:  %7.3f\r",(float)(progress)/(float)cyl->numcylinders);
+    if (k%np==0) fprintf(stderr," GLM:  %7.3f\r",(float)(progress)/(float)cyl->numcylinders);
     progress++;
-   
+
+    double w = 0;
     gsl_vector *beta = gsl_vector_calloc(nbeta);
     gsl_vector *zval = gsl_vector_calloc(nzval);
-    double w = LaminarGLM(zmap,metric,cyl,k,upsampling,beta,zval);
+    gsl_vector *residuals = gsl_vector_calloc(cyl->addr[k]->size);
+    if (permtest) w = PermGLM(zmap,metric,rim,cyl,k,beta,zval);
+    else w = LaminarGLM(zmap,metric,rim,cyl,k,upsampling,beta,zval);
     if (w < 0) continue;
-    
     
     for (i=0; i<cyl->addr[k]->size; i++) {
       size_t l = cyl->addr[k]->data[i];
       int b = gsl_matrix_int_get(cyl->xmap,l,0);
       int r = gsl_matrix_int_get(cyl->xmap,l,1);
       int c = gsl_matrix_int_get(cyl->xmap,l,2);
+      if (VPixel(rim,b,r,c,VUByte) != 3) continue;
 
 #pragma omp critical
       {
 	VPixel(wimage,b,r,c,VFloat) += 1.0;
-	VPixel(edfimage,b,r,c,VFloat) += w;
+	VPixel(r2image,b,r,c,VFloat) += w;
+	
 	for (j=0; j<nbeta; j++) {
 	  VPixel(betaimage[j],b,r,c,VFloat) += w*beta->data[j];
 	}
 	for (j=0; j<nzval; j++) {
 	  VPixel(zvalimage[j],b,r,c,VFloat) += w*zval->data[j];
-	}	
+	}
 	sumw += w;
 	nw++;
       }
     }
     gsl_vector_free(beta);
     gsl_vector_free(zval);
+    gsl_vector_free(residuals);
   }
-  if (nw < 1) VError(" no cylinders with effective degrees of freedom > 0");
-  fprintf(stderr," mean effective degrees of freedom: %.3f\n",sumw/nw);
+  if (nw < 1) VError(" no cylinders with R^2 > 0");
 
   
   /* normalize betaimages */
@@ -141,13 +149,14 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
     }
   }
 
-  /* normalize edfimage */
-  pb = VImageData(edfimage);
+  /* normalize r2image */
+  pb = VImageData(r2image);
   for (i=0; i<VImageNPixels(wimage); i++) {
     if (pw[i] > 0.001) pb[i] /= pw[i];
   }
-  return edfimage;
+  return r2image;
 }
+
 
 typedef struct FpointStruct{
   VFloat x;
@@ -162,6 +171,7 @@ int main (int argc, char **argv)
   static VString    mask_filename="";
   static VFloat     radius = 2.0;
   static VBoolean   equivol = FALSE;
+  static VBoolean   permtest = FALSE;
   static FPoint     upreso = {0,0,0};
   static VShort     nproc = 0;
   static VOptionDescRec options[] = {
@@ -170,6 +180,7 @@ int main (int argc, char **argv)
     {"mask", VStringRepn,1,(VPointer) &mask_filename,VOptionalOpt,NULL,"mask image"},
     {"radius", VFloatRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Cylinder radius in mm"},
     {"equivol", VBooleanRepn,1,(VPointer) &equivol,VOptionalOpt,NULL,"Equivolume correction"},
+    {"permtest", VBooleanRepn, 1, & permtest, VOptionalOpt,NULL,"Whether to do permutation testing" },
     {"reso",VFloatRepn,3,(VPointer) &upreso,VOptionalOpt,NULL,"Original resolution needed for upsampling factor (x,y,z)"},
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
    };
@@ -291,7 +302,7 @@ int main (int argc, char **argv)
  
   
   /* Main */
-  VImage edfimage = Cylarim(zmap,metric,rim,(double)radius,equivol,upsampling,betaimage,zvalimage);
+  VImage r2image = Cylarim(zmap,metric,rim,(double)radius,equivol,permtest,upsampling,betaimage,zvalimage);
 
   
   /* write output */
@@ -305,7 +316,7 @@ int main (int argc, char **argv)
   VAppendAttr(out_list,"nbeta",NULL,VShortRepn,(VShort)nbeta);
   for (i=0; i<nbeta; i++) VAppendAttr(out_list,"beta",NULL,VImageRepn,betaimage[i]);
   for (i=0; i<nzval; i++) VAppendAttr(out_list,"zvalimage",NULL,VImageRepn,zvalimage[i]);
-  VAppendAttr(out_list,"edfimage",NULL,VImageRepn,edfimage);
+  VAppendAttr(out_list,"r2",NULL,VImageRepn,r2image);
 
   if (! VWriteFile (out_file, out_list)) exit (1);
   fprintf (stderr, "%s: done.\n", argv[0]);
