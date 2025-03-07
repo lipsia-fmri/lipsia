@@ -1,6 +1,5 @@
-
 False discovery rates in TED
-===================================
+-----------------------------------
 
 The program **vtedfdr** performs a statistical inference based on the output produced by the
 program :doc:`vted <vted>`.

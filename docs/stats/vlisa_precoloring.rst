@@ -1,5 +1,5 @@
 LISA single subject analysis using precoloring (vlisa_precoloring)
-====================================================================
+--------------------------------------------------------------------
 
 
 The program **vlisa_precoloring** performs a single-subject analysis

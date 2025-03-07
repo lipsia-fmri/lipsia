@@ -1,6 +1,6 @@
 
 Task-based edge density (TED)
-===================================
+-----------------------------------
 
 The program **vted** performs a task-based connectivity analysis at the voxel level.
 It compares two groups of data sets corresponding to two experimental conditions

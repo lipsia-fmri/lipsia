@@ -1,6 +1,6 @@
 
 Hubness maps resulting from TED
-===================================
+-----------------------------------
 
 The program **vhubness** produces a hubness map resulting from the output of :doc:`vted <vted>`.
 A voxel in the hubness map records the number of edges for which this voxel serves as an endpoint.

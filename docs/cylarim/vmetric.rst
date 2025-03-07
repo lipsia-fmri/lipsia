@@ -1,5 +1,5 @@
 vmetric
-=====================
+---------------------
 
 The program  **vmetric** expects a high-resolution segmentation into grey/white matter and CSF as input.
 The spatial resolution should be around 0.2mm (not necessarily isotropic).

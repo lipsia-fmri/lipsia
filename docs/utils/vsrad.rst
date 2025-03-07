@@ -1,5 +1,5 @@
 Speckle filter
-==============
+--------------
 
 
 The program **vsrad** implements a speckle reducing filter.

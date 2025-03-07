@@ -1,6 +1,6 @@
 
 Bipartite connectivity mapping (BCM)
-======================================
+--------------------------------------
 
 The program **vbcm** implements a new approach for 
 analyzing connectivity in rs-fMRI between two brain regions.
@@ -13,7 +13,7 @@ where the seed ROI must be averaged so that its spatial information is lost.
 
 
 Example:
-``````````
+^^^^^^^^^^
 
  :: 
  
@@ -21,19 +21,12 @@ Example:
 
 
 
-References
-^^^^^^^^^^^^^^
-
-.. [2018a_Lohmann] Lohmann, G. et al (2018), 6th Biennial Conf on Resting State and Brain
-   Connectivity, Montreal, Canada, 
-
-
 
 
 
 
 Parameters of 'vbcm'
-````````````````````````````````
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  -help    Prints usage information.
  -in      Input file.
@@ -43,4 +36,10 @@ Parameters of 'vbcm'
 
 
 .. index:: bcm
+
+References
+^^^^^^^^^^^^^^
+
+.. [2018a_Lohmann] Lohmann, G. et al (2018), 6th Biennial Conf on Resting State and Brain Connectivity, Montreal, Canada, 
+
 

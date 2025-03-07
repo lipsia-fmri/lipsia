@@ -1,5 +1,5 @@
 Masking an image
-============================
+----------------------------
 
 
 The program **vapplymask** applies a mask to an input image.

@@ -1,5 +1,5 @@
 LISA single subject analysis using prewhitening (vlisa_prewhitening)
-=====================================================================
+---------------------------------------------------------------------
 
 
 The program **vlisa_prewhitening** performs a single-subject analysis
