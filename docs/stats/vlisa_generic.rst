@@ -1,5 +1,5 @@
 LISA generic framework (vlisa_generic)
-========================================
+----------------------------------------
 
 
 The program **vlisa_generic** implements a generic framework for statistical inference of fMRI data [2018_Lohmann]_.

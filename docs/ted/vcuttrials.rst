@@ -1,6 +1,6 @@
 
 Cut functional data into trials
-===================================
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The program **vcuttrials** takes a preprocessed functional data set as input and cuts it up
 into small pieces along trial borders. This step is needed as a preparation for a subsequent

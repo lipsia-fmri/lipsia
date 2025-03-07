@@ -1,5 +1,5 @@
 vcylarim_getmask
-======================================
+--------------------------------------
 
 The program **vcylarim_getmask** can be used to obtain an initial brain mask.
 The idea is to exclude brain regions where values in the activation map 

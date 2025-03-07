@@ -1,5 +1,5 @@
 LISA twosample test (vlisa_twosample)
-=========================================
+-----------------------------------------
 
 
 The program **vlisa_twosample** performs a two-sample t-test on two groups of images

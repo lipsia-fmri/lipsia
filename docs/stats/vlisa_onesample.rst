@@ -1,5 +1,5 @@
 LISA onesample test (vlisa_onesample)
-=======================================
+---------------------------------------
 
 
 The program **vlisa_onesample** performs a one-sample t-test on a group of images

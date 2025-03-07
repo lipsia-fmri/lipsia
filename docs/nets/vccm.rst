@@ -1,6 +1,5 @@
-
 Connectivity concordance mapping (CCM)
-=======================================
+---------------------------------------
 
 
 The program **vccm** computes connectivity concordance maps (CCM).
@@ -21,7 +20,7 @@ the same orientation as the functional data.
 
 
 Example:
-``````````
+^^^^^^^^^^
 
  :: 
  
@@ -37,15 +36,8 @@ at time point 20 for each voxel covered by the region of interest mask.
 
 
 
-**Reference:**
-*Lohmann et al (2012),
-"Connectivity Concordance Mapping: A New Tool for Model-Free Analysis of fMRI Data of the Human Brain."
-Frontiers in Systems Neuroscience. 2012;6:13. doi:10.3389/fnsys.2012.00013.*
-
-
-
 Parameters of 'vccm'
-````````````````````````````````
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  -help    Prints usage information.
  -in      Input file.
@@ -55,6 +47,13 @@ Parameters of 'vccm'
  -first   First timestep to use. Default: 0
  -length  Length of time series to use, '0' to use full length. Default: 0
  -type    Concordance metric [ kendall | occc ]. Default: kendall
+
+
+**Reference:**
+*Lohmann et al (2012),
+"Connectivity Concordance Mapping: A New Tool for Model-Free Analysis of fMRI Data of the Human Brain."
+Frontiers in Systems Neuroscience. 2012;6:13. doi:10.3389/fnsys.2012.00013.*
+
 
 
 .. index:: ccm

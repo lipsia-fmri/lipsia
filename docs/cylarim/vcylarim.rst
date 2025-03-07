@@ -1,6 +1,6 @@
 
 vcylarim
-======================================
+--------------------------------------
 
 **vcylarim** is the core tool of the Cylarim package.
 It expects as input an activation map, a rim image and a metric image.
@@ -52,20 +52,20 @@ This file can be analyzed in subsequent processing steps using **cylarim_stats**
 
 Parameters of 'vcylarim'
 ````````````````````````````````
+::
 
- -help     Prints usage information.
- -in       Input file.
- -out      Output file.
- -mask     Region of interest mask (Optional)
- -metric   Metric image (required)
- -rim      Rim image (required)
- -radius   Cylinder radius in mm. Default: 2
- -equivol  Whether to apply equivolume correction [ true | false ]. Default: false
- -permtest Whether to do permutation testing. Default: false
- -reso     Original resolution needed for upsampling factor (x,y,z). Default: 0 0 0
- -j        Number of processors to use, '0' to use all. Default: 0
+  -help     Prints usage information.
+  -in       Input file.
+  -out      Output file.
+  -mask     Region of interest mask (Optional)
+  -metric   Metric image (required)
+  -rim      Rim image (required)
+  -radius   Cylinder radius in mm. Default: 2
+  -equivol  Whether to apply equivolume correction [ true | false ]. Default: false
+  -permtest Whether to do permutation testing. Default: false
+  -reso     Original resolution needed for upsampling factor (x,y,z). Default: 0 0 0
+  -j        Number of processors to use, '0' to use all. Default: 0
 
 
 
 .. index:: cylarim
-

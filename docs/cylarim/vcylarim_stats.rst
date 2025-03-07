@@ -1,5 +1,5 @@
 vcylarim_stats
-=====================
+---------------------
 
 The program  **vcylarim_stats** expects the GLM-coefficients computed by **vcylarim** as its input,
 and produces a laminar-specific map. The GLM coefficients corresponding to the three layers

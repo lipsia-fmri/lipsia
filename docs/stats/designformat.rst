@@ -1,6 +1,6 @@
 
 Design file format
-=====================
+---------------------
 
 
 Statistical evaluations require a specification of the experimental design which must
