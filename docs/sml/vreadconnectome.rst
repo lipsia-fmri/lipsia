@@ -1,5 +1,5 @@
 Reading data for use in Semi-blind machine learning (SML-EL)
-=============================================================
+-------------------------------------------------------------
 
 The program **vreadconnectome** prepares inputs for the program **vsml**.
 The purpose of **vreadconnectome** is to convert the connectome data into the format expected by the

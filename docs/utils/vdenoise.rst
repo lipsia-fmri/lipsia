@@ -1,5 +1,5 @@
 Denoising
-=========
+---------
 
 The program **vdenoise** removes noise from MRI data using wavelet
 filtering. Wavelet filters may produce pseduo-Gibbs artefacts.

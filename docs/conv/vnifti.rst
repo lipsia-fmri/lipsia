@@ -1,6 +1,5 @@
-
 Convert to/from nifti files
-===========================
+---------------------------
 
 The program **vnifti** converts nifti1 files \*.nii to vista files \*.v and back. 
 It recognizes the file type from the file name suffix.
@@ -27,6 +26,7 @@ The program is typically called as follows:
 
 
 Parameters of *vnifti*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
  -help         Usage information.

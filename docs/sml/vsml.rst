@@ -1,5 +1,5 @@
 Semi-blind machine learning - ensemble learning (SML-EL)
-===========================================================
+-----------------------------------------------------------
 
 The program **vsml** implements a new approach for predictive modelling based on fMRI.
 The main idea is to supplement fMRI data with readily available non-imaging information so 

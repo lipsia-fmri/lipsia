@@ -1,5 +1,5 @@
 LISA second-level GLM (vlisa_2ndlevel)
-===============================================
+-----------------------------------------------
 
 
 The program **vlisa_2ndlevel** performs a 2nd-level (group level) inference using the general linear model

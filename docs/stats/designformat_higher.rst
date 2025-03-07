@@ -1,8 +1,5 @@
-
-
-
 Higher-level  level design files
-================================
+--------------------------------
 
 Higher-level designs are used to compute higher-level statistics such as two-sample or paired tests
 so that groups of data sets can be statistically assessed.
@@ -27,7 +24,7 @@ Below, some simple design files are listed for tutorial purposes.
 
 
 One-sample test
---------------------
+^^^^^^^^^^^^^^^^^^^^
 
  ::
 
@@ -51,7 +48,7 @@ For such simple scenarios, an easier way to do a one-sample test is to use `vlis
 
 
 Two-sample test
---------------------
+^^^^^^^^^^^^^^^^^^^^
  ::
 
         %
@@ -105,7 +102,7 @@ For such simple scenarios, an easier way to the same test is to use  `vlisa_twos
 
 
 Paired test
-----------------
+^^^^^^^^^^^^^^^^
 
 ::
 

@@ -1,5 +1,5 @@
 Convert from dicom files
-=========================
+-------------------------
 
 This program converts dicom files to vista files.
 
@@ -18,7 +18,7 @@ multiple output files named "file-1.v", "file-2.v", etc.
 
 
 Parameters of 'vdicom'
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
  -help         Usage information.
  -in           Input directory containing raw DICOM files.

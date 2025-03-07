@@ -1,6 +1,6 @@
 
 Detrending
-============
+------------
 
 The program **vdetrend** can be used for removing a baseline drift.
 The drift can be removed either by subtracting a moving average or

@@ -1,6 +1,6 @@
 
 Spatial smoothing and temporal filtering
-=========================================
+-----------------------------------------
 
 Spatial and temporal filtering can be applied to fMRI data using the program **vpreprocess**.
 Spatial filtering is often used to improve the signal-to-noise-ratio (SNR), and to reduce
