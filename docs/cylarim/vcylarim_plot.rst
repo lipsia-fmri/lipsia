@@ -1,5 +1,5 @@
 vcylarim_plot
-=====================
+---------------------
 
 The inputs into the program  **vcylarim_plot** are a file containing
 the GLM-coefficients computed by **vcylarim**, and also a region of interest (ROI).
