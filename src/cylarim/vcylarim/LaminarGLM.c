@@ -1,8 +1,4 @@
-/*
-** cylarim, residual permutation GLM 
-**
-** G.Lohmann, Jan 2025, MPI-KYB
-*/
+
 /* From the Vista library: */
 #include <viaio/VImage.h>
 #include <viaio/Vlib.h>
@@ -11,25 +7,30 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_sort.h>
 #include <gsl/gsl_multifit.h>
-#include <gsl/gsl_linalg.h>
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_blas.h>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_cdf.h>
 
 
 /* From the standard C library: */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <float.h>
 
 #include "../cylutils/cyl.h"
 
 extern double gaussian(double x,int);
-extern void XWriteOutput(VImage image,VAttrList geolist,char *filename);
-extern void GetResolution(VImage src,gsl_vector *reso);
-extern void Leverage(gsl_matrix *X,gsl_vector *leverage);
+extern double contrastVariance(gsl_matrix *cov,gsl_vector *c);
+extern void ZStats(gsl_vector *beta,gsl_matrix *cov,double edf,gsl_vector *zval);
 
+void YNorm(gsl_vector *x)
+{
+  double mean = gsl_stats_mean(x->data,1,x->size);
+  gsl_vector_add_constant(x,-mean);
+}
 
 /* 
 ** approximation: convert t to z values 
@@ -60,6 +61,7 @@ double contrastVariance(gsl_matrix *cov,gsl_vector *c)
   }
   return cv;
 }
+
 
 /* z-stats for three contrasts: b0-b1, b0-b2, b1-b2 */
 void ZStats(gsl_vector *beta,gsl_matrix *cov,double edf,gsl_vector *zval)
@@ -102,98 +104,166 @@ void ZStats(gsl_vector *beta,gsl_matrix *cov,double edf,gsl_vector *zval)
 
 
 
-/* Laminar GLM */
+/* gaussian */
+double gaussian(double x,int i)
+{
+  double mean[3] = {0.05,0.5,0.95};
+  double sigma=0.2;
+  double z = exp(-(x-mean[i])*(x-mean[i])/(2.0*sigma*sigma));
+  return z;
+}
+
+
+
 double LaminarGLM(VImage zmap,VImage metric,VImage rim,
-		  Cylinders *cyl,size_t cid,double upsampling,gsl_vector *beta,gsl_vector *zval)
+		  Cylinders *cyl,size_t cid,size_t numperm,gsl_vector *beta,gsl_vector *zval)
 {
   int b,r,c;
-  size_t i,j,k;
-  size_t p=beta->size;
-  size_t nn=cyl->addr[cid]->size;
-  size_t m=zval->size;
-  double u=0,v=0,edf=0,r2=-1;
- 
+  size_t i,j,k,perm;
+  size_t nzval = zval->size;
+  size_t p = beta->size;
+  size_t n = cyl->addr[cid]->size;
+  double u=0,v=0;
+  double rtcode = -1;
+  gsl_matrix *X = NULL;
+  gsl_multifit_linear_workspace *work = NULL;
+
   gsl_vector_set_zero(beta);
   gsl_vector_set_zero(zval);
-   
+
   /* cylinder must be big enough for sufficient stats */
-  if (nn < p*10) return -1;
+  if (n < 5*p) return -1;
 
-  size_t n=0;
-  for (i=0; i<nn; i++) {
-    k = cyl->addr[cid]->data[i];
-    b = gsl_matrix_int_get(cyl->xmap,k,0);
-    r = gsl_matrix_int_get(cyl->xmap,k,1);
-    c = gsl_matrix_int_get(cyl->xmap,k,2);
-    if (VPixel(rim,b,r,c,VUByte) == 3) n++;
-  }
-
-  /* fill y-vector with activation map values */
   gsl_vector *y = gsl_vector_calloc(n);
   gsl_vector *mvec = gsl_vector_calloc(n);
-  j=0;
-  for (i=0; i<nn; i++) {
+
+  /* fill y-vector with activation map values */
+  for (i=0; i<n; i++) {
     k = cyl->addr[cid]->data[i];
     b = gsl_matrix_int_get(cyl->xmap,k,0);
     r = gsl_matrix_int_get(cyl->xmap,k,1);
     c = gsl_matrix_int_get(cyl->xmap,k,2);
-    if (VPixel(rim,b,r,c,VUByte) != 3) continue;
-    y->data[j] = VPixel(zmap,b,r,c,VFloat);
-    mvec->data[j] = VPixel(metric,b,r,c,VFloat);
-    j++;
+    y->data[i] = VPixel(zmap,b,r,c,VFloat);
+    mvec->data[i] = VPixel(metric,b,r,c,VFloat);
   }
 
-  /* return if z-values in this cylinder have no variance */
+  /* return if zmap-values in this cylinder have no variance */
   double tss = gsl_stats_tss(y->data,1,y->size);
   if (tss < 0.001) goto ende;
-  
 
-  /* GLM */
+  /* centering, no intercept */
+  YNorm(y);
+
+  /* set up GLM */
   double chisq=0;
-  gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(n,p);
+  gsl_vector *tval = gsl_vector_calloc(nzval);
   gsl_matrix *cov = gsl_matrix_calloc(p,p);
-  gsl_matrix *X = gsl_matrix_calloc(n,p);
+  work = gsl_multifit_linear_alloc(n,p);
+  X = gsl_matrix_calloc(n,p);
   gsl_matrix_set_all(X,1.0);
-   
+  
   for (i=0; i<n; i++) {
     u = mvec->data[i];
-    for (j=0; j<m; j++) {
+    for (j=0; j<beta->size; j++) {
       v = gaussian(u,(int)j);
       gsl_matrix_set(X,i,j,v);
     }
   }
+
+  /* GLM */
   gsl_multifit_linear(X,y,beta,cov,&chisq,work);
 
-
+  
   /* reciprocal condition number of design matrix */
   double rcond = gsl_multifit_linear_rcond(work);
-  if (rcond < 0.001) goto ende;
-    
+  if (rcond < 0.001) goto noperm;
+
+
   /* goodness of fit, R^2 */
-  r2 = 1.0 - chisq/tss;
-  if (r2 < 0) goto ende;
+  double r2 = 1.0 - chisq/tss;
+  rtcode = r2;
+  if (r2 < 0) goto noperm;
 
- 
-  /* degrees of freedom */
-  double nx = (double)n;
-  double px = (double)p;
-  double neff = nx;
+  
+  /* non-permuted stats */
+  double edf = -1;
+  ZStats(beta,cov,edf,tval);
+  
+  if (numperm < 1) {  /* no permutation, degrees of freedom over-estimated */
+    edf = (double)(n-p);
+    ZStats(beta,cov,edf,zval);
+    goto noperm;
+  }
+  
 
-  /* adjust number of observations using upsampling factor */
-  if (upsampling > DBL_EPSILON) neff = nx/upsampling;
-  edf = neff - px;
+  /* ini random generator */
+  gsl_rng_env_setup();
+  unsigned long int seed = cid;
+  const gsl_rng_type *T = gsl_rng_default;
+  gsl_rng *rx = gsl_rng_alloc(T);
+  gsl_rng_set(rx,(unsigned long int)seed);
 
 
-  /*  z-values */
-  ZStats(beta,cov,edf,zval);
-  gsl_matrix_free(cov);
+  /* permutation testing */
+  gsl_matrix *Xperm = gsl_matrix_calloc(n,p);
+  gsl_matrix_set_all(Xperm,1.0);
+  gsl_vector *xbeta = gsl_vector_calloc(beta->size);
+  gsl_vector *tperm = gsl_vector_calloc(nzval);
+  double *kx = (double *)VCalloc(nzval,sizeof(double));
+
+  /* permutations */
+  for (perm=0; perm<numperm; perm++) {
+
+    /* shuffle depth values */
+    gsl_ran_shuffle(rx,mvec->data,n,sizeof(double));
+    
+    for (i=0; i<n; i++) {
+      u = mvec->data[i];
+      for (j=0; j<p; j++) {
+	v = gaussian(u,(int)j);
+	gsl_matrix_set(Xperm,i,j,v);
+      }
+    }
+  
+    gsl_multifit_linear(Xperm,y,xbeta,cov,&chisq,work);
+    ZStats(xbeta,cov,edf,tperm);
+       
+    for (i=0; i<nzval; i++) {
+      if (tperm->data[i] > tval->data[i]) kx[i]++;
+    }
+  }
+
+  /* compute z-stats */
+  double pmin = DBL_EPSILON;
+  double pmax = 1.0-2.0*pmin;
+  double nx = (double)numperm;
+  double pval = 0;
+  for (i=0; i<nzval; i++) {
+    pval = kx[i]/nx;
+    if (pval < pmin) pval = pmin;
+    if (pval > pmax) pval = pmax;    
+    zval->data[i] = gsl_cdf_ugaussian_Qinv(pval);
+  }
+
+  
+  /* free memory */
+  VFree(kx);
+  gsl_vector_free(xbeta);
+  gsl_vector_free(tperm);
+  gsl_matrix_free(Xperm);
+  gsl_rng_free(rx);
+
+ noperm: ;
   gsl_multifit_linear_free(work);
-  gsl_matrix_free(X);  
+  gsl_vector_free(tval);
+  gsl_matrix_free(cov);
+  gsl_matrix_free(X);
 
  ende: ;
   gsl_vector_free(y);
   gsl_vector_free(mvec);
-  return r2;
+
+  return rtcode;
 }
 
 
