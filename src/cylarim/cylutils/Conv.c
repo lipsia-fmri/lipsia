@@ -7,19 +7,9 @@
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_blas.h>
-#include <gsl/gsl_permutation.h>
 #include <gsl/gsl_sort_vector.h>
 
 #include "../cylutils/cyl.h"
-
-
-double gaussian(double x,int i)
-{
-  double mean[3] = {0.2,0.5,0.8};
-  double sigma=0.1;
-  double z = exp(-(x-mean[i])*(x-mean[i])/(2.0*sigma*sigma));
-  return z;
-}
 
 
 VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn)
