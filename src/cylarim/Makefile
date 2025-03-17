@@ -1,6 +1,6 @@
 BIN=~/bin
 
-SUBDIRS = vmetric vrim vcylarim vcylarim_stats vcylarim_getmask vcylarim_plot vfdr
+SUBDIRS = vmetric vrim vcylarim vcylarim_stats vfdr
 #SUBDIRS = $(shell ls -d */)
 
 all::
