@@ -24,37 +24,16 @@
 
 #include "../cylutils/cyl.h"
 
-
 void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric,VImage rim)
 {
   int b,r,c;
-  size_t i,j,k,l,nbins = 10000;
-  double u=0,w=0,hmin=-0.01,hmax=1.01;
+  size_t i,j,k,nbins = 10000;
+  double u=0,hmin=-0.05,hmax=1.05;
 
-  
-  /* ini weight image */
-  VFillImage(wimage,VAllBands,0);
-  for (k=0; k<cyl->numcylinders; k++) {
-    for (l=0; l<cyl->addr[k]->size; l++) {
-      j = cyl->addr[k]->data[l];
-      b = gsl_matrix_int_get(cyl->xmap,j,0);
-      r = gsl_matrix_int_get(cyl->xmap,j,1);
-      c = gsl_matrix_int_get(cyl->xmap,j,2);
-      VPixel(wimage,b,r,c,VFloat) += 1.0;
-    }
-  }
-  
-  double wmax=-1;
-  VFloat *pp = VImageData(wimage);
-  for (i=0; i<VImageNPixels(wimage); i++) {
-    if (pp[i] > wmax) wmax = pp[i];
-  }
-
-  
   /* ini output image */
   VImage dest = VCreateImageLike(metric);
   VFillImage(dest,VAllBands,0);
-
+  VFillImage(wimage,VAllBands,0);
   
   /* ini histogram */
   gsl_histogram *hist= gsl_histogram_alloc (nbins);
@@ -65,18 +44,15 @@ void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric,VImage rim)
 
     /* hist equalization */
     gsl_histogram_reset(hist);
+
     for (j=0; j<cyl->addr[i]->size; j++) {
 
       k = cyl->addr[i]->data[j];
       b = gsl_matrix_int_get(cyl->xmap,k,0);
       r = gsl_matrix_int_get(cyl->xmap,k,1);
       c = gsl_matrix_int_get(cyl->xmap,k,2);
-
-      u = VPixel(metric,b,r,c,VFloat); 
-      w = wmax - VPixel(wimage,b,r,c,VFloat);
-      if (w < 0) w = 0;
-      if (u <= hmin || u >= hmax) continue;
-      gsl_histogram_accumulate(hist,u,w);
+      u = VPixel(metric,b,r,c,VFloat);
+      gsl_histogram_increment(hist,u);
     }
     gsl_histogram_pdf_init(cdf,hist);
 
@@ -88,8 +64,10 @@ void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric,VImage rim)
       b = gsl_matrix_int_get(cyl->xmap,k,0);
       r = gsl_matrix_int_get(cyl->xmap,k,1);
       c = gsl_matrix_int_get(cyl->xmap,k,2);
+
+      VPixel(wimage,b,r,c,VFloat) += 1.0;
       u = VPixel(metric,b,r,c,VFloat);
-       
+
       k=0;
       if (gsl_histogram_find(hist,u,&k) == GSL_SUCCESS) {
 	VPixel(dest,b,r,c,VFloat) += cdf->sum[k];
@@ -97,10 +75,8 @@ void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric,VImage rim)
       else VWarning(" hist");
     }
   }
-
-  
+ 
   VFloat *pd = VImageData(dest);
-  VFloat *px = VImageData(metric);
   VFloat *pw = VImageData(wimage);
   VUByte *pu = VImageData(rim);
   for (i=0; i<VImageNPixels(wimage); i++) {
@@ -110,13 +86,12 @@ void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric,VImage rim)
     }
     
     /* add rim points */
-    if (px[i] > 0) {
+    if (pd[i] > 0) {
       if (pu[i] == 1) pd[i] = 1;
       if (pu[i] == 2) pd[i] = 0.0001;
     }
   }
   VCopyImagePixels(dest,metric,VAllBands);
-
 
   VDestroyImage(dest);
   gsl_histogram_pdf_free(cdf);
