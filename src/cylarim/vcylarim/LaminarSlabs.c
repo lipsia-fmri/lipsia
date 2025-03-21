@@ -24,6 +24,7 @@
 
 extern double Xt2z(double t,double df);
 
+  
 /* two-sample Welsh test */
 double TwosampleTest(double *x1,double *x2,size_t n1,size_t n2,int computeZ)
 {
@@ -49,11 +50,11 @@ double TwosampleTest(double *x1,double *x2,size_t n1,size_t n2,int computeZ)
 
 void AssignLabels(gsl_vector *y,int *label,double *y0,double *y1,double *y2,size_t n)
 {
-  size_t i,n0=0,n1=0,n2=0;
+  size_t i,k0=0,k1=0,k2=0;
   for (i=0; i<n; i++) {
-    if (label[i] == 0) y0[n0++] = y->data[i];
-    if (label[i] == 1) y1[n1++] = y->data[i];
-    if (label[i] == 2) y2[n2++] = y->data[i];
+    if (label[i] == 0) y0[k0++] = y->data[i];
+    if (label[i] == 1) y1[k1++] = y->data[i];
+    if (label[i] == 2) y2[k2++] = y->data[i];
   }
 }
 
@@ -100,9 +101,9 @@ double LaminarSlabs(VImage zmap,VImage metric,VImage rim,
   for (i=0; i<n; i++) {
     if (mvec->data[i] < t1) { label[i] = 0; n0++; }
     if (mvec->data[i] >= t1 && mvec->data[i] < t2) { label[i] = 1; n1++; }
-    if (mvec->data[i] > t2) { label[i] = 2; n2++; }
+    if (mvec->data[i] >= t2) { label[i] = 2; n2++; }
   }
-
+ 
 
   /* no-permutation */
   double *y0 = (double *)VCalloc(n0,sizeof(double));
