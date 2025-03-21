@@ -14,6 +14,7 @@
 #include "viaio/option.h"
 
 
+
 void ApplyMask3d(VImage src,VImage mask)
 {
   int b,r,c;
@@ -26,7 +27,7 @@ void ApplyMask3d(VImage src,VImage mask)
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
 	u = VGetPixel(mask,b,r,c);
-	if (u < 0.1) VSetPixel(src,b,r,c,0.0);
+	if (u < TINY) VSetPixel(src,b,r,c,0.0);
       }
     }
   }
@@ -47,7 +48,7 @@ void ApplyMask4d(VAttrList list,VImage mask)
     for (r=0; r<nrows; r++) {
       for (c=0; c<ncols; c++) {
 	u = VGetPixel(mask,b,r,c);
-	if (u < 0.1) {
+	if (u < TINY) {
 	  for (j=0; j<nt; j++) {
 	    VSetPixel(src[b],j,r,c,0.0);
 	  }
