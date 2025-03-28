@@ -33,15 +33,24 @@ double gmax(double x,double y)
   else return y;
 }
 
+double xsigmoid(double x,double z)
+{
+  double scale = 1.0/(1.0 + exp(-(x-3.0)));
+  return z * scale;
+}
+
 
 /* contrast value */
-double getcontrast(gsl_vector *beta,gsl_vector *zval,double zthr,int type)
+double getcontrast(gsl_vector *beta,gsl_vector *zval,int type)
 {
-  double z=0;
+  double z=0,s=0;
+
+  /* means or beta estimates */
   double bx0=beta->data[0];
   double bx1=beta->data[1];
   double bx2=beta->data[2];
 
+  /* twosample t-tests */
   double z01 = zval->data[0];
   double z02 = zval->data[1];
   double z12 = zval->data[2];
@@ -50,69 +59,101 @@ double getcontrast(gsl_vector *beta,gsl_vector *zval,double zthr,int type)
   double z20 = -z02;
   double z21 = -z12;
 
-  
+
   z=0;
   switch (type) {
 
+  /* means or beta estimates */
   case 0: z = bx0; break;
   case 1: z = bx1; break;
   case 2: z = bx2; break;
 
-  case 3: z = 2.0*bx0 - bx1 - bx2; break;
-  case 4: z = 2.0*bx1 - bx0 - bx2; break;
-  case 5: z = 2.0*bx2 - bx1 - bx0; break;
-
-  case 6: z = gmin(z01,z02); break;    /* deep>middle && deep>superficial */
-  case 7: z = gmin(z10,z12); break;    /* middle>deep && middle>superficial */
-  case 8: z = gmin(z21,z20); break;    /* superficial>deep && superficial>middle */
+  /* twosample t-tests */
+  case 3: z = z01; break;
+  case 4: z = z02; break;
+  case 5: z = z12; break;
     
-  case 9:  z = gmax(z10,z20);  break;   /* deep<middle or deep<superficial */
-  case 10: z = gmax(z01,z21);  break;   /* middle<deep or middle<superficial */
-  case 11: z = gmax(z02,z12);  break;   /* superficial<deep or superficial<middle */
+  /* twosample t-tests, signflipped */
+  case 6: z = z10; break;
+  case 7: z = z20; break;
+  case 8: z = z21; break;
 
-    
-  case 12:  /* max ID */
+  /* conjunctions */
+  case 9: z = gmin(z01,z02); break;    /* deep>middle && deep>superficial */
+  case 10: z = gmin(z10,z12); break;    /* middle>deep && middle>superficial */
+  case 11: z = gmin(z21,z20); break;    /* superficial>deep && superficial>middle */
+
+  /* max ID */
+  case 12:  
     z=0;
-    if (z01 > zthr && z02 > zthr) z = 1;
-    if (-z01 > zthr && z12 > zthr) z = 2;
-    if (-z02 > zthr && -z12 > zthr) z = 3;
+    if (bx0 > bx1 && bx0 > bx2) z = 1;
+    if (bx1 > bx0 && bx1 > bx2) z = 2;
+    if (bx2 > bx1 && bx2 > bx0) z = 3;
     break;
 
-  case 13:  /* min ID */
+  /* min ID */
+  case 13:
     z=0;
-    if (z01 < zthr && z02 < zthr) z = 1;
-    if (-z01 < zthr && z12 < zthr) z = 2;
-    if (-z02 < zthr && -z12 < zthr) z = 3;
+    if (bx0 < bx1 && bx0 < bx2) z = 1;
+    if (bx1 < bx0 && bx1 < bx2) z = 2;
+    if (bx2 < bx1 && bx2 < bx0) z = 3;
+    break;
+
+    /* max beta values */
+  case 14:
+    z = bx0;
+    if (bx1 > z) z = bx1;
+    if (bx2 > z) z = bx2;
+    break;
+
+    /* min beta values */
+  case 15: 
+    z = bx0;
+    if (bx1 < z) z = bx1;
+    if (bx2 < z) z = bx2;
+    break;
+
+    /* max absolute beta-values */
+  case 16: 
+    s = 1;
+    z = fabs(bx0);
+    if (bx0 < 0) s = -1;
+    if (fabs(bx1) > z) { z = fabs(bx1); if (bx1 < 0) s = -1; }
+    if (fabs(bx2) > z) { z = fabs(bx2); if (bx2 < 0) s = -1; }
+    z *= s;
     break;
 
   default:
     VError(" unknown type %d",type);
   }
+
   return z;
 }
 
 
 VDictEntry TypDict[] = {
-  { "deep", 0, 0,0,0,0  },
-  { "middle", 1, 0,0,0,0  },
-  { "superficial", 2, 0,0,0,0  },
+  { "d", 0, 0,0,0,0  },
+  { "m", 1, 0,0,0,0  },
+  { "s", 2, 0,0,0,0  },
 
-  { "xdeep", 3, 0,0,0,0  },
-  { "xmiddle", 4, 0,0,0,0  },
-  { "xsuperficial", 5, 0,0,0,0  },
+  { "d-m", 3, 0,0,0,0  },
+  { "d-s", 4, 0,0,0,0  },
+  { "m-s", 5, 0,0,0,0  },
   
-  { "zdeep", 6, 0,0,0,0  },
-  { "zmiddle", 7, 0,0,0,0  },
-  { "zsuperficial", 8, 0,0,0,0  },
- 
-  { "notdeep", 9, 0,0,0,0  },
-  { "notmiddle", 10, 0,0,0,0  },
-  { "notsuperficial", 11, 0,0,0,0  },
+  { "m-d", 6, 0,0,0,0  },
+  { "s-d", 7, 0,0,0,0  },
+  { "s-m", 8, 0,0,0,0  },
+  
+  { "top_d", 9, 0,0,0,0  },
+  { "top_m", 10, 0,0,0,0  },
+  { "top_s", 11, 0,0,0,0  },
 
   { "max_id", 12, 0,0,0,0 },
   { "min_id", 13, 0,0,0,0 },
 
-  { "edf", 14, 0,0,0,0 },
+  { "max", 14, 0,0,0,0 },
+  { "min", 15, 0,0,0,0 },
+  { "maxabs", 16, 0,0,0,0 },
 
   { NULL, 0,0,0,0,0 }
 };
@@ -121,10 +162,8 @@ VDictEntry TypDict[] = {
 int main(int argc, char *argv[])
 {
   static VShort type = 0;
-  static VFloat zthr = 0;
   static VOptionDescRec  options[] = {
     {"type", VShortRepn,1,(VPointer) &type,VOptionalOpt,TypDict,"Output type"},
-    {"zthr", VFloatRepn,1,(VPointer) &zthr,VOptionalOpt,NULL,"z-threshold"},
   };
   FILE *out_file=NULL;
   VString in_file=NULL;
@@ -144,21 +183,6 @@ int main(int argc, char *argv[])
   if (list == NULL) VError(" error reading input file %s",in_file);
   VImage src;
   VAttrListPosn posn;
-
-
-  /* edfimage */
-  if (type == 14) {
-    int k=0;
-    for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
-      if (VGetAttrRepn (& posn) != VImageRepn) continue;
-      if (strcmp(VGetAttrName (& posn),"edfimage") == 0) {
-	VGetAttrValue (& posn, NULL,VImageRepn, & dest);
-	k++;
-      }
-    }
-    if (k==0) VError(" edfimage not found");
-    goto ende;
-  }
 
 
   /* beta images */
@@ -189,6 +213,8 @@ int main(int argc, char *argv[])
       n++;
     }
   }
+
+ 
    
   /* alloc output image */
   dest = VCreateImageLike(betaimage[0]);
@@ -202,7 +228,7 @@ int main(int argc, char *argv[])
 
   VFloat *pb,*pz;
   VFloat *pp = VImageData(dest);
-  
+
   for (i=0; i<npixels; i++) {
 
     double s=0;
@@ -217,12 +243,12 @@ int main(int argc, char *argv[])
       pz = VImageData(zvalimage[j]);
       zval->data[j] = (double)(pz[i]);
     }
-    pp[i] = (float)getcontrast(beta,zval,(double)zthr,(int)type);
+    
+    pp[i] = (float)getcontrast(beta,zval,(int)type);
   }
 
   
   /* output */
- ende: ;
   VAttrList out_list = VCreateAttrList();
   VAttrList geolist = VGetGeoInfo(list);
   VSetGeoInfo(geolist,out_list);
