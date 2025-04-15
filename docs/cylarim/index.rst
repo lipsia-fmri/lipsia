@@ -42,21 +42,19 @@ Voxel pairs are identified by finding the nearest neighbor on the opposite rim f
 After excluding redundant pairs, cylinders are defined by dilating the line connecting each pair of
 voxels with a user-specified radius (typically 3mm).
 
-After the cylinders have been constructed, vcylarim applies a general linear model (GLM) with
-three Gaussian basis functions representing deep, middle and superficial activations.
-The GLM coefficients are estimated using a pseudoinverse, and can then be used to identify
-layer specific activations within each cylinder.
+After the cylinders have been constructed, vcylarim estimates activation profiles
+for three layers (deep, middle, superficial).
 
-The output of **vcylarim** is a file that contains the estimated GLM-coefficients.
+The output of **vcylarim** is a file that contains the estimated layer coefficients.
 The first three images contain the GLM-coefficients estimated for the deep, middle and superficial layers.
-The fourth image contains the intercept values. The GLM coefficients are estimated separately for each cylinder.
-In most voxels, several cylinders overlap. In these voxels, the GLM coefficients of the overlapping cylinders are averaged.
+The coefficients are estimated separately for each cylinder.
+In most voxels, several cylinders overlap. In these voxels, the coefficients of the overlapping cylinders are averaged.
 
 Subsequent analysis of the output is performed using **vcylarim_stats**.
 This program generates maps that visualize various contrasts between the beta-images,
 as defined by the user.
 
-A typical workflow is shown below.
+A typical workflow is shown below. The final step yields a map that shows the contrast "m-d" (middle-deep).
 
 
 
@@ -72,11 +70,10 @@ Example workflow
 
    vmetric -in rim.v -out metric.v
  
-   vcylarim -in zmap.v -out cylbeta.v -rim rim.v -metric metric.v -radius 3
+   vcylarim -in zmap.v -out cylbeta.v -rim rim.v -metric metric.v -radius 2
    
-   vcylarim_stats -in cylbeta.v -out result1.v -type middle
+   vcylarim_stats -in cylbeta.v -out result.v -type m-d
    
-   vcylarim_stats -in cylbeta.v -out result2.v -type notmiddle
  
 
 
