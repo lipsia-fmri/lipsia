@@ -5,7 +5,6 @@
 
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
-#include <gsl/gsl_sort.h>
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_math.h>
@@ -14,17 +13,13 @@
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
 
-
 /* From the standard C library: */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 #include "../cylutils/cyl.h"
-
-extern double gaussian(double x,int);
-extern double contrastVariance(gsl_matrix *cov,gsl_vector *c);
-extern void ZStats(gsl_vector *beta,gsl_matrix *cov,double edf,gsl_vector *zval);
 
 void YNorm(gsl_vector *x)
 {
@@ -115,41 +110,20 @@ double gaussian(double x,int i)
 
 
 
-double LaminarGLM(VImage zmap,VImage metric,VImage rim,
-		  Cylinders *cyl,size_t cid,size_t numperm,gsl_vector *beta,gsl_vector *zval)
+int LaminarGLM(gsl_vector *y,gsl_vector *mvec,
+	       size_t numperm,long seed,gsl_vector *beta,gsl_vector *zval)
 {
-  int b,r,c;
-  size_t i,j,k,perm;
+  int rtcode = -1;
+  size_t i,j,perm;
   size_t nzval = zval->size;
   size_t p = beta->size;
-  size_t n = cyl->addr[cid]->size;
+  size_t n = y->size;
   double u=0,v=0;
-  double rtcode = -1;
   gsl_matrix *X = NULL;
   gsl_multifit_linear_workspace *work = NULL;
 
   gsl_vector_set_zero(beta);
   gsl_vector_set_zero(zval);
-
-  /* cylinder must be big enough for sufficient stats */
-  if (n < 5*p) return -1;
-
-  gsl_vector *y = gsl_vector_calloc(n);
-  gsl_vector *mvec = gsl_vector_calloc(n);
-
-  /* fill y-vector with activation map values */
-  for (i=0; i<n; i++) {
-    k = cyl->addr[cid]->data[i];
-    b = gsl_matrix_int_get(cyl->xmap,k,0);
-    r = gsl_matrix_int_get(cyl->xmap,k,1);
-    c = gsl_matrix_int_get(cyl->xmap,k,2);
-    y->data[i] = VPixel(zmap,b,r,c,VFloat);
-    mvec->data[i] = VPixel(metric,b,r,c,VFloat);
-  }
-
-  /* return if zmap-values in this cylinder have no variance */
-  double tss = gsl_stats_tss(y->data,1,y->size);
-  if (tss < 0.001) goto ende;
 
   /* centering, no intercept */
   YNorm(y);
@@ -180,8 +154,8 @@ double LaminarGLM(VImage zmap,VImage metric,VImage rim,
 
 
   /* goodness of fit, R^2 */
+  double tss = gsl_stats_tss(y->data,1,y->size);
   double r2 = 1.0 - chisq/tss;
-  rtcode = r2;
   if (r2 < 0) goto noperm;
 
   
@@ -198,11 +172,9 @@ double LaminarGLM(VImage zmap,VImage metric,VImage rim,
 
   /* ini random generator */
   gsl_rng_env_setup();
-  unsigned long int seed = cid;
   const gsl_rng_type *T = gsl_rng_default;
   gsl_rng *rx = gsl_rng_alloc(T);
   gsl_rng_set(rx,(unsigned long int)seed);
-
 
   /* permutation testing */
   gsl_matrix *Xperm = gsl_matrix_calloc(n,p);
@@ -210,15 +182,18 @@ double LaminarGLM(VImage zmap,VImage metric,VImage rim,
   gsl_vector *xbeta = gsl_vector_calloc(beta->size);
   gsl_vector *tperm = gsl_vector_calloc(nzval);
   double *kx = (double *)VCalloc(nzval,sizeof(double));
+  double *xtmp = (double *)VCalloc(n,sizeof(double));
 
+  
   /* permutations */
   for (perm=0; perm<numperm; perm++) {
 
     /* shuffle depth values */
-    gsl_ran_shuffle(rx,mvec->data,n,sizeof(double));
+    memcpy(xtmp,mvec->data,n*sizeof(double));
+    gsl_ran_shuffle(rx,xtmp,n,sizeof(double));
     
     for (i=0; i<n; i++) {
-      u = mvec->data[i];
+      u = xtmp[i];
       for (j=0; j<p; j++) {
 	v = gaussian(u,(int)j);
 	gsl_matrix_set(Xperm,i,j,v);
@@ -244,27 +219,21 @@ double LaminarGLM(VImage zmap,VImage metric,VImage rim,
     if (pval > pmax) pval = pmax;    
     zval->data[i] = gsl_cdf_ugaussian_Qinv(pval);
   }
-
+  rtcode = 1;
   
   /* free memory */
   VFree(kx);
+  VFree(xtmp);
   gsl_vector_free(xbeta);
   gsl_vector_free(tperm);
   gsl_matrix_free(Xperm);
   gsl_rng_free(rx);
+  
 
  noperm: ;
   gsl_multifit_linear_free(work);
   gsl_vector_free(tval);
   gsl_matrix_free(cov);
   gsl_matrix_free(X);
-
- ende: ;
-  gsl_vector_free(y);
-  gsl_vector_free(mvec);
-
   return rtcode;
 }
-
-
-
