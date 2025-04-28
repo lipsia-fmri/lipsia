@@ -154,6 +154,8 @@ VDictEntry TypDict[] = {
   { "max", 14, 0,0,0,0 },
   { "min", 15, 0,0,0,0 },
   { "maxabs", 16, 0,0,0,0 },
+  
+  { "zabs", 17, 0,0,0,0 },
 
   { NULL, 0,0,0,0,0 }
 };
@@ -174,7 +176,7 @@ int main(int argc, char *argv[])
   
   /* parse command line */
   VParseFilterCmdX(VNumber(options),options,argc,argv,&in_file,&out_file);
-
+  if (type > 17 || type < 0) VError(" unknown type %d",type);
  
 
   /* read input images */
@@ -183,6 +185,19 @@ int main(int argc, char *argv[])
   if (list == NULL) VError(" error reading input file %s",in_file);
   VImage src;
   VAttrListPosn posn;
+
+
+  /* maxabs z-values per cylinder, can be used to create a mask (not layer-specific) */
+  if (type == 17) {
+    for (VFirstAttr (list, & posn); VAttrExists (& posn); VNextAttr (& posn)) {
+      if (VGetAttrRepn (& posn) != VImageRepn) continue;
+      if (strcmp(VGetAttrName (& posn),"cover") == 0) {
+	VGetAttrValue (& posn, NULL,VImageRepn, & src);
+	dest = VCopyImage(src,dest,VAllBands);
+	goto ende;
+      }
+    }
+  }
 
 
   /* beta images */
@@ -199,8 +214,9 @@ int main(int argc, char *argv[])
   }
   if (n < 1) VError(" no beta images found");
 
-  
-  VImage *zvalimage = NULL;   /* zval images for permutation tests */
+
+  /* zval images for permutation tests */
+  VImage *zvalimage = NULL;
   size_t nzval=3;
   zvalimage = (VImage *)VCalloc(nzval,sizeof(VImage));
   n=0;
@@ -214,11 +230,11 @@ int main(int argc, char *argv[])
     }
   }
 
- 
-   
+    
   /* alloc output image */
   dest = VCreateImageLike(betaimage[0]);
   VFillImage(dest,VAllBands,0);
+
  
   /* beta contrasts */
   size_t i,j;
@@ -249,6 +265,7 @@ int main(int argc, char *argv[])
 
   
   /* output */
+ ende: ;
   VAttrList out_list = VCreateAttrList();
   VAttrList geolist = VGetGeoInfo(list);
   VSetGeoInfo(geolist,out_list);
