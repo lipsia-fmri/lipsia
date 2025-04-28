@@ -25,7 +25,7 @@ Example:
 
  :: 
  
-   vcylarim -in zmap.v -out cylstats.v -rim rim.v -metric metric.v -mask mask.v -type glm -nperm 1000 -radius 3
+   vcylarim -in zmap.v -out cylstats.v -rim rim.v -metric metric.v -mask mask.v -equivol true -type median -nperm 1000 -radius 2
    
 
  
@@ -66,7 +66,7 @@ Parameters of 'vcylarim'
   -radius   Cylinder radius in mm. Default: 2
   -equivol  Whether to apply equivolume correction [ true | false ]. Default: false
   -nperm    Number of permutations. Default: 1000
-  -type     Type of model [ glm | slabs ]. Default: glm
+  -type     Type of model [ median | | mean | glm ]. Default: median
   -j        Number of processors to use, '0' to use all. Default: 0
 
 
