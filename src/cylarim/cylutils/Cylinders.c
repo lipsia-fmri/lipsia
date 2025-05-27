@@ -152,7 +152,7 @@ double CylLength(double x[],double y[],double z[],double dnorm)
 
 size_t Connect(VImage rim,VImage xmapimage,VImage marked,VImage visited,
 	       gsl_matrix_int *xmap,gsl_vector *reso,
-	       int b1,int r1,int c1,int b2,int r2,int c2,double radius,int *tab,int kmax,int cid)
+	       int b1,int r1,int c1,int b2,int r2,int c2,double radius,int *tab,int kmax,int cid,VBoolean include_rim)
 {
   int i,k=0,m=0,mlen=0;
   double dnorm=0,t,step=0.03;
@@ -195,7 +195,9 @@ size_t Connect(VImage rim,VImage xmapimage,VImage marked,VImage visited,
     if (r < 0 || r >= nrows) continue;
     if (c < 0 || c >= ncols) continue;
 
-    if (VPixel(rim,b,r,c,VUByte) != 3) continue;
+    int rimval = VPixel(rim,b,r,c,VUByte);
+    if (rimval == 0) continue;
+    if (include_rim == FALSE && rimval != 3) continue;
     if (VPixel(visited,b,r,c,VInteger) == cid) continue;
     VPixel(visited,b,r,c,VInteger) = cid;
     VPixel(marked,b,r,c,VInteger) = cid;
@@ -241,7 +243,9 @@ size_t Connect(VImage rim,VImage xmapimage,VImage marked,VImage visited,
 	  if (cc < 0 || cc >= ncols) continue;
 	  z[0] = reso->data[0]*(double)cc;
 
-	  if (VPixel(rim,bb,rr,cc,VUByte) != 3) continue;
+	  int rimval = VPixel(rim,bb,rr,cc,VUByte);
+	  if (rimval == 0) continue;
+	  if (include_rim == FALSE && rimval != 3) continue;
 	  if (VPixel(marked,bb,rr,cc,VInteger) == cid) continue;
 	  ii = VPixel(xmapimage,bb,rr,cc,VInteger);
 	  if (ii < 0) continue;
@@ -256,7 +260,7 @@ size_t Connect(VImage rim,VImage xmapimage,VImage marked,VImage visited,
 	  VPixel(marked,bb,rr,cc,VInteger) = cid;
 	  xtab[kk] = ii;
 	  dist[kk] = sqrt(dx);	  
-	  kk++;	 
+	  kk++;
 	}
       }
     }
@@ -278,7 +282,9 @@ size_t Connect(VImage rim,VImage xmapimage,VImage marked,VImage visited,
       int r = gsl_matrix_int_get(xmap,j,1);
       int c = gsl_matrix_int_get(xmap,j,2);
 
-      if (VPixel(rim,b,r,c,VUByte) != 3) continue;
+      int rimval = VPixel(rim,b,r,c,VUByte);
+      if (rimval == 0) continue;
+      if (include_rim == FALSE && rimval != 3) continue;
       if (VPixel(visited,b,r,c,VInteger) == cid) continue;  /* already booked */
       if (CheckAdj(visited,rim,cid,b,r,c) < 0) continue; /* must be 6-adjacent */
       int ii = VPixel(xmapimage,b,r,c,VInteger);
@@ -325,7 +331,7 @@ void GetResolution(VImage src,gsl_vector *reso)
 }
 
 
-Cylinders *VCylinder(VImage rim,VImage metric,double radius)
+Cylinders *VCylinder(VImage rim,VImage metric,double radius,VBoolean include_rim)
 {
   size_t i,j,k;
   int b,r,c;
@@ -588,41 +594,45 @@ Cylinders *VCylinder(VImage rim,VImage metric,double radius)
   gsl_vector_int **avec = (gsl_vector_int **) VCalloc(numcylinders,sizeof(gsl_vector_int **));
   int kmax = 100000;  /* max number of voxels per cylinder */
   int *tab = (int *)VCalloc((size_t)kmax,sizeof(int));
+  double *stmp = (double *)VCalloc(numcylinders,sizeof(double));
   size_t jj=0;
   size_t np = (size_t)((float)numcylinders/100.0);
-  double *stmp = (double *)VCalloc(numcylinders,sizeof(double));
+  double sum=0;
   for (k=0; k<numcylinders; k++) {
     if (k%np==0 && verbose) fprintf(stderr," create cylinders: %7.3f\r",(float)(k)/(float)numcylinders);
 
-    size_t i = gsl_matrix_int_get(E,k,0);
+    i = gsl_matrix_int_get(E,k,0);
     int b1 = gsl_matrix_int_get(map1,i,0);
     int r1 = gsl_matrix_int_get(map1,i,1);
     int c1 = gsl_matrix_int_get(map1,i,2);
 
-    size_t j = gsl_matrix_int_get(E,k,1);
+    j = gsl_matrix_int_get(E,k,1);
     int b2 = gsl_matrix_int_get(map2,j,0);
     int r2 = gsl_matrix_int_get(map2,j,1);
     int c2 = gsl_matrix_int_get(map2,j,2);
    
     size_t m = Connect(rim,xmapimage,marked,visited,xmap,reso,
-		       b1,r1,c1,b2,r2,c2,radius,tab,kmax,(int)(k+1));
+		       b1,r1,c1,b2,r2,c2,radius,tab,kmax,(int)(k+1),include_rim);
+    
     stmp[k] = (double)m;
-    if (m < 2) continue;
+    if (m < 5) continue;
     avec[jj] = gsl_vector_int_calloc(m);
     FillCylinder(tab,avec[jj]);
+    sum += (double)m;
     jj++;
   }
   if (verbose) fprintf(stderr," create cylinders: %7.3f\n",1.0);
-  fprintf(stderr," num cylinders: %lu  %lu\n",jj,numcylinders);
   numcylinders = jj;
+  fprintf(stderr," num cylinders: %lu             \n",numcylinders);
   fprintf(stderr," cylinder radius: %.3f mm       \n",radius);
+  
   gsl_sort(stmp,1,numcylinders);
   double q1 = gsl_stats_quantile_from_sorted_data(stmp,1,numcylinders,0.25);
   double q2 = gsl_stats_quantile_from_sorted_data(stmp,1,numcylinders,0.5);
   double q3 = gsl_stats_quantile_from_sorted_data(stmp,1,numcylinders,0.75);
   VFree(stmp);
   fprintf(stderr," cylinder size: %.2f voxels (median),  %.2f  %.2f (quartiles)\n",q2,q1,q3);
-  
+
   /* alloc Cylinder struct */
   Cylinders *cyl = (Cylinders *)malloc(sizeof(Cylinders));
   cyl->numcylinders = numcylinders;
@@ -632,11 +642,11 @@ Cylinders *VCylinder(VImage rim,VImage metric,double radius)
 
 
   /* free memory */
-  VFree(tab);
   VDestroyImage(visited);
   VDestroyImage(marked);
   VDestroyImage(mapimage);
   VDestroyImage(xmapimage);
+  VFree(tab);
   gsl_matrix_int_free(map1);
   gsl_matrix_int_free(map2);
   gsl_matrix_int_free(E);
