@@ -37,7 +37,6 @@ extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
 extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
 extern int LaminarGLM(gsl_vector *,gsl_vector *,size_t,long,gsl_vector *,gsl_vector *);
 extern int LaminarMean(gsl_vector *,gsl_vector *,size_t,long,gsl_vector *,gsl_vector *);
-extern int LaminarTrimmedMean(gsl_vector *,gsl_vector *,size_t,long,gsl_vector *,gsl_vector *);
 extern int LaminarMedian(gsl_vector *,gsl_vector *,size_t,long,gsl_vector *,gsl_vector *);
 extern VImage VCylCover(VImage,VImage,VImage,Cylinders *cyl);
 
@@ -72,7 +71,6 @@ int PrepStats(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector *y,
 }
 
 
-
 VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
 	       VBoolean equivol,int type,size_t numperm,long seed,VImage *betaimage,VImage *zvalimage)
 {
@@ -80,7 +78,7 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
 
   
   /* create cylinder data struct */
-  Cylinders *cyl = VCylinder(rim,metric,radius);  
+  Cylinders *cyl = VCylinder(rim,metric,radius);
 
   
   /* equivolume correction */
@@ -111,7 +109,8 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
     gsl_vector *zval = gsl_vector_calloc(nzval);
     gsl_vector *y = gsl_vector_calloc(n);
     gsl_vector *mvec = gsl_vector_calloc(n);
-    if (PrepStats(zmap,metric,cyl,k,y,mvec,n) < 0) goto skip;
+    rtcode = PrepStats(zmap,metric,cyl,k,y,mvec,n);
+    if (rtcode < 0) goto skip;
     
     switch (type) {
     case 0:
@@ -222,6 +221,8 @@ int main (int argc, char **argv)
   if (radius < 0.0001) VError(" radius must be positive");
   if (type < 0 || type > 2) VError(" unknown type %d",type);
   if (seed < 0) VError(" seed must be non-negative");
+
+  fprintf(stderr," equivol: %d\n",equivol);
   
   
   /* omp-stuff */
@@ -232,7 +233,6 @@ int main (int argc, char **argv)
   omp_set_num_threads(num_procs);
 #endif
   
-  clock_t xstart = clock();
 
   fprintf(stderr," type:  %s\n",TypDict[type].keyword);
 
@@ -295,6 +295,11 @@ int main (int argc, char **argv)
       if (pm[i] == 0 || pu[i] == 0) { px[i] = 0; pu[i] = 0; pz[i] = 0; }
     }
   }
+
+  /* exclude voxels not covered by zmap */
+  for (i=0; i<VImageNPixels(zmap); i++) {
+    if (fabs(pz[i]) < TINY) { pu[i] = 0; px[i] = 0; }
+  }
   
 
   /* add rim pts to metric image in case they are not included */
@@ -321,9 +326,6 @@ int main (int argc, char **argv)
   /* Main */
   VImage zcover = Cylarim(zmap,metric,rim,(double)radius,equivol,(int)type,(size_t)numperm,(long)seed,betaimage,zvalimage);
   
-  clock_t xend = clock();
-  double time_spent = (double)(xend - xstart) / CLOCKS_PER_SEC;
-  printf(" CPU time used: %.2f secs,  %.2f min,  %.2f std\n", time_spent,time_spent/60.0,time_spent/3600.0);
 
   
   /* write output */
