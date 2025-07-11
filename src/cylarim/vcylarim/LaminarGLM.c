@@ -21,27 +21,13 @@
 
 #include "../cylutils/cyl.h"
 
+extern double Xt2z(double t,double df);
+
 void YNorm(gsl_vector *x)
 {
   double mean = gsl_stats_mean(x->data,1,x->size);
   gsl_vector_add_constant(x,-mean);
 }
-
-/* 
-** approximation: convert t to z values 
-*/
-double Xt2z(double t,double df)
-{
-  double z=0,u;
-  if (df < 0) return t;
-
-  u = df*log(1.0+t*t/df)*(1.0-0.5/df);
-  if (u <= 0) return 0;
-  z = sqrt(u);
-  if (t < 0) z = -z;
-  return z;
-}
-
 
 /* contrast variance, c^t cov c */
 double contrastVariance(gsl_matrix *cov,gsl_vector *c)
@@ -181,7 +167,8 @@ int LaminarGLM(gsl_vector *y,gsl_vector *mvec,
   gsl_matrix_set_all(Xperm,1.0);
   gsl_vector *xbeta = gsl_vector_calloc(beta->size);
   gsl_vector *tperm = gsl_vector_calloc(nzval);
-  double *kx = (double *)VCalloc(nzval,sizeof(double));
+  double *pos = (double *)VCalloc(nzval,sizeof(double));
+  double *neg = (double *)VCalloc(nzval,sizeof(double));
   double *xtmp = (double *)VCalloc(n,sizeof(double));
 
   
@@ -204,25 +191,27 @@ int LaminarGLM(gsl_vector *y,gsl_vector *mvec,
     ZStats(xbeta,cov,edf,tperm);
        
     for (i=0; i<nzval; i++) {
-      if (tperm->data[i] > tval->data[i]) kx[i]++;
+      if (tperm->data[i] > tval->data[i]) pos[i]++;
+      if (tperm->data[i] < tval->data[i]) neg[i]++;
     }
   }
 
   /* compute z-stats */
-  double pmin = DBL_EPSILON;
-  double pmax = 1.0-2.0*pmin;
   double nx = (double)numperm;
-  double pval = 0;
-  for (i=0; i<nzval; i++) {
-    pval = kx[i]/nx;
-    if (pval < pmin) pval = pmin;
-    if (pval > pmax) pval = pmax;    
-    zval->data[i] = gsl_cdf_ugaussian_Qinv(pval);
+  double z=0,p0=0,p1=0;
+  for (i=0; i<3; i++) {
+    p0 = (pos[i]+1.0)/(nx+1.0);
+    p1 = (neg[i]+1.0)/(nx+1.0);
+    z=0;
+    if (p0 < p1) z = gsl_cdf_ugaussian_Qinv(p0);
+    else z = -gsl_cdf_ugaussian_Qinv(p1);
+    if (gsl_finite(z)==0) z = 0;
+    zval->data[i] = z;
   }
-  rtcode = 1;
-  
+
   /* free memory */
-  VFree(kx);
+  VFree(pos);
+  VFree(neg);
   VFree(xtmp);
   gsl_vector_free(xbeta);
   gsl_vector_free(tperm);

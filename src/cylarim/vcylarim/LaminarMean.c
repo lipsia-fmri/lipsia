@@ -17,13 +17,29 @@
 /* From the standard C library: */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
+#include <string.h>
 
 #include "../cylutils/cyl.h"
 
+/* 
+** approximation: convert t to z values 
+*/
+double Xt2z(double t,double df)
+{
+  double z=0,u;
+  if (df < 0) return t;
 
-extern double Xt2z(double t,double df);
+  u = df*log(1.0+t*t/df)*(1.0-0.5/df);
+  if (u <= 0) return 0;
+  z = sqrt(u);
+  if (t < 0) z = -z;
+  return z;
+}
+
+extern void AssignLabels(gsl_vector *y,int *label,double *y0,double *y1,double *y2,size_t n);
+extern int LayerLabels(gsl_vector *mvec,int *label,size_t *n0,size_t *n1,size_t *n2);
+
 
 /* two-sample Welsh test */
 double TwosampleTest(double *x1,double *x2,size_t n1,size_t n2,int computeZ)
@@ -48,48 +64,32 @@ double TwosampleTest(double *x1,double *x2,size_t n1,size_t n2,int computeZ)
   return z;
 }
 
-void AssignLabels(gsl_vector *y,int *label,double *y0,double *y1,double *y2,size_t n)
+
+double LaminarMean(gsl_vector *ya,gsl_vector *mvec0,
+		   size_t numperm,long seed,gsl_vector *beta,gsl_vector *zval)
 {
-  size_t i,k0=0,k1=0,k2=0;
-  for (i=0; i<n; i++) {
-    if (label[i] == 0) y0[k0++] = y->data[i];
-    if (label[i] == 1) y1[k1++] = y->data[i];
-    if (label[i] == 2) y2[k2++] = y->data[i];
-  }
-}
-
-
-  /* get layer labels */
-int LayerLabels(gsl_vector *mvec,int *label,size_t *n0,size_t *n1,size_t *n2)
-{
-  (*n0) = (*n1) = (*n2) = 0;
-  size_t i,n=mvec->size;
-  double t1 = 1.0/3.0;
-  double t2 = 2.0/3.0;
-  size_t nx0=0,nx1=0,nx2=0;
-  for (i=0; i<n; i++) {
-    if (mvec->data[i] < t1) { label[i] = 0; nx0++; }
-    if (mvec->data[i] >= t1 && mvec->data[i] <= t2) { label[i] = 1; nx1++; }
-    if (mvec->data[i] > t2) { label[i] = 2; nx2++; }
-  }
-  if (nx0 < 3 || nx1 < 3 || nx2 < 3) return -1;
-  (*n0) = nx0;
-  (*n1) = nx1;
-  (*n2) = nx2;
-  return 1;
-}
-
-
-int LaminarMean(gsl_vector *y,gsl_vector *mvec,
-		size_t numperm,long seed,gsl_vector *beta,gsl_vector *zval)
-{
-  size_t i;
+  size_t i,j;
   size_t perm;
-  size_t n = y->size;
-  double u,v,w,u0,v0,w0;
+  double u,v,w,u0=0,v0=0,w0=0;
 
   gsl_vector_set_zero(beta);
   gsl_vector_set_zero(zval);
+
+  size_t n = 0;
+  for (i=0; i<mvec0->size; i++) {
+    if (mvec0->data[i] > 0.05 && mvec0->data[i] < 0.95) n++;
+  }
+  gsl_vector *y = gsl_vector_calloc(n);
+  gsl_vector *mvec = gsl_vector_calloc(n);
+
+  j=0;
+  for (i=0; i<mvec0->size; i++) {
+    if (mvec0->data[i] > 0.05 && mvec0->data[i] < 0.95) {
+      y->data[j] = ya->data[i];
+      mvec->data[j] = mvec0->data[i];
+      j++;
+    }
+  }
 
   /* get layer labels */
   size_t n0=0,n1=0,n2=0;
@@ -98,74 +98,126 @@ int LaminarMean(gsl_vector *y,gsl_vector *mvec,
     VFree(label);
     return -1;
   }
-  
+
+
   /* no-permutation */
   double *y0 = (double *)VCalloc(n0,sizeof(double));
   double *y1 = (double *)VCalloc(n1,sizeof(double));
   double *y2 = (double *)VCalloc(n2,sizeof(double));
-  AssignLabels(y,label,y0,y1,y2,n);
 
+  double *tmp0 = (double *)VCalloc(n0,sizeof(double));
+  double *tmp1 = (double *)VCalloc(n1,sizeof(double));
+  double *tmp2 = (double *)VCalloc(n2,sizeof(double));
+  AssignLabels(y,label,y0,y1,y2,n);
+  
   beta->data[0] = gsl_stats_mean(y0,1,n0);
   beta->data[1] = gsl_stats_mean(y1,1,n1);
   beta->data[2] = gsl_stats_mean(y2,1,n2);
- 
-
-  int computeZ=0;
-  if (numperm < 1) computeZ=1;
-
-  u0 = TwosampleTest(y0,y1,n0,n1,computeZ);
-  v0 = TwosampleTest(y0,y2,n0,n2,computeZ);
-  w0 = TwosampleTest(y1,y2,n1,n2,computeZ);
 
   /* skip permutations */
   if (numperm < 1) {
-    zval->data[0] = u0;
-    zval->data[1] = v0;
-    zval->data[2] = w0;
+    int computeZ = 1;
+    zval->data[0] = TwosampleTest(y0,y1,n0,n1,computeZ);
+    zval->data[1] = TwosampleTest(y0,y2,n0,n2,computeZ);
+    zval->data[2] = TwosampleTest(y1,y2,n1,n2,computeZ);
     goto noperm;
   }
-
+  else {
+    u0 = beta->data[0] - beta->data[1];
+    v0 = beta->data[0] - beta->data[2];
+    w0 = beta->data[1] - beta->data[2];
+  }
 
   /* ini random generator */
   gsl_rng_env_setup();
   const gsl_rng_type *T = gsl_rng_default;
   gsl_rng *rx = gsl_rng_alloc(T);
-  gsl_rng_set(rx,(unsigned long int)seed);
-  int *tmplabel = (int *)VCalloc(n,sizeof(int));
- 
-  /* permute layers labels */
-  double kx[3];
-  kx[0]=kx[1]=kx[2]=0;
+  gsl_rng_set(rx,(unsigned long int) seed);
+
+  double *tmp_01 = (double *)VCalloc(n0+n1,sizeof(double));
+  double *tmp_02 = (double *)VCalloc(n0+n2,sizeof(double));
+  double *tmp_12 = (double *)VCalloc(n1+n2,sizeof(double));
+
+  double *xtmp0 = (double *)VCalloc(n0,sizeof(double));
+  double *xtmp1 = (double *)VCalloc(n1,sizeof(double));
+  double *xtmp2 = (double *)VCalloc(n2,sizeof(double));
+  
+
+  /* permute depth labels */
+  double pos[3],neg[3],xm0=0,xm1=0,xm2=0;
+  for (i=0; i<3; i++) pos[i] = neg[i] = 0;
   for (perm=0; perm<numperm; perm++) {
+    
+    /* deep-middle */
+    j=0;
+    for (i=0; i<n0; i++) tmp_01[j++] = y0[i];
+    for (i=0; i<n1; i++) tmp_01[j++] = y1[i];
+    gsl_ran_shuffle(rx,tmp_01,n0+n1,sizeof(double));
+    for (i=0; i<n0; i++) tmp0[i] = tmp_01[i];
+    for (i=0; i<n1; i++) tmp1[i] = tmp_01[i+n0];
+    xm0 = gsl_stats_mean(tmp0,1,n0);
+    xm1 = gsl_stats_mean(tmp1,1,n1);
+    u = xm0 - xm1;
 
-    memcpy(tmplabel,label,n*sizeof(int));
-    gsl_ran_shuffle(rx,tmplabel,n,sizeof(int));
-    AssignLabels(y,tmplabel,y0,y1,y2,n);
+    /* deep-superficial */
+    j=0;
+    for (i=0; i<n0; i++) tmp_02[j++] = y0[i];
+    for (i=0; i<n2; i++) tmp_02[j++] = y2[i];
+    gsl_ran_shuffle(rx,tmp_02,n0+n2,sizeof(double));
+    for (i=0; i<n0; i++) tmp0[i] = tmp_02[i];
+    for (i=0; i<n2; i++) tmp2[i] = tmp_02[i+n2];
+    xm0 = gsl_stats_mean(tmp0,1,n0);
+    xm2 = gsl_stats_mean(tmp2,1,n2);
+    v = xm0 - xm2;
+    
+    /* middle-superficial */
+    j=0;
+    for (i=0; i<n1; i++) tmp_12[j++] = y1[i];
+    for (i=0; i<n2; i++) tmp_12[j++] = y2[i];
+    gsl_ran_shuffle(rx,tmp_12,n1+n2,sizeof(double));
+    for (i=0; i<n1; i++) tmp1[i] = tmp_12[i];
+    for (i=0; i<n2; i++) tmp2[i] = tmp_12[i+n1];
+    xm1 = gsl_stats_mean(tmp1,1,n1);
+    xm2 = gsl_stats_mean(tmp2,1,n2);
+    w = xm1 - xm2;
 
-    u = TwosampleTest(y0,y1,n0,n1,computeZ);
-    v = TwosampleTest(y0,y2,n0,n2,computeZ);
-    w = TwosampleTest(y1,y2,n1,n2,computeZ);
+    /* permuted test statistic */
+    if (u > u0) pos[0]++;
+    if (v > v0) pos[1]++;
+    if (w > w0) pos[2]++;
 
-    if (u > u0) kx[0]++;
-    if (v > v0) kx[1]++;
-    if (w > w0) kx[2]++;
-  }
-
-  /* compute z-stats */
-  double pmin = DBL_EPSILON;
-  double pmax = 1.0-2.0*pmin;
-  double nx = (double)numperm;
-  double pval = 0;
-  for (i=0; i<3; i++) {
-    pval = kx[i]/nx;
-    if (pval < pmin) pval = pmin;
-    if (pval > pmax) pval = pmax;    
-    zval->data[i] = gsl_cdf_ugaussian_Qinv(pval);
+    if (u < u0) neg[0]++;
+    if (v < v0) neg[1]++;
+    if (w < w0) neg[2]++;
   }
   gsl_rng_free(rx);
-  VFree(tmplabel);
+  VFree(tmp0);
+  VFree(tmp1);
+  VFree(tmp2);
+  VFree(xtmp0);
+  VFree(xtmp1);
+  VFree(xtmp2);
+  VFree(tmp_01);
+  VFree(tmp_02);
+  VFree(tmp_12);
+  
+  
+  /* compute z-stats */
+  double nx = (double)numperm;
+  double z=0,p0=0,p1=0;
+  for (i=0; i<3; i++) {
+    p0 = (pos[i]+1.0)/(nx+1.0);
+    p1 = (neg[i]+1.0)/(nx+1.0);
+    z=0;
+    if (p0 < p1) z = gsl_cdf_ugaussian_Qinv(p0);
+    else z = -gsl_cdf_ugaussian_Qinv(p1);
+    if (gsl_finite(z)==0) z = 0;
+    zval->data[i] = z;
+  }
 
  noperm: ;
+  gsl_vector_free(y);
+  gsl_vector_free(mvec);
   VFree(y0);
   VFree(y1);
   VFree(y2);
