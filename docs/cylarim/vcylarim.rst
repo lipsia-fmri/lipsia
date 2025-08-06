@@ -2,54 +2,60 @@
 vcylarim
 --------------------------------------
 
-**vcylarim** is the core tool of the Cylarim package.
-It expects as input an activation map, a rim image and a metric image.
-They can be generated using the cylarim-programs called **vrim** and **vmetric**.
-Optionally, they can also be obtained using the software package LayNii.
+The program **vcylarim** is the core tool of the Cylarim package.
+It requires three primary input images: an **activation map**, a **rim image**
+that delineates gray matter (GM) and its boundaries with white matter (WM) and cerebrospinal fluid (CSF),
+and a **cortical depth map**. The depth map normalizes cortical depth values to a range of :math:`[0,1]`,
+where '0' represents the GM/WM border and '1' signifies the GM/CSF border.
+Additionally, a user-defined mask can be provided to restrict the analysis to specific brain regions.
 Note that the rim image must use the following codes: 
-1:(CSF/GM boundary), 2:(WM/GM boundary), 3:(cortex interior).
-
-The output of **vcylarim** is a file that contains six images. 
-The first three images contain the coefficients estimated for the deep, middle and superficial layers.
-The following three images contain
-z-values of the laminar contrasts (deep-middle), (deep-superficial), (middle-superficial).
-The output of **vcylarim**  is subsequently used by **vcylarim_stats** to compute various laminar statistics.
-
-The layer coefficients are estimated separately for each cylinder.
-In most voxels, several cylinders overlap. In these voxels, the coefficients are averaged.
+1:(CSF/GM boundary), 2:(WM/GM boundary), 3:(GM).
 
 
+An example of a typical call to **vcylarim** is shown below.
+In this example, ``zmap.v`` is an fMRI activation map, ``rim.v`` is the image encoding the cortical rim,
+and ``metric.v`` is the file that encodes cortical depths. Cylinders of a 2mm radius will be used.
 
-Example:
-``````````
+.. code-block::
 
- :: 
- 
-   vcylarim -in zmap.v -out cylstats.v -rim rim.v -metric metric.v -mask mask.v -equivol true -type median -nperm 1000 -radius 2
-   
+   vcylarim -in zmap.v -metric metric.v -rim rim.v -radius 2 -nperm 1000 -3bins true -peak true -out outfilename
 
- 
-Here, the input is an activation map (zmap.v), a rim image (rim.v), a metric image (metric.v) and a mask image (mask.v).
-The mask is optional. If present, it will restrict computations to some part of the input image. This may help
-to reduce computation time. It should be a binary image.  The program **vcylarim_getmask** can help to
-obtain useful masks.
-The parameter "-radius" specifies the radii of the cylinders in mm.
-The parameter "-equivol" specifies whether or not equivolume correction should be applied to each cylinder.
+In this command, Cylarim is instructed to perform two separate analyses: **'3bins'** where vcylarim will
+use three depth strata ('deep','middle','superficial'), and conduct pairwise t-tests in which these strata will be
+compared against each other. The other analysis  **'peak'** yields a 4D image with two volumes where the first volume
+will contain valleys of the cortical depth profiles, and the second volumes contains profile peaks.
 
-The type of model to be used can be specified by the parameter "-type". If set to "glm", a GLM is applied.
-Alternatively, this parameter can be set to "-type slabs". In this case, no GLM is fitted. Instead
-a simple averaging within three slabs (deep,middle,superficial) is done. This is easier and computationally
-less involved.
+Specifically, the above call generates the following output files:
 
-The parameter "-nperm 1000" specifies that permutation tests with 1000 permutations are done. These tests
-compare the three layers (deep, middle, superficial) against each other. During the permutations,
-a null distribution is estimated by randomly permuting the cortical depth values.
-If "-nperm" is set to zero, then no permutations are done, and crude approximations are returned.
+* ``outfilename_3bins_coeff.v``: A 4D image where the three volumes represent the median values of the three depth strata,
+  spatially resolved within each image.
+* ``outfilename_3bins_zvals.v``: A 4D file containing the statistical maps derived from the 1000 random permutations,
+  with three volumes ("deep-middle", "deep-superficial", "middle-superficial").
+* ``outfilename_peak_coeff.v``: A 4D file with two volumes, one showing depth profile valleys and the other showing depth profile peaks.
 
-**vcylarim** implements parallel computations using openmp. The number of processors to use can be specified with 
-the parameter "-j". The output (cylbeta.v) contains several images as explained above.
-This file can be analyzed in subsequent processing steps using **cylarim_stats**.
+These output files can be visualized directly using Lipsia's own viewer **vini**.
+Alternatively, they can be converted to NIfTI format using the program **vnifti** for use with other standard imaging software.
 
+If the option '-3bins true' is set to 'true', then '-nperm' specifies the the number of random permutations will be performed
+to obtain z-values for the tests to compare the three layers (deep, middle, superficial) against each other.
+During the permutations, a null distribution is estimated by randomly permuting the cortical depth values.
+If "-nperm" is set to zero, then no permutations are done, and crude approximations to these z-values are returned.
+
+Other types of analyses can also be computed as detailed in the list of parameters below.
+
+
+Further Analyses
+----------------
+
+The output files from **vcylarim** can be further processed to perform additional analyses.
+For example, to perform a conjunction analysis, the following command using the program **vcylarim_probe** can be used:
+
+.. code-block::
+
+   vcylarim_probe -in outfilename_3bins_zvals.v -out middle_dominant.v -type top_m
+
+Here, the parameter ``-type top_m`` instructs the software to identify predominant middle layer activations using a conjunction analysis.
+For further information, see the documentation of **vcylarim_probe**.
 
 
 
@@ -66,7 +72,14 @@ Parameters of 'vcylarim'
   -radius   Cylinder radius in mm. Default: 2
   -equivol  Whether to apply equivolume correction [ true | false ]. Default: false
   -nperm    Number of permutations. Default: 1000
-  -type     Type of model [ median | | mean | glm ]. Default: median
+  -3bins    Compute three depth strata (bins) [ true | false ]. Default: false
+  -nbins    Compute N depth strata (bins). Default: 0
+  -peak     Compute peaks and valleys [ true | false ]. Default: false
+  -convex   Compute convexity/concavity [ true | false ]. Default: false
+  -linear   Compute linear slopes [ true | false ]. Default: false
+  -R2       Compute model fits [ true | false ]. Default: false
+  -maxabs   Compute max absolute z-values [ true | false ]. Default: false
+  -seed     Seed for random number generator. Default: 5555
   -j        Number of processors to use, '0' to use all. Default: 0
 
 
