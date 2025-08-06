@@ -40,22 +40,21 @@ It first constructs cortical cylinders by connecting pairs of voxels:
 one on the gray matter GM/WM rim and the other on the GM/CSF rim.
 Voxel pairs are identified by finding the nearest neighbor on the opposite rim for each voxel.
 After excluding redundant pairs, cylinders are defined by dilating the line connecting each pair of
-voxels with a user-specified radius (typically 3mm).
+voxels with a user-specified radius (typically 2mm).
 
-After the cylinders have been constructed, vcylarim estimates activation profiles
-for three layers (deep, middle, superficial).
+After the cylinders have been constructed, vcylarim analysis activation profiles using
+various methods. For example, vcylarinm can be instructed to compute three depth strata (deep, middle, superficial),
+and perform pairwise t-tests to compare them. Alternatively, it can be instructed to identify
+peaks in the cortical profiles, or identify regions where the profile is concave up or down.
+The output of **vcylarim** is a set of files depending on the various type of analysis selected by the user.
 
-The output of **vcylarim** is a file that contains the estimated layer coefficients.
-The first three images contain the GLM-coefficients estimated for the deep, middle and superficial layers.
-The coefficients are estimated separately for each cylinder.
-In most voxels, several cylinders overlap. In these voxels, the coefficients of the overlapping cylinders are averaged.
+The output files are 4D images that can be further processed using the program **vcylarim_probe**.
+Alternatively, they can be visualized using out tool **vini*, or converted to Nifti-format and analysed using
+other imaging software.
 
-Subsequent analysis of the output is performed using **vcylarim_stats**.
-This program generates maps that visualize various contrasts between the beta-images,
-as defined by the user.
 
-A typical workflow is shown below. The final step yields a map that shows the contrast "m-d" (middle-deep).
-
+A typical workflow is shown below. The final step instructs **vcylarim_probe**
+to identify predominant middle layer activations ('-type top_m') using a conjunction analysis.
 
 
 
@@ -70,9 +69,9 @@ Example workflow
 
    vmetric -in rim.v -out metric.v
  
-   vcylarim -in zmap.v -out cylbeta.v -rim rim.v -metric metric.v -radius 2
+   vcylarim -in zmap.v -rim rim.v -metric metric.v -radius 2 -3bins true -nperm 1000 -out cyl
    
-   vcylarim_stats -in cylbeta.v -out result.v -type m-d
+   vcylarim_probe -in cyl_3bins_zvals.v -out result.v -type top_m
    
  
 
@@ -84,9 +83,7 @@ Contents
    :maxdepth: 1
 
    vcylarim
-   vcylarim_stats
-   vcylarim_getmask
-   vcylarim_plot
+   vcylarim_probe
    vrim
    vmetric
    
