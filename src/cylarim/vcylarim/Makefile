@@ -4,8 +4,8 @@ CFLAGS  += -fopenmp
 
 
 PROG = vcylarim
-SRC = vcylarim.c LaminarGLM.c LaminarMean.c LaminarMedian.c dquantile.c Coverage.c \
-../cylutils/EHist.c ../cylutils/Cylinders.c ../cylutils/Conv.c
+SRC = vcylarim.c LaminarPeak.c LaminarMedian.c LaminarNbins.c LaminarFit.c LaminarConvex.c LaminarLinear.c \
+ LaminarZMax.c dquantile.c ConcatImages.c ../cylutils/EHist.c ../cylutils/Cylinders.c ../cylutils/Conv.c
 OBJ=$(SRC:.c=.o)
 
 ${PROG}: ${OBJ}

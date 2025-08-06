@@ -104,33 +104,17 @@ double MedianTest(double *x1,double *x2,size_t n1,size_t n2,int computeZ)
 }
 
 
-double LaminarMedian(gsl_vector *ya,gsl_vector *mvec0,
+double LaminarMedian(gsl_vector *y,gsl_vector *mvec,
 		     size_t numperm,long seed,gsl_vector *beta,gsl_vector *zval)
 {
   size_t i,j;
+  size_t n = y->size;
   size_t perm;
   double u,v,w,u0=0,v0=0,w0=0;
 
   gsl_vector_set_zero(beta);
   gsl_vector_set_zero(zval);
-
-  size_t n = 0;
-  for (i=0; i<mvec0->size; i++) {
-    if (mvec0->data[i] > 0.05 && mvec0->data[i] < 0.95) n++;
-  }
-  gsl_vector *y = gsl_vector_calloc(n);
-  gsl_vector *mvec = gsl_vector_calloc(n);
-
-  j=0;
-  for (i=0; i<mvec0->size; i++) {
-    if (mvec0->data[i] > 0.05 && mvec0->data[i] < 0.95) {
-      y->data[j] = ya->data[i];
-      mvec->data[j] = mvec0->data[i];
-      j++;
-    }
-  }
-
-
+ 
   /* get layer labels */
   size_t n0=0,n1=0,n2=0;
   int *label = (int *)VCalloc(n,sizeof(int));
@@ -256,8 +240,6 @@ double LaminarMedian(gsl_vector *ya,gsl_vector *mvec0,
   }
 
  noperm: ;
-  gsl_vector_free(y);
-  gsl_vector_free(mvec);
   VFree(y0);
   VFree(y1);
   VFree(y2);

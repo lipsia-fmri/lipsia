@@ -35,12 +35,18 @@ extern void GetResolution(VImage src,gsl_vector *reso);
 extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
 extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
 extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
-extern int LaminarGLM(gsl_vector *,gsl_vector *,size_t,long,gsl_vector *,gsl_vector *);
-extern int LaminarMean(gsl_vector *,gsl_vector *,size_t,long,gsl_vector *,gsl_vector *);
-extern int LaminarMedian(gsl_vector *,gsl_vector *,size_t,long,gsl_vector *,gsl_vector *);
-extern VImage VCylCover(VImage,VImage,VImage,Cylinders *cyl);
 
-    
+extern double LaminarMedian(gsl_vector *,gsl_vector *,size_t,long,gsl_vector *,gsl_vector *);
+extern double LaminarNBins(gsl_vector *,gsl_vector *,gsl_vector *,int);
+extern double LaminarConvex(gsl_vector *,gsl_vector *,gsl_vector *,int);
+extern double LaminarPeak(gsl_vector *,gsl_vector *,gsl_vector *,int);
+extern double LaminarFit(gsl_vector *,gsl_vector *,gsl_vector *);
+extern double LaminarLinear(gsl_vector *,gsl_vector *,gsl_vector *);
+extern double LaminarZMax(gsl_vector *y);
+extern VAttrList VConcatImages(VImage *src,VAttrList geolist,int n);
+extern void strip_filename(char *path);
+
+
 void XWriteOutput(VImage image,VAttrList geolist,char *filename)
 {
   VAttrList out_list = VCreateAttrList();
@@ -51,31 +57,136 @@ void XWriteOutput(VImage image,VAttrList geolist,char *filename)
   fclose(fp);
 }
 
-
-/* fill vectors as prep for laminat statistics */
-int PrepStats(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector *y,gsl_vector *mvec,size_t n)
+/* count number of data points in current cylinder */
+size_t NumPoints(VImage zmap,VImage metric,Cylinders *cyl,size_t cid)
 {
-  size_t i,k,nzero=0;
+  size_t m = cyl->addr[cid]->size;
+  size_t i,k;
   int b,r,c;
-  for (i=0; i<n; i++) {
+  double w=0,z=0;
+  size_t n=0;
+  for (i=0; i<m; i++) {
     k = cyl->addr[cid]->data[i];
     b = gsl_matrix_int_get(cyl->xmap,k,0);
     r = gsl_matrix_int_get(cyl->xmap,k,1);
     c = gsl_matrix_int_get(cyl->xmap,k,2);
-    mvec->data[i] = VPixel(metric,b,r,c,VFloat);
-    y->data[i] = VPixel(zmap,b,r,c,VFloat);
-    if (fabs(y->data[i]) < TINY) nzero++;
+    w = VPixel(metric,b,r,c,VFloat);
+    if (w < 0.05 || w > 0.95) continue;
+    z = VPixel(zmap,b,r,c,VFloat);
+    if (fabs(z) < TINY) continue;
+    n++;
   }
-  if (nzero > n-1) return -1;  /* z-values are all zero */
-  return 1;
+  return n;
 }
 
 
-VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
-	       VBoolean equivol,int type,size_t numperm,long seed,VImage *betaimage,VImage *zvalimage)
+/* fill vectors as prep for laminar statistics */
+int PrepStats(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector *y,gsl_vector *mvec)
 {
+  size_t m = cyl->addr[cid]->size;
   size_t i,j,k;
+  int b,r,c;
+  double w=0,z=0;
 
+  int verbose=0;
+  j=0;
+  for (i=0; i<m; i++) {
+    k = cyl->addr[cid]->data[i];
+    b = gsl_matrix_int_get(cyl->xmap,k,0);
+    r = gsl_matrix_int_get(cyl->xmap,k,1);
+    c = gsl_matrix_int_get(cyl->xmap,k,2);
+    w = VPixel(metric,b,r,c,VFloat);
+    if (w < 0.05 || w > 0.95) continue;
+    z = VPixel(zmap,b,r,c,VFloat);
+    if (fabs(z) < TINY) continue;
+    mvec->data[j] = w;
+    y->data[j] = z;
+
+    /* if (c==416 && r==104 && b==5) verbose = 1; */
+    /* if (c==77 && r==48 && b==50) verbose = 1; */
+    j++;
+  }
+  return verbose;
+}
+
+
+void WriteToFile(VImage *betaimage,VAttrList geolist,int nbeta,
+		 float radius,VBoolean equivol,VLong numperm,VLong seed,
+		 VString name,VString out_filename)
+{
+  char cbuf[5000];
+  VAttrList out_list = NULL;
+  if (nbeta > 1) out_list = VConcatImages(betaimage,geolist,nbeta);
+  else {
+    out_list = VCreateAttrList();
+    VSetGeoInfo(geolist,out_list);
+    VAppendAttr(out_list,"image",NULL,VImageRepn,betaimage[0]);
+  }
+  if (numperm > 0) {
+    VPrependAttr(out_list,"numperm",NULL,VLongRepn,numperm);
+    VPrependAttr(out_list,"seed",NULL,VLongRepn,seed);
+  }
+  memset(cbuf,'\0',sizeof(cbuf));
+  sprintf(cbuf,"%.4f",radius);
+  VPrependAttr(out_list,"radius",NULL,VStringRepn,cbuf);
+  if (equivol==TRUE) VPrependAttr(out_list,"equivolume",NULL,VStringRepn,(VString)"true");
+  VPrependAttr(out_list,"name",NULL,VStringRepn,name);  
+
+  memset(cbuf,'\0',sizeof(cbuf));
+  sprintf(cbuf,"%s_%s.v",out_filename,name);
+  fprintf(stderr," writing %s\n",cbuf);
+  FILE *fp = VOpenOutputFile (cbuf, TRUE);
+  if (! VWriteFile (fp,out_list)) exit (1);
+  fclose(fp);
+}
+
+void WriteStats(Cylinders *cyl,size_t k,VImage rim,gsl_vector *beta,VImage *coeff)
+{
+  size_t i,j;
+  for (i=0; i<cyl->addr[k]->size; i++) {
+    size_t l = cyl->addr[k]->data[i];
+    int b = gsl_matrix_int_get(cyl->xmap,l,0);
+    int r = gsl_matrix_int_get(cyl->xmap,l,1);
+    int c = gsl_matrix_int_get(cyl->xmap,l,2);
+    if (VPixel(rim,b,r,c,VUByte) != 3) continue;
+
+#pragma omp critical
+    {
+      for (j=0; j<beta->size; j++) {
+	VPixel(coeff[j],b,r,c,VFloat) += beta->data[j];
+      }
+    }
+  }
+}
+
+
+/* normalize images */
+void WNormalizeImage(VImage *coeff,int ncoeff,VImage wimage)
+{
+  size_t i,j;
+  VFloat *pw = VImageData(wimage);
+  VFloat *pb = NULL;
+  float wmin = 0.01;
+  for (j=0; j<ncoeff; j++) {
+    pb = VImageData(coeff[j]);
+    for (i=0; i<VImageNPixels(wimage); i++) {
+      if (pw[i] > wmin) pb[i] /= pw[i];
+      else pb[i] = 0;
+      if (gsl_finite((double)pb[i])==0) pb[i] = 0;
+    }
+  }
+}
+
+
+
+VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
+	       VBoolean equivol,size_t numperm,long seed,
+	       VBoolean x3bins,int nbins,VBoolean xpeak,VBoolean xconvex,VBoolean xlinear,VBoolean xR2,
+	       VImage *bin3_coeff,VImage *bin3_perm,VImage *nbin_coeff,VImage *peak_coeff,
+	       VImage convex_coeff,VImage linear_coeff,
+	       VImage *R2_coeff)
+{
+  size_t k;
   
   /* create cylinder data struct */
   Cylinders *cyl = VCylinder(rim,metric,radius);
@@ -89,141 +200,199 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
     HistEqualize(cyl,wimage,metric,rim);
   }
   
-  /* LayerGLM */  
+  /* LayerStats */  
   size_t progress=0;
   size_t np = (size_t)((float)cyl->numcylinders/100.0);
   if (np < 1) np = 1;
-  int nbeta=3,nzval=3;
   VFillImage(wimage,VAllBands,0);
-  
+  VImage zabsimage = VCreateImageLike(wimage);
+  VFillImage(zabsimage,VAllBands,0);
+
+ 
 #pragma omp parallel for shared(progress)
   for (k=0; k<cyl->numcylinders; k++) {
-    size_t i,j;
-    if (k%np==0) fprintf(stderr," LaminarStats:  %7.3f\r",(float)(progress)/(float)cyl->numcylinders);
+    size_t i;
+    if (k%np==0) fprintf(stderr," LaminarAnalysis:  %7.3f\r",(float)(progress)/(float)cyl->numcylinders); 
     progress++;
 
-    size_t n = cyl->addr[k]->size;
-    if (n < 20) continue; /* cylinder must be big enough for sufficient stats */
-    int rtcode = 0;
-    gsl_vector *beta = gsl_vector_calloc(nbeta);
-    gsl_vector *zval = gsl_vector_calloc(nzval);
+    size_t n = NumPoints(zmap,metric,cyl,k);
+    if (n < NPTS) continue;
     gsl_vector *y = gsl_vector_calloc(n);
     gsl_vector *mvec = gsl_vector_calloc(n);
-    rtcode = PrepStats(zmap,metric,cyl,k,y,mvec,n);
-    if (rtcode < 0) goto skip;
-    
-    switch (type) {
-    case 0:
-      rtcode = LaminarMedian(y,mvec,numperm,seed,beta,zval);
-      break;
-    case 1:
-      rtcode = LaminarMean(y,mvec,numperm,seed,beta,zval);
-      break;
-    case 2:
-      rtcode = LaminarGLM(y,mvec,numperm,seed,beta,zval);
-      break;
-    default:
-      VError(" unknown type %d",type);
+    int verbose = PrepStats(zmap,metric,cyl,k,y,mvec);
+    double tss = gsl_stats_tss(y->data,1,y->size);
+    if (tss < TINY) {
+      gsl_vector_free(y);
+      gsl_vector_free(mvec);
+      continue;
     }
-    if (rtcode < 0) goto skip;
-       
-    for (i=0; i<cyl->addr[k]->size; i++) {
-      size_t l = cyl->addr[k]->data[i];
-      int b = gsl_matrix_int_get(cyl->xmap,l,0);
-      int r = gsl_matrix_int_get(cyl->xmap,l,1);
-      int c = gsl_matrix_int_get(cyl->xmap,l,2);
-      if (VPixel(rim,b,r,c,VUByte) != 3) continue;
-
-#pragma omp critical
-      {
-	VPixel(wimage,b,r,c,VFloat) += 1.0;
-	
-	for (j=0; j<nbeta; j++) {
-	  VPixel(betaimage[j],b,r,c,VFloat) += beta->data[j];
-	}
-	
-	for (j=0; j<nzval; j++) {
-	  VPixel(zvalimage[j],b,r,c,VFloat) += zval->data[j];
-	}
+    /*
+    if (verbose) {
+      VFillImage(convex_coeff,VAllBands,0);
+      for (i=0; i<cyl->addr[k]->size; i++) {
+	size_t j = cyl->addr[k]->data[i];
+	int b = gsl_matrix_int_get(cyl->xmap,j,0);
+	int r = gsl_matrix_int_get(cyl->xmap,j,1);
+	int c = gsl_matrix_int_get(cyl->xmap,j,2);
+	VPixel(convex_coeff,b,r,c,VFloat) = 1;
       }
+      return NULL;
     }
-  skip: ;
+    */
+    
+    if (x3bins) {
+      gsl_vector *beta = gsl_vector_calloc(n3bins);
+      gsl_vector *zval = gsl_vector_calloc(p3bins);
+      if (LaminarMedian(y,mvec,numperm,seed,beta,zval) > 0) {
+	WriteStats(cyl,k,rim,beta,bin3_coeff);
+	WriteStats(cyl,k,rim,zval,bin3_perm);
+      }
+      gsl_vector_free(beta);
+      gsl_vector_free(zval);
+    }
+    if (nbins > 0) {
+      gsl_vector *beta = gsl_vector_calloc(nbins);
+      if (LaminarNBins(y,mvec,beta,verbose) > 0) {
+	WriteStats(cyl,k,rim,beta,nbin_coeff);
+      }
+      gsl_vector_free(beta);
+    }
+    if (xpeak) {
+      gsl_vector *beta = gsl_vector_calloc(npeak);
+      if (LaminarPeak(y,mvec,beta,verbose) > 0) {
+	WriteStats(cyl,k,rim,beta,peak_coeff);
+      }
+      gsl_vector_free(beta);
+    }
+
+    if (xconvex) {
+      gsl_vector *beta = gsl_vector_calloc(1);
+      if (LaminarConvex(y,mvec,beta,verbose) > 0) {
+	WriteStats(cyl,k,rim,beta,&convex_coeff);
+      }
+      gsl_vector_free(beta);
+    }
+
+    if (xlinear) {
+      gsl_vector *beta = gsl_vector_calloc(1);
+      if (LaminarLinear(y,mvec,beta) > 0) {
+	WriteStats(cyl,k,rim,beta,&linear_coeff);
+      }
+      gsl_vector_free(beta);
+    }
+
+    if (xR2) {
+      gsl_vector *beta = gsl_vector_calloc(nR2);
+      if (LaminarFit(y,mvec,beta) > 0) {
+	WriteStats(cyl,k,rim,beta,R2_coeff);
+      }
+      gsl_vector_free(beta);
+    }
+    
+    /* max absolute z-value */
+    double zmax = LaminarZMax(y);
+    
     gsl_vector_free(y);
     gsl_vector_free(mvec);
-    gsl_vector_free(beta);
-    gsl_vector_free(zval);
+
+
+#pragma omp critical
+    {    
+      for (i=0; i<cyl->addr[k]->size; i++) {
+	size_t l = cyl->addr[k]->data[i];
+	int b = gsl_matrix_int_get(cyl->xmap,l,0);
+	int r = gsl_matrix_int_get(cyl->xmap,l,1);
+	int c = gsl_matrix_int_get(cyl->xmap,l,2);
+	VPixel(zabsimage,b,r,c,VFloat) += zmax;
+	if (VPixel(rim,b,r,c,VUByte) != 3) continue;
+	VPixel(wimage,b,r,c,VFloat) += 1.0;
+      }
+    }
   }
 
   
-  /* normalize betaimages */
-  VFloat *pw = VImageData(wimage);
-  VFloat *pb = NULL;
-  float wmin = 0.01;
-  for (j=0; j<nbeta; j++) {
-    pb = VImageData(betaimage[j]);
-    for (i=0; i<VImageNPixels(wimage); i++) {
-      if (pw[i] > wmin) pb[i] /= pw[i];
-      else pb[i] = 0;
-    }
+  /* normalize images */
+  if (x3bins) {
+    WNormalizeImage(bin3_coeff,(int)n3bins,wimage);
+    WNormalizeImage(bin3_perm,(int)p3bins,wimage);
   }
-
-  /* normalize zval images */
-  for (j=0; j<nzval; j++) {
-    pb = VImageData(zvalimage[j]);
-    for (i=0; i<VImageNPixels(wimage); i++) {
-      if (pw[i] > wmin) pb[i] /= pw[i];
-      else pb[i] = 0;
-    }
+  if (nbins > 0) {
+    WNormalizeImage(nbin_coeff,(int)nbins,wimage);
   }
-
-  VImage zcover = VCylCover(zmap,rim,wimage,cyl);
-  return zcover;
+  if (xpeak) {
+    WNormalizeImage(peak_coeff,(int)npeak,wimage);
+  }
+  if (xconvex) {
+    WNormalizeImage(&convex_coeff,(int)1,wimage);
+  }
+  if (xlinear) {
+    WNormalizeImage(&linear_coeff,(int)1,wimage);
+  }
+  if (xR2) {
+    WNormalizeImage(R2_coeff,(int)nR2,wimage);
+  }
+  WNormalizeImage(&zabsimage,(int)1,wimage);
+  return zabsimage;
 }
-
-
-VDictEntry TypDict[] = {
-  { "median", 0, 0,0,0,0  },
-  { "mean", 1, 0,0,0,0  },
-  { "glm", 2, 0,0,0,0  },
-  { NULL, 0,0,0,0,0 }
-};
 
 int main (int argc, char **argv)
 {
+  static VString    in_filename="";
+  static VString    out_filename="";
   static VString    metric_filename="";
   static VString    rim_filename="";
   static VString    mask_filename="";
   static VFloat     radius = 2.0;
   static VBoolean   equivol = FALSE;
-  static VShort     type = 0;
+  static VBoolean   x3bins = FALSE;
+  static VShort     xnbins = 0;
+  static VBoolean   xconvex = FALSE;
+  static VBoolean   xlinear = FALSE;
+  static VBoolean   xpeak = FALSE;
+  static VBoolean   xR2 = FALSE;
+  static VBoolean   xzabs = FALSE;
   static VLong      seed = 5555;
   static VShort     numperm = 1000;
   static VShort     nproc = 0;
   static VOptionDescRec options[] = {
+    {"in", VStringRepn, 1, & in_filename, VRequiredOpt, NULL,"Input file" },
+    {"out", VStringRepn, 1, & out_filename, VRequiredOpt, NULL,"Output file" },
     {"metric", VStringRepn,1,(VPointer) &metric_filename,VRequiredOpt,NULL,"metric image"},
     {"rim", VStringRepn,1,(VPointer) &rim_filename,VRequiredOpt,NULL,"rim image"},
     {"mask", VStringRepn,1,(VPointer) &mask_filename,VOptionalOpt,NULL,"mask image"},
     {"radius", VFloatRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Cylinder radius in mm"},
     {"equivol", VBooleanRepn,1,(VPointer) &equivol,VOptionalOpt,NULL,"Equivolume correction"},
-    {"type", VShortRepn, 1, & type, VOptionalOpt,TypDict,"Type of model" },
+    {"3bins", VBooleanRepn,1,(VPointer) &x3bins,VOptionalOpt,NULL,"Compute 3bins"},
+    {"nbins", VShortRepn,1,(VPointer) &xnbins,VOptionalOpt,NULL,"Binning using N bins"},
+    {"peak", VBooleanRepn,1,(VPointer) &xpeak,VOptionalOpt,NULL,"Compute peaks and troughs"},
+    {"convex", VBooleanRepn,1,(VPointer) &xconvex,VOptionalOpt,NULL,"Compute convexity measures"},
+    {"linear", VBooleanRepn,1,(VPointer) &xlinear,VOptionalOpt,NULL,"Compute linear fit"},
+    {"R2", VBooleanRepn,1,(VPointer) &xR2,VOptionalOpt,NULL,"Compute model fits (R^2)"},
+    {"maxabs", VBooleanRepn,1,(VPointer) &xzabs,VOptionalOpt,NULL,"Compute max abs"},
     {"nperm", VShortRepn, 1, & numperm, VOptionalOpt,NULL,"Number of permutations" },
     {"seed", VLongRepn, 1, & seed, VOptionalOpt, NULL,"Seed for random number generator" },
     {"j",VShortRepn,1,(VPointer) &nproc,VOptionalOpt,NULL,"Number of processors to use, '0' to use all"},
    };
-  VString in_filename=NULL;
-  FILE *in_file, *out_file;
   size_t i;
   char *prg=GetLipsiaName("vcylarim");
   fprintf (stderr, " %s\n", prg);
 
   
-  VParseFilterCmdZ (VNumber (options),options,argc,argv,&in_file,&out_file,&in_filename);
+  /* parse command line */
+  if (! VParseCommand (VNumber (options), options, & argc, argv)) {
+    VReportUsage (argv[0], VNumber (options), options, NULL);
+    exit (EXIT_FAILURE);
+  }
+  if (argc > 1) {
+    VReportBadArgs (argc, argv);
+    exit (EXIT_FAILURE);
+  }
   if (radius < 0.0001) VError(" radius must be positive");
-  if (type < 0 || type > 2) VError(" unknown type %d",type);
-  if (seed < 0) VError(" seed must be non-negative");
+  if (!x3bins && xnbins==0 && !xpeak && !xlinear && !xconvex && ! xR2 && !xzabs)
+    VError(" no output will be generated, all compute options are set to 'false' ");
+  if (xnbins > 100) VError(" nbins > 100 does not make sense");
+			    
 
-  fprintf(stderr," equivol: %d\n",equivol);
-  
   
   /* omp-stuff */
 #ifdef _OPENMP
@@ -233,9 +402,6 @@ int main (int argc, char **argv)
   omp_set_num_threads(num_procs);
 #endif
   
-
-  fprintf(stderr," type:  %s\n",TypDict[type].keyword);
-
   /* read zmap  */
   VImage zmap=NULL;
   VAttrList zlist = VReadAttrList(in_filename,0L,TRUE,FALSE);
@@ -309,43 +475,117 @@ int main (int argc, char **argv)
   }
 
 
-  /* alloc output images */
-  int nbeta=3,nzval=3;
-  VImage *betaimage = (VImage *)VCalloc(nbeta,sizeof(VImage));
-  for (i=0; i<nbeta; i++) {
-    betaimage[i] = VCreateImageLike(zmap);
-    VFillImage(betaimage[i],VAllBands,0);
+
+  /* alloc 3bins */
+  VImage *bin3_coeff = NULL;
+  VImage *bin3_perm = NULL;
+  if (x3bins) {
+    bin3_coeff = (VImage *)VCalloc(n3bins,sizeof(VImage));
+    for (i=0; i<n3bins; i++) {
+      bin3_coeff[i] = VCreateImageLike(zmap);
+      VFillImage(bin3_coeff[i],VAllBands,0);
+    }
+    bin3_perm = (VImage *)VCalloc(p3bins,sizeof(VImage));
+    for (i=0; i<p3bins; i++) {
+      bin3_perm[i] = VCreateImageLike(zmap);
+      VFillImage(bin3_perm[i],VAllBands,0);
+    }
   }
-  VImage *zvalimage = (VImage *)VCalloc(nzval,sizeof(VImage));
-  for (i=0; i<nzval; i++) {
-    zvalimage[i] = VCreateImageLike(zmap);
-    VFillImage(zvalimage[i],VAllBands,0);
+
+  /* alloc nbins */
+  VImage *nbin_coeff = NULL;
+  if (xnbins > 0) {
+    nbin_coeff = (VImage *)VCalloc((int)xnbins,sizeof(VImage));
+    for (i=0; i<xnbins; i++) {
+      nbin_coeff[i] = VCreateImageLike(zmap);
+      VFillImage(nbin_coeff[i],VAllBands,0);
+    }
   }
- 
+  
+  /* alloc peak */
+  VImage *peak_coeff = NULL;
+  if (xpeak) {
+    peak_coeff = (VImage *)VCalloc(npeak,sizeof(VImage));
+    for (i=0; i<npeak; i++) {
+      peak_coeff[i] = VCreateImageLike(zmap);
+      VFillImage(peak_coeff[i],VAllBands,0);
+    }
+  }
+
+
+  /* alloc convex */
+  VImage convex_coeff = NULL;
+  if (xconvex) {
+    convex_coeff = VCreateImageLike(zmap);
+    VFillImage(convex_coeff,VAllBands,0);
+  }
+
+  /* alloc linear ramp */
+  VImage linear_coeff = NULL;
+  if (xlinear) {
+    linear_coeff = VCreateImageLike(zmap);
+    VFillImage(linear_coeff,VAllBands,0);
+  }
+
+  /* alloc R2 */
+  VImage *R2_coeff = NULL;
+  if (xR2) {
+    R2_coeff = (VImage *)VCalloc(nR2,sizeof(VImage));
+    for (i=0; i<nR2; i++) {
+      R2_coeff[i] = VCreateImageLike(zmap);
+      VFillImage(R2_coeff[i],VAllBands,0);
+    }
+  }
+
   
   /* Main */
-  VImage zcover = Cylarim(zmap,metric,rim,(double)radius,equivol,(int)type,(size_t)numperm,(long)seed,betaimage,zvalimage);
-  
+  VImage zcover = Cylarim(zmap,metric,rim,(double)radius,equivol,(size_t)numperm,(long)seed,
+			  x3bins,(int)xnbins,xpeak,xconvex,xlinear,xR2,
+			  bin3_coeff,bin3_perm,nbin_coeff,peak_coeff,convex_coeff,linear_coeff,R2_coeff);
 
-  
-  /* write output */
-  VAttrList out_list = VCreateAttrList();
-  VSetGeoInfo(geolist,out_list);
-  char cbuf[64];
-  sprintf(cbuf, "%f",radius);
-  VAppendAttr(out_list,"type",NULL,VStringRepn,(VString)TypDict[type].keyword);
-  VAppendAttr(out_list,"radius",NULL,VStringRepn,(VString)cbuf);
-  if (equivol==TRUE) VAppendAttr(out_list,"equivolume",NULL,VStringRepn,(VString)"true");
-  else VAppendAttr(out_list,"equivolume",NULL,VStringRepn,(VString)"false");
-  VAppendAttr(out_list,"nbeta",NULL,VShortRepn,(VShort)nbeta);
-  VAppendAttr(out_list,"seed",NULL,VLongRepn,(VLong)seed);
-  for (i=0; i<nbeta; i++) VAppendAttr(out_list,"beta",NULL,VImageRepn,betaimage[i]);
-  for (i=0; i<nzval; i++) VAppendAttr(out_list,"zvalimage",NULL,VImageRepn,zvalimage[i]);
-  if (zcover != NULL) VAppendAttr(out_list,"cover",NULL,VImageRepn,zcover);
+  /* write output images */
+  fprintf(stderr,"\n");
+  strip_filename(out_filename);
 
-  if (! VWriteFile (out_file, out_list)) exit (1);
+  if (x3bins) {
+    WriteToFile(bin3_coeff,geolist,n3bins,
+		(float)radius,(VBoolean)equivol,(VLong)0,(VLong)0,
+		"3bins_coeff",out_filename);
+    WriteToFile(bin3_perm,geolist,p3bins,
+		(float)radius,(VBoolean)equivol,(VLong)numperm,(VLong)seed,
+		"3bins_zvals",out_filename);
+  }
+  if (xnbins > 0) {
+    WriteToFile(nbin_coeff,geolist,(int)xnbins,
+		(float)radius,(VBoolean)equivol,(VLong)0,(VLong)0,
+		"nbins_coeff",out_filename);
+  }
+  if (xpeak) {
+    WriteToFile(peak_coeff,geolist,npeak,
+		(float)radius,(VBoolean)equivol,(VLong)0,(VLong)0,
+		"peak",out_filename);
+  }
+  if (xconvex) {
+    WriteToFile(&convex_coeff,geolist,1,
+		(float)radius,(VBoolean)equivol,(VLong)0,(VLong)0,
+		"convex",out_filename);
+  }
 
+  if (xlinear) {
+    WriteToFile(&linear_coeff,geolist,1,
+		(float)radius,(VBoolean)equivol,(VLong)0,(VLong)0,
+		"linear",out_filename);
+  }
   
+  if (xR2) {
+    WriteToFile(R2_coeff,geolist,nR2,
+		(float)radius,(VBoolean)equivol,(VLong)0,(VLong)0,
+		"R2",out_filename);
+  }
+  if (xzabs) {
+    WriteToFile(&zcover,geolist,1,(float)radius,(VBoolean)equivol,(VLong)0,(VLong)0,"zabs",out_filename);
+  }
+    
   fprintf (stderr, "%s: done.\n", argv[0]);
   return 0;
 }
