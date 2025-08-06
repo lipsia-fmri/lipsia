@@ -33,8 +33,8 @@ Parameters of 'vcylarim_probe'
   -help     Prints usage information.
   -in       Input file.
   -out      Output file.
-  -slice    Slice to be selected. Default: 0
-  -xinvert  Whether to invert the selected slice[ true | false ]. Default: false
-  -type     Type of output [ slice | top_d | top_m | top_s | bottom_d | bottom_m | bottom_s | max_id | min_id | maxabs ]. Default: slice
+  -volume   Volume to be selected. Default: 0
+  -xinvert  Whether to invert the selected volume [ true | false ]. Default: false
+  -type     Type of output [ volume | top_d | top_m | top_s | bottom_d | bottom_m | bottom_s | max_id | min_id | maxabs ]. Default: volume
 
 .. index:: cylarim_probe
