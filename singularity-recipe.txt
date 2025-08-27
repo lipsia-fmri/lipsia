@@ -1,6 +1,10 @@
 Bootstrap: docker
 
-From: ubuntu:22.04
+From: ubuntu:24.04
+
+%files
+    /home/lohmann/data/tst2/.bashrc /etc/skel/.bashrc
+    /home/lohmann/data/tst2/.bashrc /root/.bashrc
 
 
 %post
