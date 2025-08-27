@@ -2,10 +2,6 @@ Bootstrap: docker
 
 From: ubuntu:24.04
 
-%files
-    /home/lohmann/data/tst2/.bashrc /etc/skel/.bashrc
-    /home/lohmann/data/tst2/.bashrc /root/.bashrc
-
 
 %post
 apt-get update && \
