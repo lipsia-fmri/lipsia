@@ -365,7 +365,7 @@ int main (int argc, char **argv)
     {"3bins", VBooleanRepn,1,(VPointer) &x3bins,VOptionalOpt,NULL,"Compute 3bins"},
     {"nbins", VShortRepn,1,(VPointer) &xnbins,VOptionalOpt,NULL,"Binning using N bins"},
     {"peak", VBooleanRepn,1,(VPointer) &xpeak,VOptionalOpt,NULL,"Compute peaks and troughs"},
-    {"convex", VBooleanRepn,1,(VPointer) &xconvex,VOptionalOpt,NULL,"Compute convexity measures"},
+    {"concave", VBooleanRepn,1,(VPointer) &xconvex,VOptionalOpt,NULL,"Compute concavity measures"},
     {"linear", VBooleanRepn,1,(VPointer) &xlinear,VOptionalOpt,NULL,"Compute linear fit"},
     {"R2", VBooleanRepn,1,(VPointer) &xR2,VOptionalOpt,NULL,"Compute model fits (R^2)"},
     {"maxabs", VBooleanRepn,1,(VPointer) &xzabs,VOptionalOpt,NULL,"Compute max abs"},
