@@ -1,7 +1,7 @@
-BIN=~/bin
+BIN=${LIPSIA_BIN}
 
-SUBDIRS = vmetric vrim vcylarim vcylarim_stats vfdr
-#SUBDIRS = $(shell ls -d */)
+#SUBDIRS = vmetric vrim vcylarim vcylarim_stats vfdr
+SUBDIRS = $(shell ls -d */)
 
 all::
 	for i in $(SUBDIRS:/=) ;\
