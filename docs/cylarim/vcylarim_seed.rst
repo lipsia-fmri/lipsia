@@ -16,7 +16,7 @@ in one of these three layers. Each row contains two values: the normalized corti
 corresponding z-value of the input zmap.
 
 If "-type chebyshev", only one txt file will be produced. Its name is specified using
-the parameter **--report**. It has one row for each voxel in the selected
+the parameter **-report**. It has one row for each voxel in the selected
 cylinder. And each row contains three values:  1) the normalized cortical depth,
 2) the corresponding z-value of the input zmap, 3) the value of the 
 fitted chebyshev polynomial of order 4 at that point.
