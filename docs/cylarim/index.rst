@@ -42,25 +42,20 @@ Voxel pairs are identified by finding the nearest neighbor on the opposite rim f
 After excluding redundant pairs, cylinders are defined by dilating the line connecting each pair of
 voxels with a user-specified radius (typically 2mm).
 
-After the cylinders have been constructed, vcylarim analysis activation profiles using
-various methods. For example, vcylarinm can be instructed to compute three depth strata (deep, middle, superficial),
+After the cylinders have been constructed, vcylarim analyses activation profiles using
+various methods. For example, vcylarim can be instructed to compute three depth strata (deep, middle, superficial),
 and perform pairwise t-tests to compare them. Alternatively, it can be instructed to identify
 peaks in the cortical profiles, or identify regions where the profile is concave up or down.
 The output of **vcylarim** is a set of files depending on the various type of analysis selected by the user.
 
 The output files are 4D images that can be further processed using the program **vcylarim_probe**.
-Alternatively, they can be visualized using out tool **vini*, or converted to Nifti-format and analysed using
-other imaging software.
 
 
-A typical workflow is shown below. The final step instructs **vcylarim_probe**
-to identify predominant middle layer activations ('-type top_m') using a conjunction analysis.
+Some typical workflows are shown below. 
 
 
 
-
-
-Example workflow
+Example workflow 1
 ```````````````````````
 
  ::
@@ -73,7 +68,46 @@ Example workflow
    
    vcylarim_probe -in cyl_3bins_zvals.v -out result.v -type top_m
    
+   vfdr -in result.v -out result_fdrcorrected.v -alpha 0.01
+   
+   vnifti -in result_fdrcorrected.v -out result_fdrcorrected.nii
+   
+   
+
+The program **vcylarim_probe**
+identifies predominant middle layer activations ('-type top_m') using a conjunction analysis,
+and the next command uses "vfdr" to correct the result for the false discovery rate (FDR).
+The output image can be visualized either using the program **vini** or converted to
+nifti and visualized using other imaging software.
+
+
+   
+   
+ Example workflow 2
+```````````````````````
+
+ ::
+
+   vrim -in segmentation.v -out rim.v
+
+   vmetric -in rim.v -out metric.v
  
+   vcylarim -in zmap.v -rim rim.v -metric metric.v -radius 2 -peaks true -out cyl
+   
+   vnifti -in cyl_peaks_coeff.v -out cyl_peaks_coeff.nii
+   
+
+
+In this example, the locations of peaks and valleys are estimated in each cylinder.
+It involves fitting a fourth-order Chebyshev polynomial to the z-values within each cylinder
+using a least-squares approach.
+A fourth-order polynomial was chosen to achieve a better balance between overfitting and underfitting
+The largest and smallest points of the fitted curve within the interval [0,1] are then
+identified and reported as the output.
+The resulting file "cyl_peaks_coeff.v" contains two volumes. The first volume
+shows valleys, the second shows the location of peaks.
+   
+
 
 
 Contents
@@ -84,6 +118,9 @@ Contents
 
    vcylarim
    vcylarim_probe
+   vcylarim_roi
+   vcylarim_seed
+   vfdr
    vrim
    vmetric
    
