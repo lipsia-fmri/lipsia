@@ -2,13 +2,13 @@ vcylarim_seed
 ---------------------
 
 The program **vcylarim_seed** is designed to allow inspection of individual cylinders.
-The cylinder is specified using the parameter **-seed*. The program locates the cylinder
+The cylinder is specified using the parameter **-seed**. The program locates the cylinder
 that is closest to the given seed. The seed must be specified using voxel coordinates (x,y,z)
 (not MNI coordinates). 
 The output image shows the selected cylinder filled with voxel values of the input zmap.
 All other voxels of the output image are set to zero.
 
-In addition, txt files are produced dependening on the parameter **-type**.
+In addition, txt files are produced depending on the parameter **-type**.
 
 If "-type 3bins", then three output txt files will be produced called "deep.txt",
 "middle.txt", "superficial.txt" containing one row per voxel depending on membership
