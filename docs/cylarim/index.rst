@@ -81,10 +81,13 @@ The output image can be visualized either using the program **vini** or converte
 nifti and visualized using other imaging software.
 
 
+
+
+
    
    
- Example workflow 2
-```````````````````````
+Example workflow 2
+````````````````````
 
  ::
 
