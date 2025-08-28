@@ -36,6 +36,9 @@ extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
 extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
 extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
 extern void GetResolution(VImage src,gsl_vector *reso);
+extern void PrintShape(VImage zmap,VImage metric,VImage dest,Cylinders *cyl,size_t cid,char *filename);
+extern void PrintPeak(VImage zmap,VImage metric,VImage dest,Cylinders *cyl,size_t cid,char *filename);
+extern void PrintBins(VImage zmap,VImage metric,VImage dest,Cylinders *cyl,size_t cid,char *filename);
 
 void ApplySeedMask(VImage metric,VImage rim,int b0,int r0,int c0,int wn)
 {
@@ -55,12 +58,12 @@ void ApplySeedMask(VImage metric,VImage rim,int b0,int r0,int c0,int wn)
 }
 
 
-VImage VFindCyl(VImage zmap,VImage metric,VImage rim,double radius,VBoolean equivol,VBoolean single,
-		int type,VString txt_filename,int b1,int r1,int c1,int b2,int r2,int c2)
+VImage VFindCyl(VImage zmap,VImage metric,VImage rim,double radius,VBoolean equivol,
+		int type,VString txt_filename,int b1,int r1,int c1)
 {
   size_t i,j,k,l,n;
-  double s=0,nx=0,d1=0,d2=0,x[3],xx[3],y[3];
-  FILE *fp = NULL;
+  double s=0,nx=0,d1=0,x[3],y[3];
+
 
   int nslices = VImageNBands(rim);
   int nrows = VImageNRows(rim);
@@ -68,9 +71,6 @@ VImage VFindCyl(VImage zmap,VImage metric,VImage rim,double radius,VBoolean equi
   if (c1 < 0 || c1 >= ncols) VError(" illegal column address (%d), must be < %d",c1,ncols);
   if (r1 < 0 || r1 >= nrows) VError(" illegal row address (%d), must be < %d",r1,nrows);
   if (b1 < 0 || b1 >= nslices) VError(" illegal slice address (%d), must be < %d",b1,nslices);
-  if (b2 >= nslices) VError(" illegal slice address (%d), must be < %d",b2,nslices);
-  if (r2 >= nslices) VError(" illegal row address (%d), must be < %d",r2,nrows);
-  if (c2 >= nslices) VError(" illegal column address (%d), must be < %d",c2,ncols);
 
   /* mask enclosing seed point */
   gsl_vector *reso = gsl_vector_calloc(3);
@@ -78,20 +78,14 @@ VImage VFindCyl(VImage zmap,VImage metric,VImage rim,double radius,VBoolean equi
   double xreso = gsl_vector_min(reso); 
   int wn = (int)((2.0*radius+5.0)/xreso+0.5);
   ApplySeedMask(metric,rim,b1,r1,c1,wn);
-  if (b2 >= 0) ApplySeedMask(metric,rim,b2,r2,c2,wn);
 
+  
   /* for (i=0; i<3; i++) reso->data[i] = 1; */
   x[0] = reso->data[0]*(double)c1;
   x[1] = reso->data[1]*(double)r1;
   x[2] = reso->data[2]*(double)b1;
 
-  xx[0] = xx[1] = xx[2] = -1;
-  if (b1 >= 0) {
-    xx[0] = reso->data[0]*(double)c2;
-    xx[1] = reso->data[1]*(double)r2;
-    xx[2] = reso->data[2]*(double)b2;
-  }
-  
+
   /* get cylinder struct */
   Cylinders *cyl = VCylinder(rim,metric,radius);
 
@@ -125,11 +119,6 @@ VImage VFindCyl(VImage zmap,VImage metric,VImage rim,double radius,VBoolean equi
       
       d1 = (x[0]-y[0])*(x[0]-y[0]) + (x[1]-y[1])*(x[1]-y[1]) + (x[2]-y[2])*(x[2]-y[2]);
       s += exp(-d1);
-      
-      if (b2 >= 0) {
-	d2 = (xx[0]-y[0])*(xx[0]-y[0]) + (xx[1]-y[1])*(xx[1]-y[1]) + (xx[2]-y[2])*(xx[2]-y[2]);
-	s += exp(-d2);
-      }
       nx++;
     }
     if (nx > 0.1) table[k] = s/nx;
@@ -148,63 +137,23 @@ VImage VFindCyl(VImage zmap,VImage metric,VImage rim,double radius,VBoolean equi
   }
   if (zmax < 0) VError(" no cylinder found");
 
-
-  /* map to dest image */
+  /* do..*/
   VImage dest = VCreateImageLike(zmap);
   VFillImage(dest,VAllBands,0);
-  VFloat u=0,z=0,w=0;
 
-  /* map a single cylinder that best matches the seed voxel */
-  if (single) {
-    if (strlen(txt_filename) > 0) fp = fopen(txt_filename,"w");
-    for (l=0; l<cyl->addr[k0]->size; l++) {
-      j = cyl->addr[k0]->data[l];
-      int b = gsl_matrix_int_get(cyl->xmap,j,0);
-      int r = gsl_matrix_int_get(cyl->xmap,j,1);
-      int c = gsl_matrix_int_get(cyl->xmap,j,2);
-      z = VPixel(zmap,b,r,c,VFloat);
-      u = VPixel(metric,b,r,c,VFloat);
-
-      if (fp != NULL) fprintf(fp," %f %f\n",u,z);  
-      w=0;
-      if (type == 0) w = u;
-      if (type == 1) w = z;
-      if (type == 2) w = 1;
-      VPixel(dest,b,r,c,VFloat) = w;
-    }
-    if (fp != NULL) fclose(fp);      
+  switch (type) {
+  case 0:
+    PrintBins(zmap,metric,dest,cyl,k0,txt_filename);
+    break;
+  case 1:
+    PrintPeak(zmap,metric,dest,cyl,k0,txt_filename);
+    break;
+  case 2:
+    PrintShape(zmap,metric,dest,cyl,k0,txt_filename);
+    break;
+  default:
+    VError(" unknown type");
   }
-
-  /* map all cylinders that match the seed voxel */
-  else {
-    fprintf(stderr," number of cylinders found: %lu\n",n);
-    VFillImage(wimage,VAllBands,0);
-    for (i=0; i<n; i++) {
-      k = match[i];
-      for (l=0; l<cyl->addr[k]->size; l++) {
-	j = cyl->addr[k]->data[l];
-	int b = gsl_matrix_int_get(cyl->xmap,j,0);
-	int r = gsl_matrix_int_get(cyl->xmap,j,1);
-	int c = gsl_matrix_int_get(cyl->xmap,j,2);
-	z = VPixel(zmap,b,r,c,VFloat);
-	u = VPixel(metric,b,r,c,VFloat);
-	w=0;
-	if (type == 0) w = u;
-	if (type == 1) w = z;
-	if (type == 2) w = 1;
-	VPixel(dest,b,r,c,VFloat) += w;
-	VPixel(wimage,b,r,c,VFloat) += 1;
-      }
-    }
-    if (type < 2) {
-      VFloat *pw = VImageData(wimage);
-      VFloat *px = VImageData(dest);
-      for (i=0; i<VImageNPixels(dest); i++) {
-	if (pw[i] > 0.001) { px[i] /= pw[i]; }
-      }
-    }
-  }
-
   return dest;
 }
 
@@ -216,32 +165,30 @@ typedef struct SpointStruct{
 } SPoint;
 
 VDictEntry TypDict[] = {
-  { "metric", 0, 0,0,0,0  },
-  { "zmap", 1, 0,0,0,0  },
-  { "cover", 2, 0,0,0,0  },
+  { "3bins", 0, 0,0,0,0  },
+  { "peak", 1, 0,0,0,0  },
+  { "shape", 2, 0,0,0,0  },
   { NULL, 0,0,0,0,0 }
 };
 
 int main (int argc, char **argv)
 {
-  static SPoint     addr1;
-  static SPoint     addr2;
+  static SPoint     addr;
   static VString    metric_filename="";
   static VString    rim_filename="";
   static VString    txt_filename="";
+  static VString    mask_filename="";
   static VFloat     radius = 2.0;
   static VShort     type = 0;
   static VBoolean   equivol = FALSE;
-  static VBoolean   single = TRUE;
   static VOptionDescRec options[] = {
-    {"seed1",VShortRepn,3,(VPointer) &addr1,VRequiredOpt,NULL,"Seed 1 (x,y,z)"},
-    {"seed2",VShortRepn,3,(VPointer) &addr2,VOptionalOpt,NULL,"Seed 2 (x,y,z)"},
+    {"seed",VShortRepn,3,(VPointer) &addr,VRequiredOpt,NULL,"Seed 1 (x,y,z)"},
     {"metric", VStringRepn,1,(VPointer) &metric_filename,VRequiredOpt,NULL,"metric image"},
     {"rim", VStringRepn,1,(VPointer) &rim_filename,VRequiredOpt,NULL,"rim image"},
-    {"report", VStringRepn,1,(VPointer) &txt_filename,VOptionalOpt,NULL,"output txt-file"},
+    {"mask", VStringRepn,1,(VPointer) &mask_filename,VOptionalOpt,NULL,"mask image"},
+    {"report", VStringRepn,1,(VPointer) &txt_filename,VRequiredOpt,NULL,"output txt-file"},
     {"radius", VFloatRepn,1,(VPointer) &radius,VOptionalOpt,NULL,"Cylinder radius in mm"},
     {"equivol", VBooleanRepn,1,(VPointer) &equivol,VOptionalOpt,NULL,"Equivolume correction"},
-    {"one", VBooleanRepn,1,(VPointer) &single,VOptionalOpt,NULL,"Whether to show only one cylinder"},
     {"type", VShortRepn,1,(VPointer) &type,VOptionalOpt,TypDict,"Output type"},
    };
   VString in_filename=NULL;
@@ -302,10 +249,31 @@ int main (int argc, char **argv)
   rim = Convert2Repn(rtmp,rim,VUByteRepn);
   VDestroyImage(rtmp);
 
-
-  /* add rim pts to metric image in case they are not included */
+  
+  /* mask image */
   VUByte *pu = VImageData(rim);
   VFloat *px = VImageData(metric);
+  VFloat *pz = VImageData(zmap);
+  VImage mask=NULL;
+  if (strlen(mask_filename) > 1) {
+    VAttrList mlist = VReadAttrList(mask_filename,0L,TRUE,FALSE);
+    if (mlist == NULL) VError(" error reading file %s",mask_filename);
+    VImage mtmp = VReadImage(mlist);
+    if (mtmp == NULL) VError(" err reading %s",mask_filename);
+    if (VImageNPixels(mtmp) != VImageNPixels(zmap))
+      VError(" inconsistent image dimensions: mask vs zmap");
+    mask = Convert2Repn(mtmp,mask,VBitRepn);
+    VDestroyImage(mtmp);
+  
+    VBit *pm = VImageData(mask);  /* apply mask, if present */
+    for (i=0; i<VImageNPixels(rim); i++) {
+      if (pm[i] == 0 || pu[i] == 0) { px[i] = 0; pu[i] = 0; pz[i] = 0; }
+    }
+  }
+
+  /* add rim pts to metric image in case they are not included */
+  pu = VImageData(rim);
+  px = VImageData(metric);
   for (i=0; i<VImageNPixels(rim); i++) {
     if (pu[i] == 1) px[i] = 1;
     if (pu[i] == 2) px[i] = 0.0001;
@@ -314,21 +282,14 @@ int main (int argc, char **argv)
   
   /* voxel address  */
   int b1=-1,r1=-1,c1=-1;
-  b1 = addr1.z;
-  r1 = addr1.y;
-  c1 = addr1.x;
-  fprintf(stderr," seed voxel 1:  %d  %d  %d \n",c1,r1,b1);
+  b1 = addr.z;
+  r1 = addr.y;
+  c1 = addr.x;
+  fprintf(stderr," seed voxel:  %d  %d  %d \n",c1,r1,b1);
 
-  int b2=-1,r2=-1,c2=-1;
-  if (b2 >= 0) {
-    b2 = addr2.z;
-    r2 = addr2.y;
-    c2 = addr2.x;
-    fprintf(stderr," seed voxel 2:  %d  %d  %d \n",c2,r2,b2);
-  }
 
   /* main */
-  VImage dest = VFindCyl(zmap,metric,rim,(double)radius,equivol,single,(int)type,txt_filename,b1,r1,c1,b2,r2,c2);
+  VImage dest = VFindCyl(zmap,metric,rim,(double)radius,equivol,(int)type,txt_filename,b1,r1,c1);
   
 
   /* output */

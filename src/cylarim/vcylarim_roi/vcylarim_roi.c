@@ -37,7 +37,7 @@ int main (int argc, char **argv)
   static VString  roi_filename="";
   static VString  metric_filename="";
   static VString  txt_filename="";
-  static VShort   nbins = 15;
+  static VShort   nbins = 5;
   static VOptionDescRec options[] = {
     {"metric", VStringRepn,1,(VPointer) &metric_filename,VRequiredOpt,NULL,"metric image"},
     {"out", VStringRepn,1,(VPointer) &txt_filename,VRequiredOpt,NULL,"Output txt file"},

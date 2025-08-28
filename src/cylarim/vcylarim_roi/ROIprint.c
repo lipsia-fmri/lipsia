@@ -9,11 +9,15 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_errno.h>
+#include <gsl/gsl_sort_vector.h>
+#include <gsl/gsl_sort.h>
+#include <gsl/gsl_statistics.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+
 
 
 void ROIprint(VImage zmap,VImage metric,VImage roi,int nbins,VString filename)
