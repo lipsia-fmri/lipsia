@@ -83,6 +83,8 @@ double Fraction(gsl_vector *beta)
   double z = 0;
   if (b > 0) z = 1.0 - x;
   if (b < 0) z = x;
+
+  /* clamping */
   if (z < 0) z = 0;
   if (z > 1) z = 1;
   return z;
