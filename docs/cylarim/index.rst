@@ -78,7 +78,7 @@ In this example, the cortical ribbon is divided into three depth strata ('deep',
 and two-sample tests are performed to obtain three contrasts:
 deep-middle, deep-superficial, and middle-superficial. 
 Z-values uncorrected for multiple comparisons
-are obtained using using permutation tests by randomly reassigning cortical depth values. 
+are obtained using permutation tests by randomly reassigning cortical depth values. 
 
 
 The program **vcylarim_probe** then
@@ -116,7 +116,7 @@ using a least-squares approach.
 The largest and smallest points of the fitted curve within the interval [0,1] are then
 identified and reported as the output.
 The resulting file "cyl_peaks_coeff.v" contains two volumes. The first volume
-shows valleys, the second shows the location of peaks.
+shows the location of valleys, the second shows the location of peaks.
    
 
 
