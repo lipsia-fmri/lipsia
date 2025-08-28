@@ -36,7 +36,6 @@ extern VImage Convert2Repn(VImage src,VImage dest,VRepnKind repn);
 extern Cylinders *VCylinder(VImage rim,VImage metric,double radius);
 extern void HistEqualize(Cylinders *,VImage,VImage,VImage);
 extern void GetResolution(VImage src,gsl_vector *reso);
-extern void PrintShape(VImage zmap,VImage metric,VImage dest,Cylinders *cyl,size_t cid,char *filename);
 extern void PrintPeak(VImage zmap,VImage metric,VImage dest,Cylinders *cyl,size_t cid,char *filename);
 extern void PrintBins(VImage zmap,VImage metric,VImage dest,Cylinders *cyl,size_t cid,char *filename);
 
@@ -148,9 +147,6 @@ VImage VFindCyl(VImage zmap,VImage metric,VImage rim,double radius,VBoolean equi
   case 1:
     PrintPeak(zmap,metric,dest,cyl,k0,txt_filename);
     break;
-  case 2:
-    PrintShape(zmap,metric,dest,cyl,k0,txt_filename);
-    break;
   default:
     VError(" unknown type");
   }
@@ -166,8 +162,7 @@ typedef struct SpointStruct{
 
 VDictEntry TypDict[] = {
   { "3bins", 0, 0,0,0,0  },
-  { "peak", 1, 0,0,0,0  },
-  { "shape", 2, 0,0,0,0  },
+  { "chebyshev", 1, 0,0,0,0  },
   { NULL, 0,0,0,0,0 }
 };
 

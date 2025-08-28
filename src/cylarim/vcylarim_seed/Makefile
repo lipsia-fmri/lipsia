@@ -4,7 +4,7 @@ CFLAGS  += -fopenmp
 
 
 PROG = vcylarim_seed
-SRC = vcylarim_seed.c PrintBins.c PrintShape.c PrintPeak.c ../cylutils/Cylinders.c ../cylutils/EHist.c ../cylutils/Conv.c
+SRC = vcylarim_seed.c PrintBins.c PrintPeak.c ../cylutils/Cylinders.c ../cylutils/EHist.c ../cylutils/Conv.c
 OBJ=$(SRC:.c=.o)
 
 ${PROG}: ${OBJ}
