@@ -35,11 +35,12 @@ Example:
 Parameters of 'vfdr'
 ````````````````````````````````
 
--help        Prints usage information.
--in          Input file.
--out         Output file.
--alpha       FDR significance level. Default: 0.05
--dependence  Dependence correction [true | false]. Default: false
+-help         Prints usage information.
+-in           Input file.
+-out          Output file.
+-alpha        FDR significance level. Default: 0.05
+-dependence   Dependence correction. Default: false
+
 
 
 .. index:: vfdr
