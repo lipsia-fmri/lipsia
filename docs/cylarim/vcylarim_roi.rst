@@ -13,7 +13,7 @@ Example:
 
  :: 
  
-   vcylarim_roi -in zmap.v -roi roi.nii -metric metric.v -nbins 20 -out list.txt
+   vcylarim_roi -in zmap.v -roi roi.nii -metric metric.v -nbins 15 -out list.txt
 
  
 
@@ -25,7 +25,7 @@ Parameters of 'vcylarim_roi'
 -out      Output txt file.
 -metric   Image containing the normalized cortical depths.
 -roi      Region of interest. Required.
--nbins    Number of bins. Default: 15
+-nbins    Number of bins. Default: 5
 
 
 .. index:: cylarim_roi

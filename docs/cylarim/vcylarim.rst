@@ -41,7 +41,10 @@ to obtain z-values for the tests to compare the three layers (deep, middle, supe
 During the permutations, a null distribution is estimated by randomly permuting the cortical depth values.
 If "-nperm" is set to zero, then no permutations are done, and crude approximations to these z-values are returned.
 
-Other types of analyses can also be computed as detailed in the list of parameters below.
+Other types of analyses can be computed as well. For example, by setting  **-concave true**, a 3D image is computed
+which shows the fraction of points per cylinder where the depth profile is "concave up".
+
+A complete list of analysis options is given below.
 
 
 Further Analyses
@@ -75,7 +78,7 @@ Parameters of 'vcylarim'
   -3bins    Compute three depth strata (bins) [ true | false ]. Default: false
   -nbins    Compute N depth strata (bins). Default: 0
   -peak     Compute peaks and valleys [ true | false ]. Default: false
-  -convex   Compute convexity/concavity [ true | false ]. Default: false
+  -concave  Compute concave up. Default: false
   -linear   Compute linear slopes [ true | false ]. Default: false
   -R2       Compute model fits [ true | false ]. Default: false
   -maxabs   Compute max absolute z-values [ true | false ]. Default: false
