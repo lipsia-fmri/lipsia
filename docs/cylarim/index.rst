@@ -51,6 +51,12 @@ The output of **vcylarim** is a set of files depending on the various type of an
 The output files are 4D images that can be further processed using the program **vcylarim_probe**.
 
 
+The input images can be either in Lipsia's own 'vista'-format (*.v), or in nifti-format (*.nii).
+The output images are always in 'vista'-format. They can be visualized using the viewer
+**vini** (github.com/MPI-Neuroinformatics/vini), or converted to nifti using the program **vnifti**
+and visualized using other neuroimaging tools.
+
+
 Some typical workflows are shown below. 
 
 
