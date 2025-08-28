@@ -120,6 +120,13 @@ shows the location of valleys, the second shows the location of peaks.
    
 
 
+Reference:
+^^^^^^^^^^^^^^^^^^^^^^
+
+ Lohmann, G. et al (2025), bioRxiv, Beyond ROIs: Laminar fMRI Mapping with Cylarim, https://doi.org/10.1101/2025.03.25.645237
+
+
+
 
 Contents
 ```````````````````````
