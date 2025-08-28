@@ -66,7 +66,7 @@ Example workflow 1
  
    vcylarim -in zmap.v -rim rim.v -metric metric.v -radius 2 -3bins true -nperm 1000 -out cyl
    
-   vcylarim_probe -in cyl_3bins_zvals.v -out result.v -type top_m
+   vcylarim_probe -in cyl_3bins_zvals.v -out result.v -type bottom_m
    
    vfdr -in result.v -out result_fdrcorrected.v -alpha 0.01
    
@@ -74,9 +74,18 @@ Example workflow 1
    
    
 
-The program **vcylarim_probe**
-identifies predominant middle layer activations ('-type top_m') using a conjunction analysis,
-and the next command uses "vfdr" to correct the result for the false discovery rate (FDR).
+In this example, the cortical ribbon is divided into three depth strata ('deep', 'middle', 'superficial'),
+and two-sample tests are performed to obtain three contrasts:
+deep-middle, deep-superficial, and middle-superficial. 
+Z-values uncorrected for multiple comparisons
+are obtained using using permutation tests by randomly reassigning cortical depth values. 
+
+
+The program **vcylarim_probe** then
+identifies predominant deep layer activations ('-type bottom_m') using a conjunction analysis
+in which the conjunction between the contrasts 'deep-middle' and 'deep-superficial'
+is computed.
+Finally, the resulting map is corrected for the false discovery rate (FDR) using a significance level of 0.01.
 The output image can be visualized either using the program **vini** or converted to
 nifti and visualized using other imaging software.
 
@@ -104,7 +113,6 @@ Example workflow 2
 In this example, the locations of peaks and valleys are estimated in each cylinder.
 It involves fitting a fourth-order Chebyshev polynomial to the z-values within each cylinder
 using a least-squares approach.
-A fourth-order polynomial was chosen to achieve a better balance between overfitting and underfitting
 The largest and smallest points of the fitted curve within the interval [0,1] are then
 identified and reported as the output.
 The resulting file "cyl_peaks_coeff.v" contains two volumes. The first volume
