@@ -41,7 +41,7 @@ Parameters of 'vcylarim_seed'
 -help     Prints usage information.
 -in       Input zmap file.
 -out      Output image file.
--report   Output txt file.
+-report   Output txt file for type 'chebyshev'.
 -metric   Image containing the normalized cortical depths.
 -rim      Rim image. Required.
 -radius   Cylinder radius in mm. Default: 2
