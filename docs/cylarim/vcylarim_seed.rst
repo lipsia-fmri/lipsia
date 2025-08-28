@@ -15,7 +15,8 @@ If "-type 3bins", then three output txt files will be produced called "deep.txt"
 in one of these three layers. Each row contains two values: the normalized cortical depth and the
 corresponding z-value of the input zmap.
 
-If "-type chebyshev", only one txt file will be produced. It has one row for each voxel in the selected
+If "-type chebyshev", only one txt file will be produced. Its name is specified using
+the parameter **--report**. It has one row for each voxel in the selected
 cylinder. And each row contains three values:  1) the normalized cortical depth,
 2) the corresponding z-value of the input zmap, 3) the value of the 
 fitted chebyshev polynomial of order 4 at that point.
@@ -30,7 +31,7 @@ Example:
 
  :: 
  
-   vcylarim_seed -in zmap.v -metric metric.v -rim rim.v -rad 2 -seed 20 30 43 -type 3bins -report list.txt -out z.v
+   vcylarim_seed -in zmap.v -metric metric.v -rim rim.v -rad 2 -seed 20 30 43 -type 3bins -out z.v
 
  
 
