@@ -23,7 +23,7 @@ fitted chebyshev polynomial of order 4 at that point.
 
 
 Input file formats can be either nifti (.nii) or vista (.v). The output image
-is in vista-format, and can be converted to nifti using the program *vnifti**.
+is in vista-format, and can be converted to nifti using the program **vnifti**.
 
 
 Example:
