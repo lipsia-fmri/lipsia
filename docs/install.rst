@@ -13,9 +13,9 @@ The easiest way to install Lipsia is via a singularity container. To build a sin
 This creates a container called "lipsia.sif". Its size is around 220 MByte.
 To execute programs within this container, do the following:
 
-> ./lipsia.sif exec vsml
+> ./lipsia.sif shell vcylarim
 
-This will execute the lipsia-program called "vsml". Other lipsia-programs can be called in a similar way.
+This will execute the lipsia-program called "vcylarim". Other lipsia-programs can be called in a similar way.
 
 
 
