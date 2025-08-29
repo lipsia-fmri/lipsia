@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM ubuntu:24.04
 
 RUN apt-get update && apt-get -y install build-essential libgsl0-dev libboost-dev zlib1g-dev git lsb-release libopenblas-dev 
 
