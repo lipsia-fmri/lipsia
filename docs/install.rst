@@ -6,14 +6,26 @@ How to install LIPSIA using Singularity
 -----------------------------------------
 
 
-The easiest way to install Lipsia is via a singularity container. To build a singularity container for lipsia, execute the following command:
+The easiest way is to download an existing singularity container. It is available for download from:
+https://keeper.mpdl.mpg.de/d/3c0f3564099145de8ccb/
+
+The container file is called "lipsia_4.1.1.sif". Its size is about 245 MByte.
+
+
+
+Alternatively, one can build a new singularity container for lipsia, execute the following command:
 
 > singularity build lipsia.sif ./singularity-recipe.txt 
 
-This creates a container called "lipsia.sif". Its size is around 220 MByte.
-To execute programs within this container, do the following:
+This creates a new container called "lipsia.sif". 
 
-> ./lipsia.sif shell vcylarim
+
+
+
+To execute programs within a singularity container, do the following:
+
+> singularity exec lipsia_4.1.1.sif vcylarim
+
 
 This will execute the lipsia-program called "vcylarim". Other lipsia-programs can be called in a similar way.
 
