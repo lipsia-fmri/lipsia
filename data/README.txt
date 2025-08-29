@@ -14,7 +14,7 @@ Huber et al (2017), "High-Resolution CBV-fMRI Allows Mapping of Laminar Activity
 
 "zmap_vaso.v" corresponds to Fig 3A of this publication ("tapping with touch").
 "ana_vaso.v" shows the underlying anatomy.
-"rim_vaso.v" is adapted from the grey/white matter segmentation used in this paper.
+"rim_vaso.v" is adapted from the grey/white matter segmentation used in Huber et al (2017).
 "metric_vaso.v" was generated from "rim_vaso.v" using the program "vmetric".
 
 
