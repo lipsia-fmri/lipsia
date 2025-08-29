@@ -8,6 +8,7 @@ The file "zmap_M.v" is synthetically generated to simulate an activation map wit
 
 
 
+
 The files "ana_vaso.v" and "zmap_vaso.v" are taken from the following publication:
 Huber et al (2017), "High-Resolution CBV-fMRI Allows Mapping of Laminar Activity and Connectivity of Cortical Input and Output in Human M1", Neuron, Vol 96.
 
@@ -16,3 +17,10 @@ Huber et al (2017), "High-Resolution CBV-fMRI Allows Mapping of Laminar Activity
 "rim_vaso.v" is adapted from the grey/white matter segmentation used in this paper.
 "metric_vaso.v" was generated from "rim_vaso.v" using the program "vmetric".
 
+
+
+
+The files called "*_Ding.v" are imported from
+https://github.com/layerfMRI/LAYNIIi/test_data/
+"ana_Ding.v" corresponds to Ding2016_occip_T2starweighted_filtered_for_tests.nii.gz
+"rim_Ding.v" corresponds to Ding2016_occip_rim.nii.gz
