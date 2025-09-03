@@ -31,17 +31,6 @@
 #include <omp.h>
 #endif /*_OPENMP*/
 
-/*
-void XWriteOutput(VImage image,VAttrList geolist,char *filename)
-{
-  VAttrList out_list = VCreateAttrList();
-  VSetGeoInfo(geolist,out_list);
-  VAppendAttr(out_list,"image",NULL,VImageRepn,image);
-  FILE *fp = fopen(filename,"w");
-  if (! VWriteFile (fp, out_list)) exit (1);
-  fclose(fp);
-}
-*/
 
 
 int verbose=1;
@@ -80,7 +69,8 @@ int CheckConnected(VImage rim,int b1,int r1,int c1,int b2,int r2,int c2)
     if (c < 0 || c >= ncols) continue;
     if (b==b1 && r==r1 && c==c1) continue;
     if (b==b2 && r==r2 && c==c2) continue;
-    if (VPixel(rim,b,r,c,VUByte) != 3) return -1;  /* not inside grey matter */
+    /*  if (VPixel(rim,b,r,c,VUByte) != 3) return -1; */
+    if (VPixel(rim,b,r,c,VUByte) == 0) return -1;  /* not inside cortex */
   }
   return 1;
 }
@@ -423,13 +413,7 @@ Cylinders *VCylinder(VImage rim,VImage metric,double radius,VBoolean include_rim
     VPixel(mapimage,b2,r2,c2,VInteger) = i;
   }
 
-  /*
-  VSetAttr(VImageAttrList(xmapimage),"voxel",NULL,VStringRepn,"0.1 0.1 0.1");
-  XWriteOutput(xmapimage,NULL,"xmap.v");
-  exit(0);
-  */
 
-  
   /* bipartite graph, assignment problem */
   int *match1 = (int *)VCalloc(n1,sizeof(int));
   int *match2 = (int *)VCalloc(n2,sizeof(int));

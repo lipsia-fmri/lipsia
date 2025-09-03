@@ -101,9 +101,6 @@ int PrepStats(VImage zmap,VImage metric,Cylinders *cyl,size_t cid,gsl_vector *y,
     if (fabs(z) < TINY) continue;
     mvec->data[j] = w;
     y->data[j] = z;
-
-    /* if (c==416 && r==104 && b==5) verbose = 1; */
-    /* if (c==77 && r==48 && b==50) verbose = 1; */
     j++;
   }
   return verbose;
@@ -148,7 +145,6 @@ void WriteStats(Cylinders *cyl,size_t k,VImage rim,gsl_vector *beta,VImage *coef
     int b = gsl_matrix_int_get(cyl->xmap,l,0);
     int r = gsl_matrix_int_get(cyl->xmap,l,1);
     int c = gsl_matrix_int_get(cyl->xmap,l,2);
-    if (VPixel(rim,b,r,c,VUByte) != 3) continue;
 
 #pragma omp critical
     {
@@ -161,10 +157,11 @@ void WriteStats(Cylinders *cyl,size_t k,VImage rim,gsl_vector *beta,VImage *coef
 
 
 /* normalize images */
-void WNormalizeImage(VImage *coeff,int ncoeff,VImage wimage)
+void WNormalizeImage(VImage *coeff,int ncoeff,VImage wimage,VImage rim)
 {
   size_t i,j;
   VFloat *pw = VImageData(wimage);
+  VUByte *pu = VImageData(rim);
   VFloat *pb = NULL;
   float wmin = 0.01;
   for (j=0; j<ncoeff; j++) {
@@ -173,6 +170,7 @@ void WNormalizeImage(VImage *coeff,int ncoeff,VImage wimage)
       if (pw[i] > wmin) pb[i] /= pw[i];
       else pb[i] = 0;
       if (gsl_finite((double)pb[i])==0) pb[i] = 0;
+      if (pu[i] != 3) pb[i] = 0;  /* exclude rim border voxels */
     }
   }
 }
@@ -226,19 +224,6 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
       gsl_vector_free(mvec);
       continue;
     }
-    /*
-    if (verbose) {
-      VFillImage(convex_coeff,VAllBands,0);
-      for (i=0; i<cyl->addr[k]->size; i++) {
-	size_t j = cyl->addr[k]->data[i];
-	int b = gsl_matrix_int_get(cyl->xmap,j,0);
-	int r = gsl_matrix_int_get(cyl->xmap,j,1);
-	int c = gsl_matrix_int_get(cyl->xmap,j,2);
-	VPixel(convex_coeff,b,r,c,VFloat) = 1;
-      }
-      return NULL;
-    }
-    */
     
     if (x3bins) {
       gsl_vector *beta = gsl_vector_calloc(n3bins);
@@ -304,7 +289,6 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
 	int r = gsl_matrix_int_get(cyl->xmap,l,1);
 	int c = gsl_matrix_int_get(cyl->xmap,l,2);
 	VPixel(zabsimage,b,r,c,VFloat) += zmax;
-	if (VPixel(rim,b,r,c,VUByte) != 3) continue;
 	VPixel(wimage,b,r,c,VFloat) += 1.0;
       }
     }
@@ -313,25 +297,25 @@ VImage Cylarim(VImage zmap,VImage metric,VImage rim,double radius,
   
   /* normalize images */
   if (x3bins) {
-    WNormalizeImage(bin3_coeff,(int)n3bins,wimage);
-    WNormalizeImage(bin3_perm,(int)p3bins,wimage);
+    WNormalizeImage(bin3_coeff,(int)n3bins,wimage,rim);
+    WNormalizeImage(bin3_perm,(int)p3bins,wimage,rim);
   }
   if (nbins > 0) {
-    WNormalizeImage(nbin_coeff,(int)nbins,wimage);
+    WNormalizeImage(nbin_coeff,(int)nbins,wimage,rim);
   }
   if (xpeak) {
-    WNormalizeImage(peak_coeff,(int)npeak,wimage);
+    WNormalizeImage(peak_coeff,(int)npeak,wimage,rim);
   }
   if (xconvex) {
-    WNormalizeImage(&convex_coeff,(int)1,wimage);
+    WNormalizeImage(&convex_coeff,(int)1,wimage,rim);
   }
   if (xlinear) {
-    WNormalizeImage(&linear_coeff,(int)1,wimage);
+    WNormalizeImage(&linear_coeff,(int)1,wimage,rim);
   }
   if (xR2) {
-    WNormalizeImage(R2_coeff,(int)nR2,wimage);
+    WNormalizeImage(R2_coeff,(int)nR2,wimage,rim);
   }
-  WNormalizeImage(&zabsimage,(int)1,wimage);
+  WNormalizeImage(&zabsimage,(int)1,wimage,rim);
   return zabsimage;
 }
 
