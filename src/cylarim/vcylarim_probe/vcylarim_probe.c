@@ -18,7 +18,26 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <libgen.h>
 
+
+/* check if file is in Nifti format */
+int CheckNifti(char *filename)
+{
+  fprintf(stderr," %s\n",filename);
+  int nii=0;
+  char *base = basename(filename);
+  size_t len = strlen(base);
+  if (len > 6) {
+    char *start1 = base + (len - 6);
+    if (strncmp(start1,"nii.gz",6)==0) nii=1;
+  }
+  if (len > 3) {
+    char *start2 = base + (len - 3);
+    if (strncmp(start2,"nii",3)==0) nii=1;
+  }
+  return nii;
+}
 
 float Conjunction(float u,float v)
 {
@@ -215,39 +234,19 @@ int main(int argc, char *argv[])
   if (list == NULL) VError(" error reading input file %s",in_file);
 
   
-  /* get name */
-  VString cbuf;
-  /*
-    int i,j;
-  char cbuf1[30],cbuf2[30];
-  memset(cbuf1,0,sizeof(cbuf1));
-  memset(cbuf2,0,sizeof(cbuf2));
-  ntype=0,stype=0;
-  */
-  if (VGetAttr (list, "name", NULL,VStringRepn, (VPointer) & cbuf) == VAttrFound) {
-    fprintf(stderr," name: %s\n",cbuf);
-    if (strcmp(cbuf,"zabs")==0)  VError(" nothing to be done on a 'zabs' image");
-    /*
-    i=0;
-    while (cbuf[i] != '_') { cbuf1[i]=cbuf[i]; i++; }
-    i++;
-    j=0;
-    while (i<strlen(cbuf)) {
-      cbuf2[j++]=cbuf[i++];
+  /* some plausibility checks (only available for vista-format) */
+  int nii = CheckNifti(in_file);
+  if (nii==0) {
+    VString cbuf;
+    if (VGetAttr (list, "name", NULL,VStringRepn, (VPointer) & cbuf) == VAttrFound) {
+      fprintf(stderr," name: %s\n",cbuf);
+      if (strcmp(cbuf,"zabs")==0)  VError(" nothing to be done on a 'zabs' image");
     }
-    if (strcmp(cbuf1,"3bins")==0) ntype = 0;
-    else if (strcmp(cbuf1,"peak")==0) ntype = 1;
-    else if (strcmp(cbuf1,"shape")==0) ntype = 2;
-    else if (strcmp(cbuf1,"R2")==0) ntype = 3;
-
-    if (strcmp(cbuf2,"coeffs")==0) stype = 0;
-    else if (strcmp(cbuf2,"stats")==0) stype = 1;
-    */
+    if (type > 1 && type < 7 && strcmp(cbuf,"3bins_zvals") != 0 )
+      VError(" type '%s' only available for '3bins_zvals', not for '%s' ",TypDict[type].keyword,cbuf);
+    if (type == 9 && strcmp(cbuf,"3bins_coeff") != 0 )
+      VError(" type '%s' only available for '3bins_coeff', not for '%s' ",TypDict[type].keyword,cbuf);
   }
-  if (type > 1 && type < 7 && strcmp(cbuf,"3bins_zvals") != 0 )
-    VError(" type '%s' only available for '3bins_zvals', not for '%s' ",TypDict[type].keyword,cbuf);
-  if (type == 9 && strcmp(cbuf,"3bins_coeff") != 0 )
-    VError(" type '%s' only available for '3bins_coeff', not for '%s' ",TypDict[type].keyword,cbuf);
 
   
   /* ini functional data struct  */
@@ -268,10 +267,11 @@ int main(int argc, char *argv[])
   VFillImage(btmp,VAllBands,0);
   VFillImage(ctmp,VAllBands,0);
 
+  
   /* cases */
   switch (type) {
   case 0:
-    if (slice < 0 || slice >= nimages) VError(" slice %d not available in '%s' ",slice,cbuf);
+    if (slice < 0 || slice >= nimages) VError(" slice %d not available",slice);
     SelectSlice(src,(int)slice,dest);
     if (xinvert) {
       VImageInvert(dest);
@@ -286,6 +286,7 @@ int main(int argc, char *argv[])
     break;
     
   case 2:   /* top_m */
+
     SelectSlice(src,(int)0,atmp);
     SelectSlice(src,(int)2,btmp);
     VImageInvert(atmp);
