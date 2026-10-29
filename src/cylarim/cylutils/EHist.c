@@ -18,7 +18,7 @@ extern void gsl_sort_float(float *,size_t,size_t);
 /*
 ** equivolume layering via histogram equalization
 */
-void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric,VImage rim,VAttrList geolist)
+void HistEqualize(Cylinders *cyl,VImage wimage,VImage metric,VImage rim)
 {
   int b,r,c;
   size_t i,j,k,n;
